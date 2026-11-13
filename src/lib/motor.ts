@@ -1,6 +1,9 @@
 // Endereço do app da web do Apps Script (motor da agenda/pasta CFP). Vazio = só o gatilho de 5 minutos.
-export const URL_MOTOR =
+const URL_PRODUCAO =
   'https://script.google.com/macros/s/AKfycbwDzHy0XviM9Lg0Jh0SK3qsNmUW9-paBHxgSL7AYcGpfIp5jHF5VW76Gl7_KHZ5CKj3/exec';
+
+// Nos testes (emulador) o motor real nunca é chamado.
+export const URL_MOTOR = import.meta.env.VITE_USE_EMULATORS === 'true' ? '' : URL_PRODUCAO;
 
 /**
  * Avisa o motor para rodar agora. Não espera resposta e nunca atrapalha o salvamento:
