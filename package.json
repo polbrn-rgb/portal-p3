@@ -1,0 +1,36 @@
+{
+  "name": "portal-p3",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "vite",
+    "dev:emulador": "vite --mode emulador",
+    "emuladores": "firebase emulators:start --only auth,firestore --project demo-portal-p3",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:regras": "firebase emulators:exec --only firestore --project demo-portal-p3 \"vitest run -c vitest.rules.config.ts\"",
+    "test:e2e": "playwright test",
+    "test:tudo": "npm run typecheck && npm test && npm run test:regras && npm run test:e2e"
+  },
+  "dependencies": {
+    "firebase": "^12.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "firebase-tools": "^14.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0"
+  }
+}

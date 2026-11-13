@@ -1,0 +1,76 @@
+/* Cores provisórias: serão trocadas pelas do Portal Operacional P/3 atual. */
+:root {
+  --cor-primaria: #0b3d91;
+  --cor-fundo: #f3f5f9;
+  --cor-cartao: #ffffff;
+  --cor-texto: #1b1f27;
+  --cor-suave: #5b6372;
+  --raio: 12px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--cor-texto);
+  background: var(--cor-fundo);
+  -webkit-text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+/* Celular primeiro; telas maiores só ganham espaço. */
+.tela {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 0 max(16px, env(safe-area-inset-bottom));
+}
+
+.topo {
+  background: var(--cor-primaria);
+  color: #fff;
+  padding: max(20px, env(safe-area-inset-top)) 16px 20px;
+}
+
+.topo h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.topo p {
+  margin: 4px 0 0;
+  opacity: 0.85;
+}
+
+.cartao {
+  background: var(--cor-cartao);
+  border-radius: var(--raio);
+  margin: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.cartao h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.cartao p {
+  margin: 0;
+  color: var(--cor-suave);
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .topo {
+    border-radius: 0 0 var(--raio) var(--raio);
+    padding-inline: 24px;
+  }
+  .cartao {
+    margin: 24px;
+  }
+}
