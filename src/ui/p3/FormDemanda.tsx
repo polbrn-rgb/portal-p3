@@ -230,7 +230,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
         </div>
       </fieldset>
 
-      <fieldset className="cartao grupo">
+      <fieldset className="cartao grupo bloco-largo">
         <legend>Complemento</legend>
         <Campo rotulo="Resposta" erro={erros.resposta}>
           <textarea rows={3} value={dados.resposta} onChange={(e) => mudar('resposta', e.target.value)} />

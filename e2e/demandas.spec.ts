@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar } from './ajuda';
+import { entrar, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ page }, info) => {
@@ -56,4 +56,14 @@ test('Cia não vê o cadastro de demandas', async ({ page }) => {
   await entrar(page, '2cia', SENHA_TESTE);
   await expect(page.getByRole('heading', { name: '2ª CIA' })).toBeVisible();
   await expect(page.getByRole('link', { name: '+ Nova demanda' })).toHaveCount(0);
+});
+
+test('lista e formulário cabem na tela, no celular e no computador', async ({ page }) => {
+  await entrar(page, 'p3', SENHA_TESTE);
+  await expect(page.getByRole('heading', { name: 'Demandas', level: 2 })).toBeVisible();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await expect(page.getByRole('heading', { name: 'Nova demanda' })).toBeVisible();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });

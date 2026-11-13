@@ -27,8 +27,7 @@ body {
 
 /* Celular primeiro; telas maiores só ganham espaço. */
 .tela {
-  max-width: 960px;
-  margin: 0 auto;
+  --margem: max(16px, calc((100% - 1200px) / 2));
   padding: 0 0 max(16px, env(safe-area-inset-bottom));
 }
 
@@ -36,7 +35,7 @@ body {
   background: linear-gradient(90deg, var(--cor-primaria) 0%, var(--cor-secundaria) 100%);
   border-bottom: 4px solid var(--cor-destaque);
   color: #fff;
-  padding: max(20px, env(safe-area-inset-top)) 16px 20px;
+  padding: max(20px, env(safe-area-inset-top)) var(--margem) 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -296,6 +295,21 @@ a.botao {
   font-size: 0.9rem;
 }
 
+/* No celular as informações viram uma linha: "Categoria · Destinos · Prazo". */
+.item-info > span:not(:first-child):not(:empty)::before {
+  content: ' · ';
+}
+
+.cabecalho-lista {
+  display: none;
+}
+
+.controles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .selo {
   font-size: 0.8rem;
   font-weight: 700;
@@ -419,12 +433,110 @@ a.botao {
   }
 }
 
-@media (min-width: 768px) {
-  .topo {
-    border-radius: 0 0 var(--raio) var(--raio);
-    padding-inline: 24px;
+/* Conteúdo acompanha a largura do topo (até 1200px) no computador. */
+.tela > .cartao {
+  margin-inline: var(--margem);
+}
+
+/* No celular o próprio painel já tem 16px de respiro. */
+.painel {
+  margin-inline: calc(var(--margem) - 16px);
+}
+
+.tela > .formulario {
+  margin-inline: 16px;
+}
+
+@media (min-width: 480px) {
+  .tela > .formulario {
+    margin: 48px auto;
+    width: 420px;
   }
-  .cartao {
-    margin: 24px;
+}
+
+/* ---------- Computador ---------- */
+@media (min-width: 1024px) {
+  .painel {
+    margin-inline: var(--margem);
+    padding-inline: 0;
+  }
+
+  .controles {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 12px;
+    align-items: center;
+  }
+
+  /* Lista vira tabela: uma linha por demanda, colunas alinhadas. */
+  .cabecalho-lista,
+  .item-demanda {
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr) 180px 160px 180px 120px;
+    column-gap: 16px;
+    align-items: center;
+  }
+
+  .cabecalho-lista {
+    padding: 0 14px 0 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--cor-suave);
+  }
+
+  .lista {
+    gap: 6px;
+  }
+
+  .item-demanda {
+    padding: 10px 14px;
+  }
+
+  .item-demanda:hover {
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+  }
+
+  .item-topo,
+  .item-info {
+    display: contents;
+  }
+
+  .item-num { grid-area: 1 / 1; }
+  .item-saida { grid-area: 1 / 2; }
+  .item-cat { grid-area: 1 / 3; }
+  .item-dest { grid-area: 1 / 4; }
+  .item-prazo { grid-area: 1 / 5; }
+  .item-topo .selo { grid-area: 1 / 6; justify-self: start; }
+
+  .item-info > span:not(:first-child):not(:empty)::before {
+    content: none;
+  }
+
+  .item-info > span {
+    color: var(--cor-suave);
+    font-size: 0.9rem;
+  }
+
+  /* Formulário em duas colunas de blocos. */
+  .formulario-demanda {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .formulario-demanda > .painel-cabecalho,
+  .formulario-demanda > .bloco-largo,
+  .formulario-demanda > .mensagem,
+  .formulario-demanda > .barra-acoes {
+    grid-column: 1 / -1;
+  }
+
+  .barra-acoes {
+    justify-content: flex-end;
+  }
+
+  .barra-acoes > * {
+    flex: 0 0 160px;
   }
 }

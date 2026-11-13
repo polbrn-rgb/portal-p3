@@ -74,30 +74,32 @@ export function ListaDemandas() {
         </button>
       </div>
 
-      <input
-        className="busca"
-        type="search"
-        placeholder="Buscar por número, assunto, Cia, responsável…"
-        aria-label="Buscar demandas"
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-      />
+      <div className="controles">
+        <input
+          className="busca"
+          type="search"
+          placeholder="Buscar por número, assunto, Cia, responsável…"
+          aria-label="Buscar demandas"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+        />
 
-      {aba === 'abertas' && (
-        <div className="filtros" aria-label="Filtrar por situação">
-          {FILTROS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              className={`filtro filtro-${f}`}
-              aria-pressed={filtro === f}
-              onClick={() => setFiltro(f)}
-            >
-              {f === 'todas' ? 'Todas' : ROTULO_SITUACAO[f]} {contagem[f] ?? 0}
-            </button>
-          ))}
-        </div>
-      )}
+        {aba === 'abertas' && (
+          <div className="filtros" aria-label="Filtrar por situação">
+            {FILTROS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`filtro filtro-${f}`}
+                aria-pressed={filtro === f}
+                onClick={() => setFiltro(f)}
+              >
+                {f === 'todas' ? 'Todas' : ROTULO_SITUACAO[f]} {contagem[f] ?? 0}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {erro && (
         <p className="mensagem erro" role="alert">
@@ -107,6 +109,16 @@ export function ListaDemandas() {
       {carregando && <p className="carregando">Carregando…</p>}
       {!carregando && !erro && visiveis.length === 0 && <p className="vazio">Nenhuma demanda encontrada.</p>}
 
+      {visiveis.length > 0 && (
+        <div className="cabecalho-lista" aria-hidden="true">
+          <span>Nº</span>
+          <span>Saída</span>
+          <span>Categoria</span>
+          <span>Destinos</span>
+          <span>Prazo</span>
+          <span>Situação</span>
+        </div>
+      )}
       <ul className="lista">
         {visiveis.map((d) => (
           <li key={d.id}>
@@ -131,11 +143,15 @@ function ItemDemanda({ demanda: d, hoje }: { demanda: Demanda; hoje: string }) {
   return (
     <a className={`item-demanda borda-${situacao}`} href={`#/demanda/${d.id}`}>
       <span className="item-topo">
-        <strong>Nº {d.numero}</strong>
+        <strong className="item-num">Nº {d.numero}</strong>
         <span className={`selo selo-${situacao}`}>{ROTULO_SITUACAO[situacao]}</span>
       </span>
       <span className="item-saida">{d.saida}</span>
-      <span className="item-info">{[d.categoria, destinos, prazo].filter(Boolean).join(' · ')}</span>
+      <span className="item-info">
+        <span className="item-cat">{d.categoria}</span>
+        <span className="item-dest">{destinos}</span>
+        <span className="item-prazo">{prazo}</span>
+      </span>
     </a>
   );
 }
