@@ -5,9 +5,9 @@ import { mensagemErroLogin } from '../../src/domain/mensagens';
 
 describe('contas', () => {
   test('P/3 usa o e-mail principal e as Cias usam +id', () => {
-    expect(emailDaConta('p3')).toBe('8bpmm@gmail.com');
-    expect(emailDaConta('1cia')).toBe('8bpmm+1cia@gmail.com');
-    expect(emailDaConta('ft')).toBe('8bpmm+ft@gmail.com');
+    expect(emailDaConta('p3')).toBe('8bpmmp3@gmail.com');
+    expect(emailDaConta('1cia')).toBe('8bpmmp3+1cia@gmail.com');
+    expect(emailDaConta('ft')).toBe('8bpmmp3+ft@gmail.com');
   });
 
   test('são 8 contas: P/3 + 7 unidades, sem e-mail repetido', () => {

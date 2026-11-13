@@ -1,8 +1,8 @@
 import { UNIDADES, type UnidadeId } from './unidades';
 
-// Conta única da P/3. As Cias usam o mesmo Gmail com "+id" (ex.: 8bpmm+1cia@gmail.com):
+// Conta única da P/3. As Cias usam o mesmo Gmail com "+id" (ex.: 8bpmmp3+1cia@gmail.com):
 // o Gmail entrega tudo na caixa da P/3, então o link de troca de senha chega para vocês.
-export const EMAIL_P3 = '8bpmm@gmail.com';
+export const EMAIL_P3 = '8bpmmp3@gmail.com';
 
 export type ContaId = 'p3' | UnidadeId;
 export type Claims = { perfil: 'p3' } | { perfil: 'unidade'; unidade: UnidadeId };
