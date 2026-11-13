@@ -1,0 +1,141 @@
+import { useEffect, useMemo, useState } from 'react';
+import { buscarConcluidas } from '../../data/demandas';
+import { formatarData, hojeISO } from '../../domain/datas';
+import type { Demanda } from '../../domain/demanda';
+import { filtrarDemandas, ROTULO_SITUACAO, situacaoDaDemanda, type Situacao } from '../../domain/situacao';
+import { siglaDoDestino } from '../../domain/unidades';
+import { db } from '../../lib/firebase';
+import { useDemandasAbertas } from '../../lib/useDemandasAbertas';
+
+type Aba = 'abertas' | 'concluidas';
+const FILTROS: (Situacao | 'todas')[] = ['todas', 'atrasado', 'vence_hoje', 'cia_atrasada', 'em_aberto'];
+
+export function ListaDemandas() {
+  const hoje = hojeISO();
+  const [aba, setAba] = useState<Aba>('abertas');
+  const [texto, setTexto] = useState('');
+  const [filtro, setFiltro] = useState<Situacao | 'todas'>('todas');
+  const abertas = useDemandasAbertas();
+
+  const [concluidas, setConcluidas] = useState<Demanda[]>([]);
+  const [temMais, setTemMais] = useState(true);
+  const [carregandoMais, setCarregandoMais] = useState(false);
+  const [erroConcluidas, setErroConcluidas] = useState('');
+
+  async function carregarMais() {
+    setCarregandoMais(true);
+    setErroConcluidas('');
+    try {
+      const ultima = concluidas.at(-1)?.numero;
+      const pagina = await buscarConcluidas(db, ultima);
+      setConcluidas((atual) => [...atual, ...pagina.lista]);
+      setTemMais(pagina.temMais);
+    } catch {
+      setErroConcluidas('Não foi possível carregar as concluídas.');
+    }
+    setCarregandoMais(false);
+  }
+
+  useEffect(() => {
+    if (aba === 'concluidas' && concluidas.length === 0 && temMais && !carregandoMais) void carregarMais();
+    // carrega a primeira página só quando a aba é aberta
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aba]);
+
+  const contagem = useMemo(() => {
+    const c: Record<string, number> = { todas: abertas.lista.length };
+    for (const d of abertas.lista) {
+      const s = situacaoDaDemanda(d, hoje);
+      c[s] = (c[s] ?? 0) + 1;
+    }
+    return c;
+  }, [abertas.lista, hoje]);
+
+  const base = aba === 'abertas' ? abertas.lista : concluidas;
+  const visiveis = filtrarDemandas(base, texto, aba === 'abertas' ? filtro : 'todas', hoje);
+  const carregando = aba === 'abertas' ? abertas.carregando : carregandoMais && concluidas.length === 0;
+  const erro = aba === 'abertas' ? abertas.erro : erroConcluidas;
+
+  return (
+    <section className="painel">
+      <div className="painel-cabecalho">
+        <h2>Demandas</h2>
+        <a className="botao destaque botao-novo" href="#/nova">
+          + Nova demanda
+        </a>
+      </div>
+
+      <div className="abas" role="tablist">
+        <button type="button" role="tab" aria-selected={aba === 'abertas'} onClick={() => setAba('abertas')}>
+          Abertas ({abertas.lista.length})
+        </button>
+        <button type="button" role="tab" aria-selected={aba === 'concluidas'} onClick={() => setAba('concluidas')}>
+          Concluídas
+        </button>
+      </div>
+
+      <input
+        className="busca"
+        type="search"
+        placeholder="Buscar por número, assunto, Cia, responsável…"
+        aria-label="Buscar demandas"
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+      />
+
+      {aba === 'abertas' && (
+        <div className="filtros" aria-label="Filtrar por situação">
+          {FILTROS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={`filtro filtro-${f}`}
+              aria-pressed={filtro === f}
+              onClick={() => setFiltro(f)}
+            >
+              {f === 'todas' ? 'Todas' : ROTULO_SITUACAO[f]} {contagem[f] ?? 0}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {erro && (
+        <p className="mensagem erro" role="alert">
+          {erro}
+        </p>
+      )}
+      {carregando && <p className="carregando">Carregando…</p>}
+      {!carregando && !erro && visiveis.length === 0 && <p className="vazio">Nenhuma demanda encontrada.</p>}
+
+      <ul className="lista">
+        {visiveis.map((d) => (
+          <li key={d.id}>
+            <ItemDemanda demanda={d} hoje={hoje} />
+          </li>
+        ))}
+      </ul>
+
+      {aba === 'concluidas' && temMais && concluidas.length > 0 && (
+        <button className="botao secundario" type="button" disabled={carregandoMais} onClick={carregarMais}>
+          {carregandoMais ? 'Carregando…' : 'Carregar mais'}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function ItemDemanda({ demanda: d, hoje }: { demanda: Demanda; hoje: string }) {
+  const situacao = situacaoDaDemanda(d, hoje);
+  const destinos = d.destinos.map(siglaDoDestino).join(', ');
+  const prazo = d.prazoCPA ? `Prazo CPA ${formatarData(d.prazoCPA)}` : d.prazoCia ? `Prazo Cia ${formatarData(d.prazoCia)}` : '';
+  return (
+    <a className={`item-demanda borda-${situacao}`} href={`#/demanda/${d.id}`}>
+      <span className="item-topo">
+        <strong>Nº {d.numero}</strong>
+        <span className={`selo selo-${situacao}`}>{ROTULO_SITUACAO[situacao]}</span>
+      </span>
+      <span className="item-saida">{d.saida}</span>
+      <span className="item-info">{[d.categoria, destinos, prazo].filter(Boolean).join(' · ')}</span>
+    </a>
+  );
+}

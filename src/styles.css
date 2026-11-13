@@ -161,6 +161,264 @@ body {
   color: #1d5c1a;
 }
 
+.botao.secundario {
+  background: #fff;
+  color: var(--cor-primaria);
+  border: 1px solid #c8cdd6;
+  font-weight: 600;
+}
+
+a.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
+/* ---------- Demandas ---------- */
+.painel {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.painel-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.painel-cabecalho h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.abas {
+  display: flex;
+  background: #fff;
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+
+.abas button {
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cor-secundaria);
+}
+
+.abas button[aria-selected='true'] {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
+.busca {
+  font: inherit;
+  font-size: 16px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #c8cdd6;
+  border-radius: 8px;
+  width: 100%;
+}
+
+/* Filtros deslizam para o lado no celular, sem quebrar a tela. */
+.filtros {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.filtro {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #c8cdd6;
+  background: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.filtro[aria-pressed='true'] {
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria);
+  color: #fff;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item-demanda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #fff;
+  border-radius: var(--raio);
+  padding: 12px 14px;
+  border-left: 6px solid var(--cor-secundaria);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
+  color: inherit;
+  text-decoration: none;
+}
+
+.item-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-saida {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.item-info {
+  color: var(--cor-suave);
+  font-size: 0.9rem;
+}
+
+.selo {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.selo-em_aberto { background: #e7f1fb; color: #1d4f86; }
+.selo-cia_atrasada { background: #f9eeda; color: #7a4b00; }
+.selo-vence_hoje { background: #f9ece7; color: #9a3412; }
+.selo-atrasado { background: #fbebeb; color: #8a1c1c; }
+.selo-concluido { background: #e5f4e4; color: #1d5c1a; }
+
+.borda-cia_atrasada { border-left-color: #e0a100; }
+.borda-vence_hoje { border-left-color: #ea7a2c; }
+.borda-atrasado { border-left-color: var(--cor-destaque); }
+.borda-concluido { border-left-color: #3c9a37; }
+
+.painel .cartao {
+  margin: 0;
+}
+
+.vazio {
+  text-align: center;
+  color: var(--cor-suave);
+  margin: 24px 0;
+}
+
+.botao-novo {
+  white-space: nowrap;
+}
+
+/* ---------- Formulário de demanda ---------- */
+.grupo {
+  margin: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grupo legend {
+  float: left;
+  width: 100%;
+  font-weight: 700;
+  color: var(--cor-secundaria);
+  margin-bottom: 4px;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.campo textarea {
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  padding: 8px 12px;
+  border: 1px solid #c8cdd6;
+  border-radius: 8px;
+  width: 100%;
+  resize: vertical;
+}
+
+.erro-campo {
+  color: #8a1c1c;
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opcao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #c8cdd6;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.opcao input {
+  width: 18px;
+  height: 18px;
+}
+
+.opcao.coberta {
+  opacity: 0.55;
+}
+
+/* Botões sempre à mão no celular. */
+.barra-acoes {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+  background: var(--cor-fundo);
+}
+
+.barra-acoes > * {
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .grade {
+    grid-template-columns: 1fr 1fr;
+  }
+  .painel {
+    padding: 24px;
+  }
+}
+
 @media (min-width: 768px) {
   .topo {
     border-radius: 0 0 var(--raio) var(--raio);

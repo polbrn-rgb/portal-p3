@@ -22,6 +22,18 @@ export type UnidadeId = (typeof UNIDADES)[number]['id'];
 export type RegistroId = (typeof DESTINOS_REGISTRO)[number]['id'];
 export type DestinoId = UnidadeId | RegistroId | 'TODAS';
 
+/** Ordem oficial de exibição de todos os destinos. */
+export const ORDEM_DESTINOS: readonly DestinoId[] = [
+  'TODAS',
+  ...UNIDADES.map((u) => u.id),
+  ...DESTINOS_REGISTRO.map((d) => d.id),
+];
+
+export function siglaDoDestino(id: DestinoId): string {
+  if (id === 'TODAS') return 'TODAS';
+  return [...UNIDADES, ...DESTINOS_REGISTRO].find((d) => d.id === id)?.sigla ?? id;
+}
+
 const IDS_UNIDADES = UNIDADES.map((u) => u.id) as UnidadeId[];
 const IDS_VALIDOS = new Set<string>([...IDS_UNIDADES, ...DESTINOS_REGISTRO.map((d) => d.id), 'TODAS']);
 

@@ -1,12 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { entrar } from './ajuda';
 import { SENHA_TESTE } from './dados';
-
-async function entrar(page: Page, unidade: string, senha: string) {
-  await page.goto('/');
-  await page.getByLabel('Unidade').selectOption(unidade);
-  await page.getByLabel('Senha').fill(senha);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-}
 
 test('Cia entra, vê o nome da própria unidade e sai', async ({ page }) => {
   await entrar(page, '1cia', SENHA_TESTE);
@@ -16,9 +10,9 @@ test('Cia entra, vê o nome da própria unidade e sai', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
 });
 
-test('P/3 entra com o perfil da P/3', async ({ page }) => {
+test('P/3 entra direto na lista de demandas', async ({ page }) => {
   await entrar(page, 'p3', SENHA_TESTE);
-  await expect(page.getByRole('heading', { name: 'P/3', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Demandas', level: 2 })).toBeVisible();
 });
 
 test('senha errada mostra aviso e não entra', async ({ page }) => {
