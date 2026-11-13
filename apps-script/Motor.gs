@@ -12,7 +12,7 @@
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
-  PASTA_CFP: '1_DJwdylB3VAcTDMBC-9u-K8dgajrR9x5',
+  PASTA_CFP: '1rqCpo4l64qmFG1FhPUWF1ivCL6DYffjo',
   PLANILHA_OPERACOES: 'COLE_AQUI_O_ID_DA_PLANILHA_DO_NUMERADOR', // a que tem a aba "Operações"
   ABA_OPERACOES: 'Operações',
   POR_RODADA: 10
