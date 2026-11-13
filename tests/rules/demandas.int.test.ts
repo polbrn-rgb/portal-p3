@@ -78,6 +78,22 @@ describe('edição, conclusão e histórico', () => {
   });
 });
 
+describe('aviso para o motor da agenda/pasta', () => {
+  test('só marca pendente quando há prazo/CFP ou muda campo que aparece na agenda', async () => {
+    const semPrazo = String(await criarDemanda(db, dados()));
+    expect((await obterDemanda(db, semPrazo))?.automacaoPendente).toBe(false);
+
+    const comPrazo = String(await criarDemanda(db, { ...dados(), prazoCPA: '2026-11-30' }));
+    expect((await obterDemanda(db, comPrazo))?.automacaoPendente).toBe(true);
+
+    const aberta = dadosDe((await obterDemanda(db, semPrazo))!);
+    await atualizarDemanda(db, semPrazo, aberta, { ...aberta, responsavel: 'Sgt Sousa' });
+    expect((await obterDemanda(db, semPrazo))?.automacaoPendente).toBe(false);
+    await atualizarDemanda(db, semPrazo, { ...aberta, responsavel: 'Sgt Sousa' }, { ...aberta, responsavel: 'Sgt Sousa', prazoCia: '2026-11-25' });
+    expect((await obterDemanda(db, semPrazo))?.automacaoPendente).toBe(true);
+  });
+});
+
 describe('duas pessoas editando a mesma demanda', () => {
   async function abrir() {
     const id = String(await criarDemanda(db, dados()));

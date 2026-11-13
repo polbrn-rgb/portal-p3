@@ -448,6 +448,14 @@ a.botao {
   width: 100%;
 }
 
+.lista-status {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* ---------- Formulário de demanda ---------- */
 .grupo {
   margin: 0;

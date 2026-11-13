@@ -95,3 +95,25 @@ test('P/3 lembra o responsável e baixa a planilha de backup com a demanda', asy
   expect(conteudo).toContain(assunto);
   expect(conteudo).toContain('Cb Holanda');
 });
+
+test('CFP pede as datas do Btl e a demanda mostra a agenda aguardando o Apps Script', async ({ page }, info) => {
+  const assunto = `CFP teste ${info.project.name} ${Date.now()}`;
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await page.getByLabel('Adicionar e gerar pasta CFP').check();
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByText('Para o CFP, informe o início.')).toBeVisible();
+
+  await page.getByLabel('Início Btl').fill('2099-12-20');
+  await page.getByLabel('Término Btl').fill('2099-12-26');
+  await page.getByLabel('Prazo CPA').fill('2099-12-10');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await page.getByRole('link', { name: 'Ver lista' }).click();
+  await page.getByRole('link', { name: new RegExp(assunto) }).click();
+
+  const bloco = page.getByRole('group', { name: 'Agenda e pasta' });
+  await expect(bloco).toContainText('Prazo CPA');
+  await expect(bloco).toContainText('Agenda CFP');
+  await expect(bloco).toContainText('aguardando');
+});

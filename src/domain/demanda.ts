@@ -1,3 +1,4 @@
+import type { Automacao } from './automacao';
 import { ehDataISO } from './datas';
 import {
   CATEGORIAS,
@@ -42,7 +43,14 @@ export type DadosDemanda = {
   linkEvento: boolean;
 };
 
-export type Demanda = DadosDemanda & { id: string; numero: number; status: StatusDemanda };
+export type Demanda = DadosDemanda & {
+  id: string;
+  numero: number;
+  status: StatusDemanda;
+  /** Preenchido pelo Apps Script da P/3 (agenda, pasta CFP). */
+  automacao?: Automacao;
+  automacaoPendente?: boolean;
+};
 
 export type ErrosDemanda = Partial<Record<keyof DadosDemanda, string>>;
 
@@ -124,6 +132,9 @@ export function validarDemanda(d: DadosDemanda): ErrosDemanda {
   if (!erros.terminoBtl && d.inicioBtl && d.terminoBtl && d.terminoBtl < d.inicioBtl) {
     erros.terminoBtl = 'O término não pode ser antes do início.';
   }
+  // O evento do CFP vai do início ao término: sem as duas datas não dá para agendar.
+  if (d.adicionarCFP && !erros.inicioBtl && !d.inicioBtl) erros.inicioBtl = 'Para o CFP, informe o início.';
+  if (d.adicionarCFP && !erros.terminoBtl && !d.terminoBtl) erros.terminoBtl = 'Para o CFP, informe o término.';
   return erros;
 }
 

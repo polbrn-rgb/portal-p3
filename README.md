@@ -47,6 +47,11 @@ Publicar as regras de segurança no banco real (depois de `npx firebase login` c
 Informe o último número usado no numerador (a próxima demanda continua dele):
 `npm run contador -- 2150` → a próxima será a 2151. Sem número, `npm run contador` só mostra onde está.
 
+## Agenda e pasta CFP (Apps Script)
+
+Os eventos de Prazo CPA/Cia e a pasta + agenda do CFP + aba Operações são criados por um Apps Script
+na conta da P/3, a cada 5 minutos. Instalação em `apps-script/LEIAME.md`.
+
 ## Backup
 
 Na lista de demandas, **Baixar planilha** gera um `.csv` com todas as demandas (colunas do numerador

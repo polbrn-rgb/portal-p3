@@ -15,6 +15,7 @@ import {
   type Firestore,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
+import { edicaoPrecisaAutomacao, precisaAutomacao } from '../domain/automacao';
 import { camposAlterados, dadosDe, type DadosDemanda, type Demanda, type StatusDemanda } from '../domain/demanda';
 import {
   idEncaminhamento,
@@ -50,6 +51,7 @@ export async function criarDemanda(db: Firestore, dados: DadosDemanda): Promise<
       ...dados,
       numero,
       status: 'em_aberto',
+      automacaoPendente: precisaAutomacao(dados),
       criadoEm: serverTimestamp(),
       atualizadoEm: serverTimestamp(),
     });
@@ -121,7 +123,11 @@ export async function atualizarDemanda(
       const resumo = resumoDaDemanda(final);
       const agora = serverTimestamp();
 
-      tx.update(ref, { ...mudancas, atualizadoEm: agora });
+      tx.update(ref, {
+        ...mudancas,
+        ...(edicaoPrecisaAutomacao(meus) ? { automacaoPendente: true } : {}),
+        atualizadoEm: agora,
+      });
       tx.set(doc(collection(ref, 'historico')), { acao: 'editada', campos: meus, em: agora });
       for (const unidade of plano.criar) {
         tx.set(doc(db, 'encaminhamentos', idEncaminhamento(id, unidade)), {
@@ -170,6 +176,20 @@ export async function alterarStatus(db: Firestore, id: string, status: StatusDem
     }
   }
   await lote.commit();
+}
+
+/** Uma demanda em tempo real (para ver o motor terminar a agenda/pasta). */
+export function observarDemanda(
+  db: Firestore,
+  id: string,
+  aoMudar: (d: Demanda | null) => void,
+  aoFalhar: (erro: Error) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'demandas', id),
+    (s) => aoMudar(s.exists() ? { ...(s.data() as Omit<Demanda, 'id'>), id: s.id } : null),
+    aoFalhar,
+  );
 }
 
 export async function obterDemanda(db: Firestore, id: string): Promise<Demanda | null> {

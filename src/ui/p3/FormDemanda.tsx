@@ -25,6 +25,7 @@ import { ORDEM_DESTINOS, siglaDoDestino, UNIDADES, type DestinoId } from '../../
 import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
 import { RespostasCias } from './RespostasCias';
+import { StatusAutomacao } from './StatusAutomacao';
 
 export function NovaDemanda() {
   return <FormDemanda />;
@@ -337,6 +338,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
         </div>
       </fieldset>
 
+      {existente && <StatusAutomacao demandaId={existente.id} />}
       {existente && <RespostasCias demandaId={existente.id} />}
 
       {erroGeral && (
