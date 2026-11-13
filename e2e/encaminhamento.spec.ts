@@ -34,6 +34,7 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await page.getByLabel('Resposta').fill('Escolta realizada.');
   await page.getByLabel('Respondido por').fill('Sd Teste');
   await page.getByRole('button', { name: 'Enviar resposta' }).click();
+  await expect(page.getByRole('heading', { name: '3ª CIA' })).toBeVisible();
   await page.getByRole('tab', { name: /Respondidas/ }).click();
   await expect(linkDaDemanda()).toContainText('Respondido');
   await sair(page);
@@ -59,6 +60,8 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await expect(page.getByLabel('Respondido por')).toHaveValue('Sd Teste');
   await page.getByLabel('Resposta').fill('Escolta realizada com 4 PMs.');
   await page.getByRole('button', { name: 'Enviar resposta' }).click();
+  // Só volta para a lista depois que o banco confirmou a gravação.
+  await expect(page.getByRole('heading', { name: '3ª CIA' })).toBeVisible();
   await sair(page);
 
   // P/3 aceita
