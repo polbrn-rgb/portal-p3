@@ -94,7 +94,7 @@ export function Login() {
             {aviso}
           </p>
         )}
-        <button className="botao" type="submit" disabled={enviando}>
+        <button className="botao destaque" type="submit" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>
         <button className="botao-link" type="button" onClick={esqueciSenha}>

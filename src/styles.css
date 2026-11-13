@@ -1,12 +1,14 @@
-/* Cores provisórias: serão trocadas pelas do Portal Operacional P/3 atual. */
+/* Cores do Portal Operacional P/3 (portal antigo em Apps Script). */
 :root {
-  --cor-primaria: #0b3d91;
-  --cor-fundo: #f3f5f9;
+  --cor-primaria: #1a2935;
+  --cor-secundaria: #2c3e50;
+  --cor-destaque: #d9534f;
+  --cor-fundo: #f0f2f5;
   --cor-cartao: #ffffff;
-  --cor-texto: #1b1f27;
+  --cor-texto: #1a2935;
   --cor-suave: #5b6372;
   --raio: 12px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
   color: var(--cor-texto);
   background: var(--cor-fundo);
   -webkit-text-size-adjust: 100%;
@@ -31,7 +33,8 @@ body {
 }
 
 .topo {
-  background: var(--cor-primaria);
+  background: linear-gradient(90deg, var(--cor-primaria) 0%, var(--cor-secundaria) 100%);
+  border-bottom: 4px solid var(--cor-destaque);
   color: #fff;
   padding: max(20px, env(safe-area-inset-top)) 16px 20px;
   display: flex;
@@ -55,7 +58,7 @@ body {
   border-radius: var(--raio);
   margin: 16px;
   padding: 16px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
 }
 
 .cartao h2 {
@@ -76,6 +79,7 @@ body {
 
 /* Formulários: 16px evita o zoom automático do iPhone; 44px é o alvo mínimo de toque. */
 .formulario {
+  border-top: 5px solid var(--cor-destaque);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -116,6 +120,11 @@ body {
   background: var(--cor-primaria);
   color: #fff;
   font-weight: 600;
+}
+
+.botao.destaque {
+  background: var(--cor-destaque);
+  letter-spacing: 0.03em;
 }
 
 .botao:disabled {
