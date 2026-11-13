@@ -42,7 +42,6 @@ function diagnostico() {
   var ok = function (rotulo, fn) {
     try { linhas.push('✅ ' + rotulo + ': ' + fn()); } catch (e) { linhas.push('❌ ' + rotulo + ': ' + e.message); }
   };
-  ok('Conta que executa', function () { return Session.getEffectiveUser().getEmail(); });
   ok('Agenda dos prazos (principal)', function () { var c = CalendarApp.getDefaultCalendar(); return c.getName() + ' (' + c.getId() + ')'; });
   ok('Agenda do CFP', function () { var c = CalendarApp.getCalendarById(CONFIG_P3.AGENDA_CFP); if (!c) throw new Error('sem acesso ou ID errado'); return c.getName(); });
   ok('Pasta do CFP', function () { return DriveApp.getFolderById(CONFIG_P3.PASTA_CFP).getName(); });
@@ -100,7 +99,7 @@ function rodarMotor_(esperaMs) {
 function processarDemanda_(doc) {
   var d = doc.dados;
   var auto = d.automacao || {};
-  var feito = { agendaCPA: auto.agendaCPA || null, agendaCia: auto.agendaCia || null, cfp: auto.cfp || null };
+  var feito = { agendaCPA: auto.agendaCPA || null, agendaCia: auto.agendaCia || null, cfp: auto.cfp || null, cfpPasta: auto.cfpPasta || null };
   var erros = [];
 
   planejarAutomacao(d, feito).forEach(function (acao) {
@@ -113,7 +112,8 @@ function processarDemanda_(doc) {
 
   feito.erro = erros.join(' | ');
   feito.processadoEm = new Date().toISOString();
-  gravarResultado_(doc, feito);
+  // Com erro, continua pendente: o gatilho tenta de novo a cada 5 minutos até dar certo.
+  gravarResultado_(doc, feito, erros.length > 0);
 }
 
 function agenda_(qual) {
@@ -145,13 +145,22 @@ function executar_(a, d, feito) {
     if (ev2) ev2.deleteEvent();
     feito[a.chave] = null;
   } else if (a.tipo === 'criarCFP') {
-    var pasta = DriveApp.getFolderById(CONFIG_P3.PASTA_CFP).createFolder(a.nomePasta);
-    pasta.createFolder('P3');
-    pasta.createFolder('CFP');
-    var url = pasta.getUrl();
-    var evCfp = cal.createAllDayEvent(a.titulo, dataLocal(a.inicio), diaSeguinte(a.fim), { description: '📂 PASTA CFP:\n' + url });
-    feito.cfp = { eventoId: evCfp.getId(), inicio: a.inicio, fim: a.fim, titulo: a.titulo, pastaUrl: url };
+    // 1) pasta (reaproveita se já foi criada numa tentativa anterior)
+    if (!feito.cfpPasta) {
+      var pasta = DriveApp.getFolderById(CONFIG_P3.PASTA_CFP).createFolder(a.nomePasta);
+      pasta.createFolder('P3');
+      pasta.createFolder('CFP');
+      feito.cfpPasta = pasta.getUrl();
+    }
+    // 2) evento na agenda do CFP com o link da pasta
+    var evCfp = cal.createAllDayEvent(a.titulo, dataLocal(a.inicio), diaSeguinte(a.fim), { description: '📂 PASTA CFP:\n' + feito.cfpPasta });
+    feito.cfp = { eventoId: evCfp.getId(), inicio: a.inicio, fim: a.fim, titulo: a.titulo, pastaUrl: feito.cfpPasta, operacoes: false };
+    // 3) linha na aba Operações
     adicionarOperacao_(d);
+    feito.cfp.operacoes = true;
+  } else if (a.tipo === 'operacoes') {
+    adicionarOperacao_(d);
+    feito.cfp.operacoes = true;
   }
 }
 
@@ -238,10 +247,10 @@ function consultarPendentes_() {
  * Grava o que foi feito. Se a demanda foi editada enquanto o motor trabalhava, guarda os IDs dos eventos
  * mas deixa "pendente" ligado, para a próxima rodada conferir de novo (nunca duplica evento).
  */
-function gravarResultado_(doc, feito) {
+function gravarResultado_(doc, feito, continuarPendente) {
   var mascara = 'updateMask.fieldPaths=automacao&updateMask.fieldPaths=automacaoPendente';
   var r = firestore_('patch', doc.nome + '?' + mascara + '&currentDocument.updateTime=' + encodeURIComponent(doc.atualizadoEm), {
-    fields: { automacao: jsParaValor(feito), automacaoPendente: { booleanValue: false } }
+    fields: { automacao: jsParaValor(feito), automacaoPendente: { booleanValue: !!continuarPendente } }
   });
   if (r.status === 200) return;
   firestore_('patch', doc.nome + '?updateMask.fieldPaths=automacao', { fields: { automacao: jsParaValor(feito) } });

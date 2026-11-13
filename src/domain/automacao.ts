@@ -2,12 +2,13 @@ import type { DadosDemanda } from './demanda';
 
 // O que o "motor" (Apps Script na conta da P/3) já fez por uma demanda.
 export type EventoFeito = { eventoId: string; inicio: string; fim: string; titulo: string };
-export type CfpFeito = EventoFeito & { pastaUrl: string };
+export type CfpFeito = EventoFeito & { pastaUrl: string; operacoes?: boolean };
 
 export type Automacao = {
   agendaCPA?: EventoFeito | null;
   agendaCia?: EventoFeito | null;
   cfp?: CfpFeito | null;
+  cfpPasta?: string | null;
   erro?: string;
   processadoEm?: string;
 };

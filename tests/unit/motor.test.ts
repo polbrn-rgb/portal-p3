@@ -61,11 +61,17 @@ describe('planejarAutomacao (Apps Script)', () => {
     const criar = motor.planejarAutomacao(d);
     expect(criar).toMatchObject([{ tipo: 'criarCFP', agenda: 'cfp', nomePasta: '2150 - Operação Natal', fim: '2026-12-26' }]);
 
-    const feito = { cfp: { ...evento('2026-12-20', 'Operação Natal', '2026-12-26'), pastaUrl: 'https://drive/x' } };
+    const feito = { cfp: { ...evento('2026-12-20', 'Operação Natal', '2026-12-26'), pastaUrl: 'https://drive/x', operacoes: true } };
     expect(motor.planejarAutomacao(d, feito)).toEqual([]);
     expect(motor.planejarAutomacao({ ...d, terminoBtl: '2026-12-27' }, feito)).toMatchObject([
       { tipo: 'atualizar', chave: 'cfp', fim: '2026-12-27' },
     ]);
+  });
+
+  test('CFP com a linha da aba Operações pendente (falhou antes): só refaz essa etapa', () => {
+    const d = { ...base, adicionarCFP: true, inicioBtl: '2026-12-20', terminoBtl: '2026-12-26' };
+    const feito = { cfp: { ...evento('2026-12-20', 'Operação Natal', '2026-12-26'), pastaUrl: 'https://drive/x', operacoes: false } };
+    expect(motor.planejarAutomacao(d, feito).map((a) => a.tipo)).toEqual(['operacoes']);
   });
 
   test('CFP sem as duas datas não faz nada', () => {

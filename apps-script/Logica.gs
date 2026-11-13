@@ -38,8 +38,10 @@ function planejarAutomacao(d, feito) {
   prazo('agendaCia', d.prazoCia, 'Prazo Cia (' + cias + '): ' + d.saida, 'Cias: ' + cias + '\n\n' + obs);
 
   // CFP: pasta + evento na agenda do CFP + linha na aba Operações (uma vez); depois só acompanha datas/título.
+  // Cada etapa fica registrada: se uma falhar, a próxima rodada continua dali sem repetir as outras.
   var cfp = feito.cfp;
   if (d.adicionarCFP && d.inicioBtl && d.terminoBtl) {
+    if (cfp && !cfp.operacoes) acoes.push({ tipo: 'operacoes', chave: 'cfp', agenda: 'cfp' });
     if (!cfp) {
       acoes.push({ tipo: 'criarCFP', chave: 'cfp', agenda: 'cfp', inicio: d.inicioBtl, fim: d.terminoBtl, titulo: d.saida,
         nomePasta: d.numero + ' - ' + d.saida });
