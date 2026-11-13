@@ -1,18 +1,19 @@
-import { app } from './lib/firebase';
+import { useSessao } from './lib/useSessao';
+import { Inicio } from './ui/Inicio';
+import { Login } from './ui/Login';
+import { Topo } from './ui/Topo';
 
 export default function App() {
-  return (
-    <main className="tela">
-      <header className="topo">
-        <h1>Portal P3</h1>
-        <p>P/3 · 8º BPM/M</p>
-      </header>
-      <section className="cartao">
-        <h2>Fase 0 concluída</h2>
-        <p>
-          Projeto conectado: <strong>{app.options.projectId}</strong>
-        </p>
-      </section>
-    </main>
-  );
+  const sessao = useSessao();
+
+  if (sessao.estado === 'carregando') {
+    return (
+      <main className="tela">
+        <Topo />
+        <p className="carregando">Carregando…</p>
+      </main>
+    );
+  }
+  if (sessao.estado === 'deslogado') return <Login />;
+  return <Inicio sessao={sessao.sessao} />;
 }

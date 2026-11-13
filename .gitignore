@@ -5,3 +5,6 @@ playwright-report
 .firebase
 *-debug.log
 .DS_Store
+chave-servico.json
+*-firebase-adminsdk-*.json
+senhas-iniciais.txt

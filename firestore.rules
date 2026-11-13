@@ -1,10 +1,56 @@
 rules_version = '2';
 
+// O perfil vem do token do login (custom claims gravados pelo script de usuários):
+//   P/3    -> perfil = 'p3'
+//   Cia    -> perfil = 'unidade' e unidade = '1cia' ... '6cia' | 'ft'
+// Tudo que não estiver liberado aqui fica bloqueado.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Fase 0: tudo bloqueado. As permissões por perfil entram na Fase 1.
-    match /{document=**} {
-      allow read, write: if false;
+
+    function logado() {
+      return request.auth != null;
+    }
+
+    function ehP3() {
+      return logado() && request.auth.token.perfil == 'p3';
+    }
+
+    function ehDaMinhaUnidade(dados) {
+      return logado()
+        && request.auth.token.perfil == 'unidade'
+        && request.auth.token.unidade is string
+        && dados.unidadeId == request.auth.token.unidade;
+    }
+
+    // A Cia só mexe nos campos da resposta, só nos status dela
+    // e não altera encaminhamento já aceito ou cancelado pela P/3.
+    function respostaDaUnidadeValida() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resposta', 'respondidoPor', 'respondidoEm', 'lidoEm', 'anexosResposta'])
+        && !(resource.data.status in ['aceito', 'cancelado'])
+        && request.resource.data.status in ['visualizado', 'em_andamento', 'respondido'];
+    }
+
+    match /demandas/{demandaId} {
+      allow read, write: if ehP3();
+
+      match /historico/{eventoId} {
+        allow read, create: if ehP3();
+      }
+    }
+
+    match /encaminhamentos/{encaminhamentoId} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create, delete: if ehP3();
+      allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaDaUnidadeValida());
+    }
+
+    match /caixaEntrada/{itemId} {
+      allow read, write: if ehP3();
+    }
+
+    match /contadores/{contadorId} {
+      allow read, write: if ehP3();
     }
   }
 }

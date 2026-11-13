@@ -34,6 +34,10 @@ body {
   background: var(--cor-primaria);
   color: #fff;
   padding: max(20px, env(safe-area-inset-top)) 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .topo h1 {
@@ -63,6 +67,89 @@ body {
   margin: 0;
   color: var(--cor-suave);
   overflow-wrap: anywhere;
+}
+
+.carregando {
+  margin: 24px 16px;
+  color: var(--cor-suave);
+}
+
+/* Formulários: 16px evita o zoom automático do iPhone; 44px é o alvo mínimo de toque. */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.campo input,
+.campo select {
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #c8cdd6;
+  border-radius: 8px;
+  background: #fff;
+  width: 100%;
+}
+
+.botao,
+.botao-sair,
+.botao-link {
+  font: inherit;
+  min-height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.botao {
+  border: 0;
+  background: var(--cor-primaria);
+  color: #fff;
+  font-weight: 600;
+}
+
+.botao:disabled {
+  opacity: 0.6;
+}
+
+.botao-link {
+  border: 0;
+  background: none;
+  color: var(--cor-primaria);
+  text-decoration: underline;
+}
+
+.botao-sair {
+  border: 1px solid rgb(255 255 255 / 0.6);
+  background: transparent;
+  color: #fff;
+  padding: 0 16px;
+}
+
+.mensagem {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.erro {
+  background: #fbebeb;
+  color: #8a1c1c;
+}
+
+.aviso {
+  background: #e5f4e4;
+  color: #1d5c1a;
 }
 
 @media (min-width: 768px) {
