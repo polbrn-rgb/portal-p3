@@ -13,8 +13,8 @@ na agenda do CFP e a linha na aba Operações.
    - `Motor.gs` (renomeie o `Código.gs` para `Motor` e cole)
    - `appsscript.json`: em **Configurações do projeto** marque *Mostrar arquivo de manifesto "appsscript.json"*
      no editor; depois abra o arquivo e cole.
-3. Em `Motor.gs`, troque `COLE_AQUI_O_ID_DA_PLANILHA_DO_NUMERADOR` pelo ID da planilha que tem a aba
-   **Operações** (o trecho do link entre `/d/` e `/edit`).
+3. Os IDs da agenda do CFP, da pasta "OPERAÇÕES 2026" e da planilha Numerador 2026 já estão no `CONFIG_P3`
+   do `Motor.gs` (se algum mudar, troque lá).
 4. **Configurações do projeto → Propriedades do script → Adicionar propriedade**:
    - Propriedade: `CHAVE_SERVICO`
    - Valor: o conteúdo inteiro do arquivo `chave-servico.json` (abra no Bloco de Notas, copie tudo e cole).
