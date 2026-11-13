@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, setDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { alterarStatus, atualizarDemanda, buscarConcluidas, criarDemanda, obterDemanda } from '../../src/data/demandas';
+import {
+  alterarStatus,
+  atualizarDemanda,
+  buscarConcluidas,
+  ConflitoEdicao,
+  criarDemanda,
+  obterDemanda,
+} from '../../src/data/demandas';
 import { dadosDe, demandaVazia, type DadosDemanda } from '../../src/domain/demanda';
 
 // Testa o código real de gravação no emulador, logado como P/3 e com as regras ligadas.
@@ -68,6 +75,43 @@ describe('edição, conclusão e histórico', () => {
     await alterarStatus(db, String(numero), 'em_aberto');
 
     expect(await historico(numero)).toEqual(['concluida', 'criada', 'editada', 'reaberta']);
+  });
+});
+
+describe('duas pessoas editando a mesma demanda', () => {
+  async function abrir() {
+    const id = String(await criarDemanda(db, dados()));
+    return { id, aberta: dadosDe((await obterDemanda(db, id))!) };
+  }
+
+  test('campos diferentes: as duas mudanças ficam', async () => {
+    const { id, aberta } = await abrir();
+    await atualizarDemanda(db, id, aberta, { ...aberta, prazoCPA: '2026-12-01' });
+    await atualizarDemanda(db, id, aberta, { ...aberta, observacao: 'Ver com o Cmt' });
+    expect(await obterDemanda(db, id)).toMatchObject({ prazoCPA: '2026-12-01', observacao: 'Ver com o Cmt' });
+  });
+
+  test('mesmo campo: quem salva depois é avisado e nada é sobrescrito', async () => {
+    const { id, aberta } = await abrir();
+    await atualizarDemanda(db, id, aberta, { ...aberta, prazoCPA: '2026-12-01' });
+    const segunda = atualizarDemanda(db, id, aberta, { ...aberta, prazoCPA: '2026-12-05', observacao: 'x' });
+    await expect(segunda).rejects.toBeInstanceOf(ConflitoEdicao);
+    await expect(segunda).rejects.toMatchObject({ campos: ['prazoCPA'] });
+    expect(await obterDemanda(db, id)).toMatchObject({ prazoCPA: '2026-12-01', observacao: '' });
+  });
+
+  test('salvando no mesmo instante, em campos diferentes, nada se perde', async () => {
+    const { id, aberta } = await abrir();
+    await Promise.all([
+      atualizarDemanda(db, id, aberta, { ...aberta, responsavel: 'Sgt Sousa' }),
+      atualizarDemanda(db, id, aberta, { ...aberta, numeroSaida: '123/26' }),
+      atualizarDemanda(db, id, aberta, { ...aberta, destinos: ['1cia', '2cia'] }),
+    ]);
+    expect(await obterDemanda(db, id)).toMatchObject({
+      responsavel: 'Sgt Sousa',
+      numeroSaida: '123/26',
+      destinos: ['1cia', '2cia'],
+    });
   });
 });
 

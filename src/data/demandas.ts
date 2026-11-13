@@ -15,7 +15,7 @@ import {
   type Firestore,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { camposAlterados, type DadosDemanda, type Demanda, type StatusDemanda } from '../domain/demanda';
+import { camposAlterados, dadosDe, type DadosDemanda, type Demanda, type StatusDemanda } from '../domain/demanda';
 import {
   idEncaminhamento,
   novoEncaminhamento,
@@ -24,7 +24,7 @@ import {
   STATUS_PENDENTES,
   type Encaminhamento,
 } from '../domain/encaminhamento';
-import { unidadesParaEncaminhar } from '../domain/unidades';
+import { UNIDADES, unidadesParaEncaminhar } from '../domain/unidades';
 
 // Acesso ao banco. Recebe o Firestore por parâmetro para poder ser testado no emulador.
 
@@ -73,44 +73,81 @@ export async function encaminhamentosDaDemanda(db: Firestore, demandaId: string)
   return s.docs.map((e) => ({ ...(e.data() as Omit<Encaminhamento, 'id'>), id: e.id }));
 }
 
+/** Duas pessoas mudaram o mesmo campo da mesma demanda: quem salvou por último é avisado. */
+export class ConflitoEdicao extends Error {
+  constructor(public readonly campos: (keyof DadosDemanda)[]) {
+    super(`Campos alterados por outra pessoa: ${campos.join(', ')}`);
+    this.name = 'ConflitoEdicao';
+  }
+}
+
 /**
- * Grava só se algo mudou, registra no histórico quais campos mudaram e acerta
- * os encaminhamentos (Cia nova, Cia retirada, assunto/prazo alterado) na mesma gravação.
+ * Grava SÓ os campos que esta pessoa mudou (em relação à versão que ela abriu), numa transação:
+ * - outra pessoa mudou outros campos no meio tempo -> as duas mudanças ficam;
+ * - outra pessoa mudou o MESMO campo -> nada é gravado e sobe ConflitoEdicao.
+ * Também acerta os encaminhamentos das Cias e registra no histórico, tudo junto.
  */
 export async function atualizarDemanda(
   db: Firestore,
   id: string,
-  antes: DadosDemanda,
-  depois: DadosDemanda,
+  aberta: DadosDemanda,
+  editada: DadosDemanda,
 ): Promise<(keyof DadosDemanda)[]> {
-  const campos = camposAlterados(antes, depois);
-  if (campos.length === 0) return campos;
-
+  const meus = camposAlterados(aberta, editada);
+  if (meus.length === 0) return meus;
+  const mudancas = Object.fromEntries(meus.map((c) => [c, editada[c]])) as Partial<DadosDemanda>;
   const numero = Number(id);
-  const plano = planejarEncaminhamentos({ ...depois, numero }, await encaminhamentosDaDemanda(db, id));
-  const resumo = resumoDaDemanda({ ...depois, numero });
-  const agora = serverTimestamp();
-
   const ref = doc(db, 'demandas', id);
-  const lote = writeBatch(db);
-  lote.update(ref, { ...depois, atualizadoEm: agora });
-  lote.set(doc(collection(ref, 'historico')), { acao: 'editada', campos, em: agora });
-  for (const unidade of plano.criar) {
-    lote.set(doc(db, 'encaminhamentos', idEncaminhamento(id, unidade)), {
-      ...novoEncaminhamento(id, unidade, resumo),
-      criadoEm: agora,
-      atualizadoEm: agora,
-    });
-  }
-  for (const e of plano.cancelar) lote.update(doc(db, 'encaminhamentos', e), { status: 'cancelado', atualizadoEm: agora });
-  for (const e of plano.reativar) {
-    lote.update(doc(db, 'encaminhamentos', e), { ...resumo, status: 'novo', resposta: '', respondidoPor: '', motivoDevolucao: '', atualizadoEm: agora });
-  }
-  for (const e of plano.atualizarResumo) {
-    if (!plano.reativar.includes(e)) lote.update(doc(db, 'encaminhamentos', e), { ...resumo, atualizadoEm: agora });
-  }
-  await lote.commit();
-  return campos;
+
+  await runTransaction(
+    db,
+    async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error('Demanda não encontrada.');
+      const atual = dadosDe({ ...(snap.data() as Omit<Demanda, 'id'>), id });
+      const choque = meus.filter((c) => camposAlterados(aberta, atual).includes(c));
+      if (choque.length > 0) throw new ConflitoEdicao(choque);
+
+      // Os encaminhamentos possíveis são só 7: lidos dentro da transação para ficarem consistentes.
+      const lidos = await Promise.all(
+        UNIDADES.map((u) => tx.get(doc(db, 'encaminhamentos', idEncaminhamento(id, u.id)))),
+      );
+      const existentes = lidos
+        .filter((e) => e.exists())
+        .map((e) => ({ ...(e.data() as Omit<Encaminhamento, 'id'>), id: e.id }));
+
+      const final = { ...atual, ...mudancas, numero };
+      const plano = planejarEncaminhamentos(final, existentes);
+      const resumo = resumoDaDemanda(final);
+      const agora = serverTimestamp();
+
+      tx.update(ref, { ...mudancas, atualizadoEm: agora });
+      tx.set(doc(collection(ref, 'historico')), { acao: 'editada', campos: meus, em: agora });
+      for (const unidade of plano.criar) {
+        tx.set(doc(db, 'encaminhamentos', idEncaminhamento(id, unidade)), {
+          ...novoEncaminhamento(id, unidade, resumo),
+          criadoEm: agora,
+          atualizadoEm: agora,
+        });
+      }
+      for (const e of plano.cancelar) tx.update(doc(db, 'encaminhamentos', e), { status: 'cancelado', atualizadoEm: agora });
+      for (const e of plano.reativar) {
+        tx.update(doc(db, 'encaminhamentos', e), {
+          ...resumo,
+          status: 'novo',
+          resposta: '',
+          respondidoPor: '',
+          motivoDevolucao: '',
+          atualizadoEm: agora,
+        });
+      }
+      for (const e of plano.atualizarResumo) {
+        if (!plano.reativar.includes(e)) tx.update(doc(db, 'encaminhamentos', e), { ...resumo, atualizadoEm: agora });
+      }
+    },
+    { maxAttempts: 10 },
+  );
+  return meus;
 }
 
 /**

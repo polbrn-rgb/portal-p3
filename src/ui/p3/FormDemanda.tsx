@@ -1,10 +1,11 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
-import { alterarStatus, atualizarDemanda, criarDemanda, obterDemanda } from '../../data/demandas';
+import { alterarStatus, atualizarDemanda, ConflitoEdicao, criarDemanda, obterDemanda } from '../../data/demandas';
 import { hojeISO } from '../../domain/datas';
 import {
   dadosDe,
   demandaVazia,
   normalizarDemanda,
+  ROTULO_CAMPO,
   validarDemanda,
   type DadosDemanda,
   type Demanda,
@@ -57,6 +58,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
   const [erros, setErros] = useState<ErrosDemanda>({});
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState('');
+  const [conflito, setConflito] = useState(false);
 
   function mudar<K extends keyof DadosDemanda>(campo: K, valor: DadosDemanda[K]) {
     setDados((d) => ({ ...d, [campo]: valor }));
@@ -84,8 +86,14 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
       if (existente) await atualizarDemanda(db, existente.id, original, limpo);
       else await criarDemanda(db, limpo);
       irPara('#/demandas');
-    } catch {
-      setErroGeral('Não foi possível salvar. Verifique a conexão e tente de novo.');
+    } catch (e) {
+      if (e instanceof ConflitoEdicao) {
+        const campos = e.campos.map((c) => ROTULO_CAMPO[c]).join(', ');
+        setErroGeral(`Outra pessoa alterou ${campos} desta demanda enquanto você editava. Nada foi salvo.`);
+        setConflito(true);
+      } else {
+        setErroGeral('Não foi possível salvar. Verifique a conexão e tente de novo.');
+      }
       setSalvando(false);
     }
   }
@@ -249,6 +257,14 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
       {erroGeral && (
         <p className="mensagem erro" role="alert">
           {erroGeral}
+          {conflito && (
+            <>
+              {' '}
+              <button className="botao-link" type="button" onClick={() => window.location.reload()}>
+                Ver a versão atual
+              </button>
+            </>
+          )}
         </p>
       )}
 

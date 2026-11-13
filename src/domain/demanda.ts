@@ -120,3 +120,26 @@ export function camposAlterados(antes: DadosDemanda, depois: DadosDemanda): (key
     (campo) => JSON.stringify(antes[campo]) !== JSON.stringify(depois[campo]),
   );
 }
+
+/** Nome de cada campo como aparece na tela (para avisos e histórico). */
+export const ROTULO_CAMPO: Record<keyof DadosDemanda, string> = {
+  dataEntrada: 'Data de entrada',
+  origem: 'Origem',
+  numeroOrigem: 'Nº da origem',
+  tipoSaida: 'Tipo de saída',
+  saida: 'Saída (assunto)',
+  numeroSaida: 'Nº da saída',
+  destinos: 'Destinos',
+  inicioBtl: 'Início Btl',
+  terminoBtl: 'Término Btl',
+  prazoCPA: 'Prazo CPA',
+  prazoCia: 'Prazo Cia',
+  adicionarCFP: 'Adicionar para o CFP',
+  agendaCPA: 'Agenda CPA',
+  agendaCia: 'Agenda Cia',
+  responsavel: 'Responsável',
+  resposta: 'Resposta',
+  categoria: 'Categoria',
+  observacao: 'Observação',
+  linkEvento: 'Link do evento',
+};
