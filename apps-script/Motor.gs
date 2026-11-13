@@ -33,6 +33,37 @@ function testarConexao() {
   Logger.log('Conexão OK. Demandas aguardando agenda/pasta: ' + pendentes.length);
 }
 
+/**
+ * Rode pelo editor quando algo não funcionar: mostra no registro em qual conta e em quais
+ * agendas/pastas o motor está gravando, e quantas demandas estão esperando.
+ */
+function diagnostico() {
+  var linhas = [];
+  var ok = function (rotulo, fn) {
+    try { linhas.push('✅ ' + rotulo + ': ' + fn()); } catch (e) { linhas.push('❌ ' + rotulo + ': ' + e.message); }
+  };
+  ok('Conta que executa', function () { return Session.getEffectiveUser().getEmail(); });
+  ok('Agenda dos prazos (principal)', function () { var c = CalendarApp.getDefaultCalendar(); return c.getName() + ' (' + c.getId() + ')'; });
+  ok('Agenda do CFP', function () { var c = CalendarApp.getCalendarById(CONFIG_P3.AGENDA_CFP); if (!c) throw new Error('sem acesso ou ID errado'); return c.getName(); });
+  ok('Pasta do CFP', function () { return DriveApp.getFolderById(CONFIG_P3.PASTA_CFP).getName(); });
+  ok('Planilha Operações', function () {
+    if (CONFIG_P3.PLANILHA_OPERACOES.indexOf('COLE_AQUI') === 0) throw new Error('ID não preenchido no CONFIG_P3');
+    var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_OPERACOES);
+    if (!ss.getSheetByName(CONFIG_P3.ABA_OPERACOES)) throw new Error('aba Operações não encontrada em ' + ss.getName());
+    return ss.getName();
+  });
+  ok('Gatilho de 5 minutos', function () {
+    var n = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'processarPendentes'; }).length;
+    if (!n) throw new Error('não instalado: rode instalarAutomacao');
+    return 'instalado';
+  });
+  ok('Firestore (chave)', function () {
+    var p = consultarPendentes_();
+    return p.length + ' demanda(s) esperando' + (p.length ? ': nº ' + p.map(function (d) { return d.dados.numero; }).join(', ') : '');
+  });
+  Logger.log(linhas.join('\n'));
+}
+
 /** Gatilho de reserva (a cada 5 min): se outra rodada estiver trabalhando, deixa para ela. */
 function processarPendentes() {
   rodarMotor_(1000);
