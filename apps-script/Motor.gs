@@ -63,6 +63,27 @@ function diagnostico() {
   Logger.log(linhas.join('\n'));
 }
 
+/** Rode pelo editor: mostra as 3 demandas mais recentes como o motor as vê e o que ele faria com cada uma. */
+function verUltimasDemandas() {
+  var r = firestore_('post', 'projects/' + CONFIG_P3.PROJETO + '/databases/(default)/documents:runQuery', {
+    structuredQuery: { from: [{ collectionId: 'demandas' }], orderBy: [{ field: { fieldPath: 'numero' }, direction: 'DESCENDING' }], limit: 3 }
+  });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  r.json.filter(function (x) { return x.document; }).forEach(function (x) {
+    var d = camposParaJs(x.document.fields);
+    var a = d.automacao || {};
+    Logger.log([
+      'Nº ' + d.numero + ' — ' + d.saida,
+      '  Prazo CPA: ' + (d.prazoCPA || '-') + ' | Prazo Cia: ' + (d.prazoCia || '-'),
+      '  CFP: ' + (d.adicionarCFP ? 'sim' : 'não') + ' | Início/Término Btl: ' + (d.inicioBtl || '-') + ' / ' + (d.terminoBtl || '-'),
+      '  Aguardando motor: ' + (d.automacaoPendente === true ? 'SIM' : d.automacaoPendente === false ? 'não' : 'campo ausente (portal antigo?)'),
+      '  Já feito: ' + JSON.stringify({ agendaCPA: a.agendaCPA, agendaCia: a.agendaCia, cfp: a.cfp }),
+      '  Último erro: ' + (a.erro || '-') + ' | Processado em: ' + (a.processadoEm || '-'),
+      '  O motor faria agora: ' + JSON.stringify(planejarAutomacao(d, { agendaCPA: a.agendaCPA, agendaCia: a.agendaCia, cfp: a.cfp }).map(function (y) { return y.tipo + ' ' + y.chave; }))
+    ].join('\n'));
+  });
+}
+
 /** Gatilho de reserva (a cada 5 min): se outra rodada estiver trabalhando, deixa para ela. */
 function processarPendentes() {
   rodarMotor_(1000);
