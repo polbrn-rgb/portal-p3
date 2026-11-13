@@ -1,7 +1,8 @@
 /**
  * MOTOR DO PORTAL P3 (Apps Script na conta 8bpmmp3@gmail.com)
  *
- * A cada 5 minutos procura demandas marcadas com "automacaoPendente" no Firestore e:
+ * Roda na hora em que o portal salva (app da web) e, de reserva, a cada 5 minutos.
+ * Procura demandas marcadas com "automacaoPendente" no Firestore e:
  *  - Prazo CPA / Prazo Cia -> evento de dia inteiro na agenda principal (como o painel do numerador);
  *  - Adicionar e gerar pasta CFP -> pasta (com P3 e CFP), evento na agenda do CFP com o link da pasta
  *    e linha na aba Operações.
@@ -32,11 +33,34 @@ function testarConexao() {
   Logger.log('Conexão OK. Demandas aguardando agenda/pasta: ' + pendentes.length);
 }
 
+/** Gatilho de reserva (a cada 5 min): se outra rodada estiver trabalhando, deixa para ela. */
 function processarPendentes() {
+  rodarMotor_(1000);
+}
+
+/**
+ * Chamado pelo portal logo depois de salvar (app da web). Espera a vez se outra rodada estiver
+ * trabalhando, para não deixar demanda para trás. Não recebe nem devolve dados: só faz o motor rodar.
+ */
+function doPost() {
+  rodarMotor_(25000);
+  return ContentService.createTextOutput('ok');
+}
+
+function doGet() {
+  return doPost();
+}
+
+function rodarMotor_(esperaMs) {
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(1000)) return; // uma rodada anterior ainda está trabalhando
+  if (!trava.tryLock(esperaMs)) return;
   try {
-    consultarPendentes_().forEach(processarDemanda_);
+    // Repete enquanto houver pendentes (pega também o que foi salvo durante a rodada).
+    for (var i = 0; i < 3; i++) {
+      var pendentes = consultarPendentes_();
+      if (!pendentes.length) break;
+      pendentes.forEach(processarDemanda_);
+    }
   } finally {
     trava.releaseLock();
   }

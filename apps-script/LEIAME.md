@@ -21,7 +21,15 @@ na agenda do CFP e a linha na aba Operações.
 5. No editor, escolha a função **instalarAutomacao** e clique em **Executar**. Autorize o acesso
    (Agenda, Drive, Planilhas). No **Registro de execução** deve aparecer `Conexão OK`.
 
-Pronto: a partir daí ele roda sozinho a cada 5 minutos. No portal, dentro da demanda, o bloco
+6. **Para agendar na hora (sem esperar 5 minutos):** **Implantar → Nova implantação →** engrenagem →
+   **App da Web**. Descrição: `Portal P3`; **Executar como: Eu**; **Quem pode acessar: Qualquer pessoa** →
+   **Implantar**. Copie a **URL do app da Web** (termina em `/exec`) e mande para colocar no portal.
+   O endereço só faz o motor rodar: não recebe nem devolve nenhum dado.
+
+> Sempre que trocar o código do `Motor.gs` ou `Logica.gs`: **Implantar → Gerenciar implantações →** lápis →
+> Versão: **Nova versão** → **Implantar** (a URL continua a mesma).
+
+Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 5 minutos. No portal, dentro da demanda, o bloco
 **Agenda e pasta** mostra ⏳ enquanto espera e ✅ quando o evento foi criado, com o botão **Abrir pasta CFP**.
 
 ## Se der erro

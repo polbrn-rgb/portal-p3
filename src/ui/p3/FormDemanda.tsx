@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { alterarStatus, atualizarDemanda, ConflitoEdicao, criarDemanda, obterDemanda } from '../../data/demandas';
+import { edicaoPrecisaAutomacao, precisaAutomacao } from '../../domain/automacao';
 import { hojeISO } from '../../domain/datas';
 import {
   dadosDe,
@@ -23,6 +24,7 @@ import {
 import { ROTULO_SITUACAO, situacaoDaDemanda } from '../../domain/situacao';
 import { ORDEM_DESTINOS, siglaDoDestino, UNIDADES, type DestinoId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
+import { cutucarMotor } from '../../lib/motor';
 import { irPara } from '../../lib/navegacao';
 import { RespostasCias } from './RespostasCias';
 import { StatusAutomacao } from './StatusAutomacao';
@@ -143,10 +145,13 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
     }
     try {
       if (existente) {
-        await atualizarDemanda(db, existente.id, original, limpo);
+        const campos = await atualizarDemanda(db, existente.id, original, limpo);
+        if (edicaoPrecisaAutomacao(campos)) cutucarMotor();
         irPara('#/demandas');
       } else {
-        setRegistrada(await criarDemanda(db, limpo));
+        const numero = await criarDemanda(db, limpo);
+        if (precisaAutomacao(limpo)) cutucarMotor();
+        setRegistrada(numero);
         setSalvando(false);
       }
     } catch (e) {
