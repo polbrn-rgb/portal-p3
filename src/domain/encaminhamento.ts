@@ -26,7 +26,6 @@ export type ResumoEnc = {
   numeroOrigem: string;
   prazoCia: string;
   observacao: string;
-  linkEvento: string;
 };
 
 export type Encaminhamento = ResumoEnc & {
@@ -41,7 +40,7 @@ export type Encaminhamento = ResumoEnc & {
 
 type BaseResumo = Pick<
   Demanda,
-  'numero' | 'saida' | 'categoria' | 'tipoSaida' | 'origem' | 'numeroOrigem' | 'prazoCia' | 'prazoCPA' | 'observacao' | 'linkEvento'
+  'numero' | 'saida' | 'categoria' | 'tipoSaida' | 'origem' | 'numeroOrigem' | 'prazoCia' | 'prazoCPA' | 'observacao'
 >;
 
 export function idEncaminhamento(demandaId: string, unidadeId: UnidadeId): string {
@@ -59,7 +58,6 @@ export function resumoDaDemanda(d: BaseResumo): ResumoEnc {
     numeroOrigem: d.numeroOrigem,
     prazoCia: d.prazoCia || d.prazoCPA,
     observacao: d.observacao,
-    linkEvento: d.linkEvento,
   };
 }
 

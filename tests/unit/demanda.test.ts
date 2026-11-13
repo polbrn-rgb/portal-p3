@@ -43,10 +43,12 @@ describe('validarDemanda', () => {
     expect(validarDemanda(valida())).toEqual({});
   });
 
-  test('assunto e categoria são obrigatórios', () => {
-    const erros = validarDemanda(demandaVazia(HOJE));
-    expect(erros.saida).toBe('Informe a saída (assunto).');
-    expect(erros.categoria).toBe('Escolha a categoria.');
+  test('como no painel do numerador: resumo e tipo de saída obrigatórios, com padrões preenchidos', () => {
+    const vazia = demandaVazia(HOJE);
+    expect(vazia).toMatchObject({ tipoSaida: 'OFÍCIO', meioSaida: 'SEI', categoria: 'Outras Demandas', resposta: 'Não', origem: '' });
+    expect(validarDemanda(vazia)).toEqual({ saida: 'Informe a demanda (resumo).' });
+    expect(validarDemanda({ ...vazia, saida: 'X', tipoSaida: '' }).tipoSaida).toBe('Escolha o tipo de saída.');
+    expect(validarDemanda({ ...vazia, saida: 'X', categoria: '' }).categoria).toBe('Escolha a categoria.');
   });
 
   test('origem SEI exige o número do processo', () => {
@@ -64,10 +66,13 @@ describe('validarDemanda', () => {
     expect(validarDemanda(valida({ inicioBtl: '2026-11-20', terminoBtl: '2026-11-19' })).terminoBtl).toBeDefined();
   });
 
-  test('datas e link em formato errado', () => {
-    const erros = validarDemanda(valida({ prazoCPA: '20/11/2026', linkEvento: 'drive.google.com' }));
+  test('data em formato errado e valores fora das listas', () => {
+    const erros = validarDemanda(
+      valida({ prazoCPA: '20/11/2026', origem: 'Fax' as DadosDemanda['origem'], resposta: 'Talvez' as DadosDemanda['resposta'] }),
+    );
     expect(erros.prazoCPA).toBe('Data inválida.');
-    expect(erros.linkEvento).toContain('http');
+    expect(erros.origem).toBe('Origem inválida.');
+    expect(erros.resposta).toBe('Escolha Sim ou Não.');
   });
 });
 
@@ -98,10 +103,10 @@ describe('camposAlterados e dadosDe', () => {
 
   test('dadosDe tira id, número e status e completa campos que faltarem', () => {
     const d = demanda(7) as Partial<Demanda>;
-    delete d.linkEvento;
+    delete d.meioSaida;
     const dados = dadosDe(d as Demanda);
     expect(dados).not.toHaveProperty('numero');
-    expect(dados.linkEvento).toBe('');
+    expect(dados.meioSaida).toBe('SEI');
   });
 });
 

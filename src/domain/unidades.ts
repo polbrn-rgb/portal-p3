@@ -13,8 +13,15 @@ export const UNIDADES = [
 export const DESTINOS_REGISTRO = [
   { id: 'secop', sigla: 'Sec Op M11' },
   { id: 'gt', sigla: 'GT M11' },
+  { id: 'spjmd', sigla: 'SPJMD' },
+  { id: 'cfp', sigla: 'CFP' },
   { id: 'p1', sigla: 'P/1' },
   { id: 'p2', sigla: 'P/2' },
+  { id: 'p4', sigla: 'P/4' },
+  { id: 'p5', sigla: 'P/5' },
+  { id: 'dejem', sigla: 'DEJEM' },
+  { id: 'subfrota', sigla: 'Sub Frota' },
+  { id: '21bpmm', sigla: '21º BPM/M' },
   { id: 'outros', sigla: 'OUTROS' },
 ] as const;
 

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { entrar, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
@@ -9,11 +10,16 @@ test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ p
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
   await page.getByLabel(/^Origem/).selectOption('SEI');
   await page.getByLabel('Nº do processo SEI').fill('006.00000001/2026-01');
-  await page.getByLabel('Saída (assunto)').fill(assunto);
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
   await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
   await page.getByLabel('1ª CIA', { exact: true }).check();
   await page.getByLabel('Prazo CPA').fill('2099-12-31');
   await page.getByRole('button', { name: 'Salvar' }).click();
+
+  // Como no painel do numerador: mostra o número gerado, para copiar.
+  await expect(page.getByRole('status')).toContainText('Demanda registrada');
+  await expect(page.getByRole('button', { name: 'Copiar número' })).toBeVisible();
+  await page.getByRole('link', { name: 'Ver lista' }).click();
 
   const item = page.getByRole('link', { name: new RegExp(assunto) });
   await expect(item).toBeVisible();
@@ -38,8 +44,7 @@ test('formulário não salva sem os campos obrigatórios', async ({ page }) => {
   await page.getByRole('button', { name: 'Salvar' }).click();
 
   await expect(page.getByRole('alert')).toHaveText('Confira os campos destacados.');
-  await expect(page.getByText('Informe a saída (assunto).')).toBeVisible();
-  await expect(page.getByText('Escolha a categoria.')).toBeVisible();
+  await expect(page.getByText('Informe a demanda (resumo).')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Nova demanda' })).toBeVisible();
 });
 
@@ -66,4 +71,27 @@ test('lista e formulário cabem na tela, no celular e no computador', async ({ p
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
   await expect(page.getByRole('heading', { name: 'Nova demanda' })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+});
+
+test('P/3 lembra o responsável e baixa a planilha de backup com a demanda', async ({ page }, info) => {
+  const assunto = `Backup teste ${info.project.name} ${Date.now()}`;
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await page.getByLabel('Responsável').selectOption('Cb Holanda');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+
+  // "Lançar outra" já vem com o mesmo responsável.
+  await page.getByRole('button', { name: 'Lançar outra' }).click();
+  await expect(page.getByLabel('Responsável')).toHaveValue('Cb Holanda');
+  await page.getByRole('link', { name: 'Voltar' }).click();
+
+  const baixando = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Baixar planilha' }).click();
+  const arquivo = await baixando;
+  expect(arquivo.suggestedFilename()).toMatch(/^portal-p3-backup-\d{4}-\d{2}-\d{2}\.csv$/);
+  const conteudo = await readFile((await arquivo.path())!, 'utf8');
+  expect(conteudo).toContain('Nº Demanda;Demanda;Data Entrada');
+  expect(conteudo).toContain(assunto);
+  expect(conteudo).toContain('Cb Holanda');
 });

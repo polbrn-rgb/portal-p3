@@ -31,6 +31,22 @@ export function ListaDemandas() {
   const [temMais, setTemMais] = useState(true);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [erroConcluidas, setErroConcluidas] = useState('');
+  const [baixando, setBaixando] = useState(false);
+  const [avisoBackup, setAvisoBackup] = useState('');
+
+  // O código do backup só é baixado quando alguém clica no botão.
+  async function backup() {
+    setBaixando(true);
+    setAvisoBackup('');
+    try {
+      const { baixarPlanilha } = await import('../../data/exportar');
+      const total = await baixarPlanilha(db);
+      setAvisoBackup(`Planilha com ${total} demandas baixada.`);
+    } catch {
+      setAvisoBackup('Não foi possível gerar a planilha. Tente de novo.');
+    }
+    setBaixando(false);
+  }
 
   async function carregarMais() {
     setCarregandoMais(true);
@@ -71,10 +87,20 @@ export function ListaDemandas() {
     <section className="painel">
       <div className="painel-cabecalho">
         <h2>Demandas</h2>
-        <a className="botao destaque botao-novo" href="#/nova">
-          + Nova demanda
-        </a>
+        <div className="acoes-cabecalho">
+          <button className="botao secundario" type="button" disabled={baixando} onClick={backup}>
+            {baixando ? 'Gerando…' : 'Baixar planilha'}
+          </button>
+          <a className="botao destaque botao-novo" href="#/nova">
+            + Nova demanda
+          </a>
+        </div>
       </div>
+      {avisoBackup && (
+        <p className="mensagem aviso" role="status">
+          {avisoBackup}
+        </p>
+      )}
 
       <div className="abas" role="tablist">
         <button type="button" role="tab" aria-selected={aba === 'abertas'} onClick={() => setAba('abertas')}>

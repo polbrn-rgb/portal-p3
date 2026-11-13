@@ -42,6 +42,16 @@ Trocar a senha de uma Cia: `npm run usuarios -- --nova-senha 1cia`. A Cia é des
 Publicar as regras de segurança no banco real (depois de `npx firebase login` com a conta 8bpmmp3@gmail.com):
 `npm run deploy:regras`.
 
+## Dia de entrar no ar: numeração
+
+Informe o último número usado no numerador (a próxima demanda continua dele):
+`npm run contador -- 2150` → a próxima será a 2151. Sem número, `npm run contador` só mostra onde está.
+
+## Backup
+
+Na lista de demandas, **Baixar planilha** gera um `.csv` com todas as demandas (colunas do numerador
++ respostas das Cias). Abre no Excel e no Google Planilhas.
+
 ## Regra do projeto
 
 Nenhuma parte é dada como pronta sem `npm run test:tudo` passando.

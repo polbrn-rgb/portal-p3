@@ -179,16 +179,6 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
               <dd>{enc.observacao}</dd>
             </>
           )}
-          {enc.linkEvento && (
-            <>
-              <dt>Link</dt>
-              <dd>
-                <a href={enc.linkEvento} target="_blank" rel="noreferrer">
-                  Abrir link
-                </a>
-              </dd>
-            </>
-          )}
         </dl>
       </div>
 

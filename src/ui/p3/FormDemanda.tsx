@@ -11,7 +11,15 @@ import {
   type Demanda,
   type ErrosDemanda,
 } from '../../domain/demanda';
-import { CATEGORIAS, ORIGENS, RESPONSAVEIS, TIPOS_SAIDA } from '../../domain/listas';
+import {
+  CATEGORIAS,
+  MEIOS_SAIDA,
+  ORIGENS,
+  RESPONSAVEIS,
+  RESPOSTAS,
+  TIPOS_SAIDA,
+  URL_PLANILHA_EVENTO,
+} from '../../domain/listas';
 import { ROTULO_SITUACAO, situacaoDaDemanda } from '../../domain/situacao';
 import { ORDEM_DESTINOS, siglaDoDestino, UNIDADES, type DestinoId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
@@ -52,9 +60,54 @@ function Campo({ rotulo, erro, children }: { rotulo: string; erro?: string; chil
   );
 }
 
+const CHAVE_RESPONSAVEL = 'portalp3.responsavel';
+
+// Como no painel do numerador: a demanda nova já vem com o último responsável usado neste aparelho.
+function novaComResponsavel(): DadosDemanda {
+  const nova = demandaVazia(hojeISO());
+  try {
+    const salvo = localStorage.getItem(CHAVE_RESPONSAVEL);
+    if ((RESPONSAVEIS as readonly string[]).includes(salvo ?? '')) nova.responsavel = salvo as DadosDemanda['responsavel'];
+  } catch {
+    /* sem armazenamento */
+  }
+  return nova;
+}
+
+function Registrada({ numero, aoNova }: { numero: number; aoNova: () => void }) {
+  const [copiado, setCopiado] = useState(false);
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(String(numero));
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      /* navegador sem permissão de copiar */
+    }
+  }
+  return (
+    <section className="painel">
+      <div className="cartao registrada" role="status">
+        <p>Demanda registrada</p>
+        <strong className="numero-gerado">Nº {numero}</strong>
+        <div className="acoes-linha">
+          <button className="botao secundario" type="button" onClick={copiar}>
+            {copiado ? 'Copiado!' : 'Copiar número'}
+          </button>
+          <button className="botao destaque" type="button" onClick={aoNova}>
+            Lançar outra
+          </button>
+        </div>
+        <a href="#/demandas">Ver lista</a>
+      </div>
+    </section>
+  );
+}
+
 function FormDemanda({ existente }: { existente?: Demanda }) {
-  const original = existente ? dadosDe(existente) : demandaVazia(hojeISO());
+  const [original] = useState<DadosDemanda>(() => (existente ? dadosDe(existente) : novaComResponsavel()));
   const [dados, setDados] = useState<DadosDemanda>(original);
+  const [registrada, setRegistrada] = useState<number | null>(null);
   const [erros, setErros] = useState<ErrosDemanda>({});
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState('');
@@ -83,9 +136,18 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
     }
     setSalvando(true);
     try {
-      if (existente) await atualizarDemanda(db, existente.id, original, limpo);
-      else await criarDemanda(db, limpo);
-      irPara('#/demandas');
+      localStorage.setItem(CHAVE_RESPONSAVEL, limpo.responsavel);
+    } catch {
+      /* sem armazenamento */
+    }
+    try {
+      if (existente) {
+        await atualizarDemanda(db, existente.id, original, limpo);
+        irPara('#/demandas');
+      } else {
+        setRegistrada(await criarDemanda(db, limpo));
+        setSalvando(false);
+      }
     } catch (e) {
       if (e instanceof ConflitoEdicao) {
         const campos = e.campos.map((c) => ROTULO_CAMPO[c]).join(', ');
@@ -111,6 +173,19 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
     }
   }
 
+  if (registrada !== null) {
+    return (
+      <Registrada
+        numero={registrada}
+        aoNova={() => {
+          setDados(novaComResponsavel());
+          setErros({});
+          setRegistrada(null);
+        }}
+      />
+    );
+  }
+
   const ehSEI = dados.origem === 'SEI';
   const todas = dados.destinos.includes('TODAS');
 
@@ -133,6 +208,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
           </Campo>
           <Campo rotulo="Origem" erro={erros.origem}>
             <select value={dados.origem} onChange={(e) => mudar('origem', e.target.value as DadosDemanda['origem'])}>
+              <option value="">Selecione…</option>
               {ORIGENS.map((o) => (
                 <option key={o}>{o}</option>
               ))}
@@ -150,24 +226,29 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
 
       <fieldset className="cartao grupo">
         <legend>Saída</legend>
-        <Campo rotulo="Saída (assunto)" erro={erros.saida}>
+        <Campo rotulo="Demanda (resumo)" erro={erros.saida}>
           <textarea rows={3} value={dados.saida} onChange={(e) => mudar('saida', e.target.value)} />
         </Campo>
         <div className="grade">
           <Campo rotulo="Tipo de saída" erro={erros.tipoSaida}>
             <select value={dados.tipoSaida} onChange={(e) => mudar('tipoSaida', e.target.value as DadosDemanda['tipoSaida'])}>
-              <option value="">—</option>
               {TIPOS_SAIDA.map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>
           </Campo>
-          <Campo rotulo="Nº da saída" erro={erros.numeroSaida}>
+          <Campo rotulo="Meio de saída" erro={erros.meioSaida}>
+            <select value={dados.meioSaida} onChange={(e) => mudar('meioSaida', e.target.value as DadosDemanda['meioSaida'])}>
+              {MEIOS_SAIDA.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo rotulo="Nº de saída SEI" erro={erros.numeroSaida}>
             <input value={dados.numeroSaida} onChange={(e) => mudar('numeroSaida', e.target.value)} />
           </Campo>
           <Campo rotulo="Categoria" erro={erros.categoria}>
             <select value={dados.categoria} onChange={(e) => mudar('categoria', e.target.value as DadosDemanda['categoria'])}>
-              <option value="">Escolha…</option>
               {CATEGORIAS.map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -180,6 +261,13 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
             >
               <option value="">—</option>
               {RESPONSAVEIS.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo rotulo="Resposta?" erro={erros.resposta}>
+            <select value={dados.resposta} onChange={(e) => mudar('resposta', e.target.value as DadosDemanda['resposta'])}>
+              {RESPOSTAS.map((r) => (
                 <option key={r}>{r}</option>
               ))}
             </select>
@@ -226,30 +314,27 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
         <div className="opcoes">
           <label className="opcao">
             <input type="checkbox" checked={dados.adicionarCFP} onChange={(e) => mudar('adicionarCFP', e.target.checked)} />
-            Adicionar para o CFP
-          </label>
-          <label className="opcao">
-            <input type="checkbox" checked={dados.agendaCPA} onChange={(e) => mudar('agendaCPA', e.target.checked)} />
-            Agenda CPA
-          </label>
-          <label className="opcao">
-            <input type="checkbox" checked={dados.agendaCia} onChange={(e) => mudar('agendaCia', e.target.checked)} />
-            Agenda Cia
+            Adicionar e gerar pasta CFP
           </label>
         </div>
       </fieldset>
 
       <fieldset className="cartao grupo bloco-largo">
         <legend>Complemento</legend>
-        <Campo rotulo="Resposta" erro={erros.resposta}>
-          <textarea rows={3} value={dados.resposta} onChange={(e) => mudar('resposta', e.target.value)} />
-        </Campo>
         <Campo rotulo="Observação" erro={erros.observacao}>
           <textarea rows={2} value={dados.observacao} onChange={(e) => mudar('observacao', e.target.value)} />
         </Campo>
-        <Campo rotulo="Link do evento" erro={erros.linkEvento}>
-          <input type="url" inputMode="url" value={dados.linkEvento} onChange={(e) => mudar('linkEvento', e.target.value)} />
-        </Campo>
+        <div className="opcoes">
+          <label className="opcao">
+            <input type="checkbox" checked={dados.linkEvento} onChange={(e) => mudar('linkEvento', e.target.checked)} />
+            Possui link de evento / formulário
+          </label>
+          {dados.linkEvento && (
+            <a className="botao secundario" href={URL_PLANILHA_EVENTO} target="_blank" rel="noreferrer">
+              Abrir planilha do evento
+            </a>
+          )}
+        </div>
       </fieldset>
 
       {existente && <RespostasCias demandaId={existente.id} />}

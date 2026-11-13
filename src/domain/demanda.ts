@@ -1,16 +1,31 @@
 import { ehDataISO } from './datas';
-import { CATEGORIAS, ORIGENS, RESPONSAVEIS, TIPOS_SAIDA, type Categoria, type Origem, type Responsavel, type TipoSaida } from './listas';
+import {
+  CATEGORIAS,
+  MEIOS_SAIDA,
+  ORIGENS,
+  RESPONSAVEIS,
+  RESPOSTAS,
+  TIPOS_SAIDA,
+  type Categoria,
+  type MeioSaida,
+  type Origem,
+  type Responsavel,
+  type RespostaSN,
+  type TipoSaida,
+} from './listas';
 import { ORDEM_DESTINOS, UNIDADES, type DestinoId } from './unidades';
 
 export type StatusDemanda = 'em_aberto' | 'concluido';
 
 // Campos que a P/3 preenche (as colunas do numerador). Datas no formato AAAA-MM-DD.
+// `saida` guarda a coluna "Demanda" (o resumo do assunto); `meioSaida` é a coluna "Saída" (SEI/E-mail/Físico).
 export type DadosDemanda = {
   dataEntrada: string;
-  origem: Origem;
+  origem: Origem | '';
   numeroOrigem: string;
   tipoSaida: TipoSaida | '';
   saida: string;
+  meioSaida: MeioSaida | '';
   numeroSaida: string;
   destinos: DestinoId[];
   inicioBtl: string;
@@ -21,10 +36,10 @@ export type DadosDemanda = {
   agendaCPA: boolean;
   agendaCia: boolean;
   responsavel: Responsavel | '';
-  resposta: string;
+  resposta: RespostaSN;
   categoria: Categoria | '';
   observacao: string;
-  linkEvento: string;
+  linkEvento: boolean;
 };
 
 export type Demanda = DadosDemanda & { id: string; numero: number; status: StatusDemanda };
@@ -34,10 +49,11 @@ export type ErrosDemanda = Partial<Record<keyof DadosDemanda, string>>;
 export function demandaVazia(hoje: string): DadosDemanda {
   return {
     dataEntrada: hoje,
-    origem: 'E-mail',
+    origem: '',
     numeroOrigem: '',
-    tipoSaida: '',
+    tipoSaida: 'OFÍCIO',
     saida: '',
+    meioSaida: 'SEI',
     numeroSaida: '',
     destinos: [],
     inicioBtl: '',
@@ -48,10 +64,10 @@ export function demandaVazia(hoje: string): DadosDemanda {
     agendaCPA: false,
     agendaCia: false,
     responsavel: '',
-    resposta: '',
-    categoria: '',
+    resposta: 'Não',
+    categoria: 'Outras Demandas',
     observacao: '',
-    linkEvento: '',
+    linkEvento: false,
   };
 }
 
@@ -77,9 +93,7 @@ export function normalizarDemanda(d: DadosDemanda): DadosDemanda {
     numeroOrigem: d.numeroOrigem.trim(),
     saida: d.saida.trim(),
     numeroSaida: d.numeroSaida.trim(),
-    resposta: d.resposta.trim(),
     observacao: d.observacao.trim(),
-    linkEvento: d.linkEvento.trim(),
     destinos,
   };
 }
@@ -92,11 +106,13 @@ export function validarDemanda(d: DadosDemanda): ErrosDemanda {
   const erros: ErrosDemanda = {};
 
   if (!ehDataISO(d.dataEntrada)) erros.dataEntrada = 'Informe a data de entrada.';
-  if (!(ORIGENS as readonly string[]).includes(d.origem)) erros.origem = 'Escolha a origem.';
+  if (d.origem && !(ORIGENS as readonly string[]).includes(d.origem)) erros.origem = 'Origem inválida.';
   if (d.origem === 'SEI' && !d.numeroOrigem.trim()) erros.numeroOrigem = 'Informe o número do processo SEI.';
-  if (!d.saida.trim()) erros.saida = 'Informe a saída (assunto).';
+  if (!d.saida.trim()) erros.saida = 'Informe a demanda (resumo).';
   if (!(CATEGORIAS as readonly string[]).includes(d.categoria)) erros.categoria = 'Escolha a categoria.';
-  if (d.tipoSaida && !(TIPOS_SAIDA as readonly string[]).includes(d.tipoSaida)) erros.tipoSaida = 'Tipo de saída inválido.';
+  if (!(TIPOS_SAIDA as readonly string[]).includes(d.tipoSaida)) erros.tipoSaida = 'Escolha o tipo de saída.';
+  if (d.meioSaida && !(MEIOS_SAIDA as readonly string[]).includes(d.meioSaida)) erros.meioSaida = 'Meio de saída inválido.';
+  if (!(RESPOSTAS as readonly string[]).includes(d.resposta)) erros.resposta = 'Escolha Sim ou Não.';
   if (d.responsavel && !(RESPONSAVEIS as readonly string[]).includes(d.responsavel)) erros.responsavel = 'Responsável inválido.';
 
   for (const campo of ['inicioBtl', 'terminoBtl', 'prazoCPA', 'prazoCia'] as const) {
@@ -107,9 +123,6 @@ export function validarDemanda(d: DadosDemanda): ErrosDemanda {
   }
   if (!erros.terminoBtl && d.inicioBtl && d.terminoBtl && d.terminoBtl < d.inicioBtl) {
     erros.terminoBtl = 'O término não pode ser antes do início.';
-  }
-  if (d.linkEvento && !/^https?:\/\/\S+$/.test(d.linkEvento.trim())) {
-    erros.linkEvento = 'O link precisa começar com http:// ou https://';
   }
   return erros;
 }
@@ -127,7 +140,8 @@ export const ROTULO_CAMPO: Record<keyof DadosDemanda, string> = {
   origem: 'Origem',
   numeroOrigem: 'Nº da origem',
   tipoSaida: 'Tipo de saída',
-  saida: 'Saída (assunto)',
+  saida: 'Demanda (resumo)',
+  meioSaida: 'Meio de saída',
   numeroSaida: 'Nº da saída',
   destinos: 'Destinos',
   inicioBtl: 'Início Btl',
@@ -138,8 +152,8 @@ export const ROTULO_CAMPO: Record<keyof DadosDemanda, string> = {
   agendaCPA: 'Agenda CPA',
   agendaCia: 'Agenda Cia',
   responsavel: 'Responsável',
-  resposta: 'Resposta',
+  resposta: 'Resposta?',
   categoria: 'Categoria',
   observacao: 'Observação',
-  linkEvento: 'Link do evento',
+  linkEvento: 'Link de evento / formulário',
 };

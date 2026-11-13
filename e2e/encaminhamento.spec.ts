@@ -11,11 +11,12 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   // P/3 cadastra para a 3ª Cia
   await entrar(page, 'p3', SENHA_TESTE);
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
-  await page.getByLabel('Saída (assunto)').fill(assunto);
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
   await page.getByLabel('Categoria').selectOption('Escoltas');
   await page.getByLabel('3ª CIA', { exact: true }).check();
   await page.getByLabel('Prazo CPA').fill('2099-12-31');
   await page.getByRole('button', { name: 'Salvar' }).click();
+  await page.getByRole('link', { name: 'Ver lista' }).click();
   await expect(linkDaDemanda()).toContainText('(0/1 responderam)');
   await sair(page);
 
