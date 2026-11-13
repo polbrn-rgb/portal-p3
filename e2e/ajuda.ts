@@ -11,3 +11,9 @@ export async function entrar(page: Page, unidade: string, senha: string) {
 export function sobraLateral(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 }
+
+/** Sai e espera a tela de login voltar (sem isso, o próximo login pode pegar a sessão antiga). */
+export async function sair(page: Page) {
+  await page.getByRole('button', { name: 'Sair' }).click();
+  await page.getByRole('button', { name: 'Entrar' }).waitFor();
+}

@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { entrar, sobraLateral } from './ajuda';
+import { entrar, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Fluxo completo: P/3 cria para a 3ª Cia -> 3ª Cia responde -> P/3 devolve -> Cia corrige -> P/3 aceita.
 test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', async ({ page }, info) => {
+  test.setTimeout(60_000); // seis logins seguidos
   const assunto = `Escolta teste ${info.project.name} ${Date.now()}`;
   const linkDaDemanda = () => page.getByRole('link', { name: new RegExp(assunto) });
 
@@ -16,13 +17,13 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await page.getByLabel('Prazo CPA').fill('2099-12-31');
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(linkDaDemanda()).toContainText('(0/1 responderam)');
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await sair(page);
 
   // A 4ª Cia não vê nada dessa demanda
   await entrar(page, '4cia', SENHA_TESTE);
   await expect(page.getByRole('heading', { name: '4ª CIA' })).toBeVisible();
   await expect(linkDaDemanda()).toHaveCount(0);
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await sair(page);
 
   // 3ª Cia abre, responde e a demanda vai para "Respondidas"
   await entrar(page, '3cia', SENHA_TESTE);
@@ -34,7 +35,7 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await page.getByRole('button', { name: 'Enviar resposta' }).click();
   await page.getByRole('tab', { name: /Respondidas/ }).click();
   await expect(linkDaDemanda()).toContainText('Respondido');
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await sair(page);
 
   // P/3 vê a resposta e devolve
   await entrar(page, 'p3', SENHA_TESTE);
@@ -48,7 +49,7 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await resposta.getByRole('button', { name: 'Confirmar devolução' }).click();
   await expect(resposta).toContainText('Devolvido');
   await page.getByRole('link', { name: 'Voltar' }).click();
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await sair(page);
 
   // 3ª Cia vê o motivo e corrige (o nome já vem preenchido)
   await entrar(page, '3cia', SENHA_TESTE);
@@ -57,7 +58,7 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await expect(page.getByLabel('Respondido por')).toHaveValue('Sd Teste');
   await page.getByLabel('Resposta').fill('Escolta realizada com 4 PMs.');
   await page.getByRole('button', { name: 'Enviar resposta' }).click();
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await sair(page);
 
   // P/3 aceita
   await entrar(page, 'p3', SENHA_TESTE);
