@@ -24,11 +24,16 @@ service cloud.firestore {
 
     // A Cia só mexe nos campos da resposta, só nos status dela
     // e não altera encaminhamento já aceito ou cancelado pela P/3.
+    // Para marcar "respondido" precisa da resposta e do nome de quem respondeu.
     function respostaDaUnidadeValida() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'resposta', 'respondidoPor', 'respondidoEm', 'lidoEm', 'anexosResposta'])
+      let novo = request.resource.data;
+      return novo.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resposta', 'respondidoPor', 'respondidoEm', 'lidoEm', 'anexosResposta', 'atualizadoEm'])
         && !(resource.data.status in ['aceito', 'cancelado'])
-        && request.resource.data.status in ['visualizado', 'em_andamento', 'respondido'];
+        && novo.status in ['visualizado', 'em_andamento', 'respondido']
+        && (novo.status != 'respondido'
+          || (novo.resposta is string && novo.resposta.size() > 0
+            && novo.respondidoPor is string && novo.respondidoPor.size() > 0));
     }
 
     match /demandas/{demandaId} {

@@ -1,6 +1,7 @@
 import { signOut } from 'firebase/auth';
 import type { Sessao } from '../domain/contas';
 import { auth } from '../lib/firebase';
+import { PainelUnidade } from './cia/PainelUnidade';
 import { PainelP3 } from './p3/PainelP3';
 import { Topo } from './Topo';
 
@@ -13,12 +14,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
         </button>
       </Topo>
       {sessao.tipo === 'p3' && <PainelP3 />}
-      {sessao.tipo === 'unidade' && (
-        <section className="cartao">
-          <h2>{sessao.sigla}</h2>
-          <p>As demandas da sua unidade aparecem aqui a partir da Fase 3.</p>
-        </section>
-      )}
+      {sessao.tipo === 'unidade' && <PainelUnidade unidade={sessao.unidade} sigla={sessao.sigla} />}
       {sessao.tipo === 'sem-perfil' && (
         <section className="cartao" role="alert">
           <h2>Conta sem perfil</h2>

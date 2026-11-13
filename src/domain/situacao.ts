@@ -1,26 +1,33 @@
 import type { Demanda } from './demanda';
-import { siglaDoDestino } from './unidades';
+import { siglaDoDestino, unidadesParaEncaminhar } from './unidades';
 
 // Os status da planilha que dependem da data são calculados na hora, não gravados.
-export type Situacao = 'concluido' | 'atrasado' | 'vence_hoje' | 'cia_atrasada' | 'em_aberto';
+export type Situacao = 'concluido' | 'atrasado' | 'vence_hoje' | 'cia_atrasada' | 'respondida' | 'em_aberto';
 
 export const ROTULO_SITUACAO: Record<Situacao, string> = {
   concluido: 'Concluído',
   atrasado: 'Atrasado',
   vence_hoje: 'Vence Hoje',
   cia_atrasada: 'Cia Atrasada',
+  respondida: 'Cias responderam',
   em_aberto: 'Em aberto',
 };
 
-/** Prioridade: Concluído > Atrasado > Vence Hoje > Cia Atrasada > Em aberto. */
+/**
+ * Prioridade: Concluído > Atrasado > Vence Hoje > Cia Atrasada > Cias responderam > Em aberto.
+ * `ciasPendentes`: quantas Cias ainda devem resposta (sem a informação, vale só o prazo).
+ */
 export function situacaoDaDemanda(
-  d: Pick<Demanda, 'status' | 'prazoCPA' | 'prazoCia'>,
+  d: Pick<Demanda, 'status' | 'prazoCPA' | 'prazoCia'> & Partial<Pick<Demanda, 'destinos'>>,
   hoje: string,
+  ciasPendentes?: number,
 ): Situacao {
   if (d.status === 'concluido') return 'concluido';
   if (d.prazoCPA && d.prazoCPA < hoje) return 'atrasado';
   if (d.prazoCPA && d.prazoCPA === hoje) return 'vence_hoje';
-  if (d.prazoCia && d.prazoCia < hoje) return 'cia_atrasada';
+  const ciaDeve = ciasPendentes === undefined || ciasPendentes > 0;
+  if (ciaDeve && d.prazoCia && d.prazoCia < hoje) return 'cia_atrasada';
+  if (ciasPendentes === 0 && d.destinos && unidadesParaEncaminhar(d.destinos).length > 0) return 'respondida';
   return 'em_aberto';
 }
 
@@ -34,10 +41,11 @@ export function filtrarDemandas<T extends Demanda>(
   texto: string,
   situacao: Situacao | 'todas',
   hoje: string,
+  pendentesDe: (d: T) => number | undefined = () => undefined,
 ): T[] {
   const termo = normalizarTexto(texto.trim());
   return lista.filter((d) => {
-    if (situacao !== 'todas' && situacaoDaDemanda(d, hoje) !== situacao) return false;
+    if (situacao !== 'todas' && situacaoDaDemanda(d, hoje, pendentesDe(d)) !== situacao) return false;
     if (!termo) return true;
     const alvo = [
       String(d.numero),

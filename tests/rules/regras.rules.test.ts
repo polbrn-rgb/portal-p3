@@ -127,6 +127,20 @@ describe('Cia', () => {
     await assertFails(updateDoc(enc, { status: 'respondido', unidadeId: '2cia' }));
   });
 
+  test('marca em andamento e só envia "respondido" com resposta e nome', async () => {
+    const enc = doc(cia('1cia'), 'encaminhamentos/d1_1cia');
+    await assertSucceeds(updateDoc(enc, { status: 'em_andamento' }));
+    await assertFails(updateDoc(enc, { status: 'respondido', resposta: 'Feito.' }));
+    await assertFails(updateDoc(enc, { status: 'respondido', resposta: '', respondidoPor: 'Sd Silva' }));
+    await assertSucceeds(updateDoc(enc, { status: 'respondido', resposta: 'Feito.', respondidoPor: 'Sd Silva' }));
+  });
+
+  test('não apaga o motivo da devolução nem mexe no resumo da demanda', async () => {
+    const enc = doc(cia('1cia'), 'encaminhamentos/d1_1cia');
+    await assertFails(updateDoc(enc, { status: 'visualizado', motivoDevolucao: '' }));
+    await assertFails(updateDoc(enc, { status: 'visualizado', saida: 'Outro assunto' }));
+  });
+
   test('não altera encaminhamento já aceito', async () => {
     await assertFails(updateDoc(doc(cia('1cia'), 'encaminhamentos/d0_1cia'), { status: 'respondido', resposta: 'x' }));
   });

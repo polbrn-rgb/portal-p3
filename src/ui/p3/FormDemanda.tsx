@@ -15,6 +15,7 @@ import { ROTULO_SITUACAO, situacaoDaDemanda } from '../../domain/situacao';
 import { ORDEM_DESTINOS, siglaDoDestino, UNIDADES, type DestinoId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
+import { RespostasCias } from './RespostasCias';
 
 export function NovaDemanda() {
   return <FormDemanda />;
@@ -242,6 +243,8 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
           <input type="url" inputMode="url" value={dados.linkEvento} onChange={(e) => mudar('linkEvento', e.target.value)} />
         </Campo>
       </fieldset>
+
+      {existente && <RespostasCias demandaId={existente.id} />}
 
       {erroGeral && (
         <p className="mensagem erro" role="alert">

@@ -16,6 +16,15 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { camposAlterados, type DadosDemanda, type Demanda, type StatusDemanda } from '../domain/demanda';
+import {
+  idEncaminhamento,
+  novoEncaminhamento,
+  planejarEncaminhamentos,
+  resumoDaDemanda,
+  STATUS_PENDENTES,
+  type Encaminhamento,
+} from '../domain/encaminhamento';
+import { unidadesParaEncaminhar } from '../domain/unidades';
 
 // Acesso ao banco. Recebe o Firestore por parâmetro para poder ser testado no emulador.
 
@@ -45,11 +54,29 @@ export async function criarDemanda(db: Firestore, dados: DadosDemanda): Promise<
       atualizadoEm: serverTimestamp(),
     });
     tx.set(doc(collection(ref, 'historico')), { acao: 'criada', em: serverTimestamp() });
+
+    // Cada Cia marcada recebe o seu encaminhamento na mesma gravação.
+    const resumo = resumoDaDemanda({ ...dados, numero });
+    for (const unidade of unidadesParaEncaminhar(dados.destinos)) {
+      tx.set(doc(db, 'encaminhamentos', idEncaminhamento(String(numero), unidade)), {
+        ...novoEncaminhamento(String(numero), unidade, resumo),
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp(),
+      });
+    }
     return numero;
   }, { maxAttempts: 10 });
 }
 
-/** Grava só se algo mudou, e registra no histórico quais campos mudaram. */
+export async function encaminhamentosDaDemanda(db: Firestore, demandaId: string): Promise<Encaminhamento[]> {
+  const s = await getDocs(query(collection(db, 'encaminhamentos'), where('demandaId', '==', demandaId)));
+  return s.docs.map((e) => ({ ...(e.data() as Omit<Encaminhamento, 'id'>), id: e.id }));
+}
+
+/**
+ * Grava só se algo mudou, registra no histórico quais campos mudaram e acerta
+ * os encaminhamentos (Cia nova, Cia retirada, assunto/prazo alterado) na mesma gravação.
+ */
 export async function atualizarDemanda(
   db: Firestore,
   id: string,
@@ -59,22 +86,52 @@ export async function atualizarDemanda(
   const campos = camposAlterados(antes, depois);
   if (campos.length === 0) return campos;
 
+  const numero = Number(id);
+  const plano = planejarEncaminhamentos({ ...depois, numero }, await encaminhamentosDaDemanda(db, id));
+  const resumo = resumoDaDemanda({ ...depois, numero });
+  const agora = serverTimestamp();
+
   const ref = doc(db, 'demandas', id);
   const lote = writeBatch(db);
-  lote.update(ref, { ...depois, atualizadoEm: serverTimestamp() });
-  lote.set(doc(collection(ref, 'historico')), { acao: 'editada', campos, em: serverTimestamp() });
+  lote.update(ref, { ...depois, atualizadoEm: agora });
+  lote.set(doc(collection(ref, 'historico')), { acao: 'editada', campos, em: agora });
+  for (const unidade of plano.criar) {
+    lote.set(doc(db, 'encaminhamentos', idEncaminhamento(id, unidade)), {
+      ...novoEncaminhamento(id, unidade, resumo),
+      criadoEm: agora,
+      atualizadoEm: agora,
+    });
+  }
+  for (const e of plano.cancelar) lote.update(doc(db, 'encaminhamentos', e), { status: 'cancelado', atualizadoEm: agora });
+  for (const e of plano.reativar) {
+    lote.update(doc(db, 'encaminhamentos', e), { ...resumo, status: 'novo', resposta: '', respondidoPor: '', motivoDevolucao: '', atualizadoEm: agora });
+  }
+  for (const e of plano.atualizarResumo) {
+    if (!plano.reativar.includes(e)) lote.update(doc(db, 'encaminhamentos', e), { ...resumo, atualizadoEm: agora });
+  }
   await lote.commit();
   return campos;
 }
 
+/**
+ * Concluir: o que a Cia ainda devia é cancelado e o que ela já respondeu é aceito.
+ * Reabrir: só a demanda volta a ficar aberta.
+ */
 export async function alterarStatus(db: Firestore, id: string, status: StatusDemanda): Promise<void> {
   const ref = doc(db, 'demandas', id);
+  const agora = serverTimestamp();
   const lote = writeBatch(db);
-  lote.update(ref, { status, atualizadoEm: serverTimestamp() });
+  lote.update(ref, { status, atualizadoEm: agora });
   lote.set(doc(collection(ref, 'historico')), {
     acao: status === 'concluido' ? 'concluida' : 'reaberta',
-    em: serverTimestamp(),
+    em: agora,
   });
+  if (status === 'concluido') {
+    for (const e of await encaminhamentosDaDemanda(db, id)) {
+      if (STATUS_PENDENTES.includes(e.status)) lote.update(doc(db, 'encaminhamentos', e.id), { status: 'cancelado', atualizadoEm: agora });
+      if (e.status === 'respondido') lote.update(doc(db, 'encaminhamentos', e.id), { status: 'aceito', atualizadoEm: agora });
+    }
+  }
   await lote.commit();
 }
 

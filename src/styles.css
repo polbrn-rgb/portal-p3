@@ -343,6 +343,71 @@ a.botao {
   white-space: nowrap;
 }
 
+/* Status do encaminhamento (Cia) */
+.enc-novo { background: #e7f1fb; color: #1d4f86; }
+.enc-visualizado { background: #efedff; color: #4b3aa8; }
+.enc-em_andamento { background: #f9eeda; color: #7a4b00; }
+.enc-respondido { background: #e5f4e4; color: #1d5c1a; }
+.enc-aceito { background: #1d5c1a; color: #fff; }
+.enc-devolvido { background: #fbebeb; color: #8a1c1c; }
+.enc-cancelado { background: #f0efec; color: #5b6372; }
+
+.borda-enc-respondido,
+.borda-enc-aceito { border-left-color: #3c9a37; }
+.borda-enc-devolvido { border-left-color: var(--cor-destaque); }
+
+.resposta-cia {
+  border: 1px solid #e3e6ea;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.texto-resposta {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.aviso-devolvido {
+  background: #fbebeb;
+  color: #8a1c1c;
+}
+
+.acoes-linha {
+  display: flex;
+  gap: 8px;
+}
+
+.acoes-linha > * {
+  flex: 1;
+}
+
+.devolucao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dados {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.dados dt {
+  font-weight: 600;
+  color: var(--cor-suave);
+}
+
+.dados dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Formulário de demanda ---------- */
 .grupo {
   margin: 0;
@@ -492,6 +557,13 @@ a.botao {
   .item-demanda {
     padding: 10px 14px;
   }
+
+  .item-demanda.item-cia {
+    grid-template-columns: 80px minmax(0, 1fr) 200px 150px 130px;
+  }
+
+  .item-cia .item-prazo { grid-area: 1 / 4; }
+  .item-cia .item-topo .selo { grid-area: 1 / 5; }
 
   .item-demanda:hover {
     box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
