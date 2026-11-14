@@ -57,8 +57,12 @@ export function FormPedidoEfetivo({ demanda, aoFechar }: { demanda: Demanda; aoF
     try {
       await enviarSolicitacao(db, demanda, pedido);
       aoFechar();
-    } catch {
-      setErroGeral('Não foi possível enviar. Verifique a conexão e tente de novo.');
+    } catch (e) {
+      setErroGeral(
+        (e as { code?: string }).code === 'permission-denied'
+          ? 'O banco recusou o envio: as regras novas do Firestore ainda não foram publicadas (npm run deploy:regras ou console do Firebase).'
+          : 'Não foi possível enviar. Verifique a conexão e tente de novo.',
+      );
       setEnviando(false);
     }
   }

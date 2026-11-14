@@ -8,8 +8,7 @@ import { UNIDADES, type UnidadeId } from './unidades';
 export const POSTOS = [
   { id: 'cap', rotulo: 'Cap PM' },
   { id: 'ten', rotulo: 'Ten PM' },
-  { id: 'subten', rotulo: 'Subten PM' },
-  { id: 'sgt', rotulo: 'Sgt PM' },
+  { id: 'subsgt', rotulo: 'Sub/Sgt PM' },
   { id: 'cbsd', rotulo: 'Cb/Sd PM' },
 ] as const;
 
@@ -61,7 +60,7 @@ export function idSolicitacao(numero: string, unidade: UnidadeId): string {
 }
 
 export function quantidadesVazias(): Quantidades {
-  return { cap: 0, ten: 0, subten: 0, sgt: 0, cbsd: 0 };
+  return { cap: 0, ten: 0, subsgt: 0, cbsd: 0 };
 }
 
 export function totalDe(q: Partial<Quantidades> | undefined): number {
@@ -74,14 +73,14 @@ export function normalizarRE(re: string): string {
   return numeros.length > 6 ? numeros.slice(0, 6) : numeros;
 }
 
-/** "1º Sgt PM" -> sgt; "Cb PM" -> cbsd; Maj/Ten Cel/Cel -> outro (acima de Cap). */
+/** "Subten PM" e "1º Sgt PM" -> subsgt; "Cb PM" -> cbsd; Maj/Ten Cel/Cel -> outro (acima de Cap). */
 export function categoriaDoPosto(posto: string): PostoId | 'outro' {
   const p = String(posto ?? '').toLowerCase();
-  if (/subten/.test(p)) return 'subten';
+  if (/subten/.test(p)) return 'subsgt';
   if (/ten\.?\s*cel|\bcel\b|\bmaj/.test(p)) return 'outro';
   if (/\bcap/.test(p)) return 'cap';
   if (/\bten|\basp/.test(p)) return 'ten';
-  if (/sgt|sarg/.test(p)) return 'sgt';
+  if (/sgt|sarg/.test(p)) return 'subsgt';
   if (/\bcb\b|\bsd\b|cabo|soldado/.test(p)) return 'cbsd';
   return 'outro';
 }

@@ -27,8 +27,8 @@ describe('efetivo', () => {
     expect(categoriaDoPosto('Cap PM')).toBe('cap');
     expect(categoriaDoPosto('1º Ten PM')).toBe('ten');
     expect(categoriaDoPosto('Asp Of PM')).toBe('ten');
-    expect(categoriaDoPosto('Subten PM')).toBe('subten');
-    expect(categoriaDoPosto('2º Sgt PM')).toBe('sgt');
+    expect(categoriaDoPosto('Subten PM')).toBe('subsgt');
+    expect(categoriaDoPosto('2º Sgt PM')).toBe('subsgt');
     expect(categoriaDoPosto('Cb PM')).toBe('cbsd');
     expect(categoriaDoPosto('Sd PM')).toBe('cbsd');
     expect(categoriaDoPosto('Ten Cel PM')).toBe('outro');
@@ -41,7 +41,7 @@ describe('efetivo', () => {
       { re: '2', posto: 'Sd PM', nomeGuerra: 'b', telefone: '' },
       { re: '3', posto: '1º Sgt PM', nomeGuerra: 'c', telefone: '' },
     ]);
-    expect(c).toEqual({ cap: 0, ten: 0, subten: 0, sgt: 1, cbsd: 2, outro: 0 });
+    expect(c).toEqual({ cap: 0, ten: 0, subsgt: 1, cbsd: 2, outro: 0 });
   });
 
   test('pedido precisa de prazo e de pelo menos uma Cia com policial', () => {
