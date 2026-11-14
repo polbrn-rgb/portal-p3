@@ -50,6 +50,11 @@ service cloud.firestore {
       allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaDaUnidadeValida());
     }
 
+    // Checklist Operações (id = número da demanda).
+    match /operacoes/{numero} {
+      allow read, write: if ehP3();
+    }
+
     match /caixaEntrada/{itemId} {
       allow read, write: if ehP3();
     }

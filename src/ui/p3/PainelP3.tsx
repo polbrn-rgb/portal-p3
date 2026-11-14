@@ -1,9 +1,12 @@
+import { observarOperacoes } from '../../data/operacoes';
 import { observarPendentes } from '../../data/pendentes';
+import type { Operacao } from '../../domain/operacao';
 import type { Pendente } from '../../domain/pendente';
 import type { Situacao } from '../../domain/situacao';
 import { db } from '../../lib/firebase';
 import { useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
@@ -32,11 +35,29 @@ function Abas({ ativa, pendentes }: { ativa: AbaP3; pendentes?: number }) {
   );
 }
 
+/** Dentro de Demandas Pendentes: a lista de pendentes e o Checklist Operações. */
+function SubAbas({ ativa, pendentes, operacoes }: { ativa: 'pendentes' | 'operacoes'; pendentes?: number; operacoes?: number }) {
+  return (
+    <nav className="abas abas-p3 subabas" aria-label="Demandas Pendentes">
+      <a href="#/pendentes" aria-current={ativa === 'pendentes' ? 'page' : undefined}>
+        Pendentes
+        {pendentes ? <span className="contador-aba">{pendentes}</span> : null}
+      </a>
+      <a href="#/operacoes" aria-current={ativa === 'operacoes' ? 'page' : undefined}>
+        Checklist Operações
+        {operacoes ? <span className="contador-aba">{operacoes}</span> : null}
+      </a>
+    </nav>
+  );
+}
+
 export function PainelP3() {
   const hash = useHash();
   // Fica ligado em todas as telas da P/3: o número na aba avisa quando chega pendente nova.
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
+  const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
   const total = pendentes.valor?.length;
+  const totalOperacoes = operacoes.valor?.length;
 
   if (hash === '#/nova') return <NovaDemanda />;
   if (hash === '#/pendentes/sei') return <FormPendente key="sei" tipo="sei" />;
@@ -53,11 +74,13 @@ export function PainelP3() {
       </>
     );
   }
-  if (hash === '#/pendentes') {
+  if (hash === '#/pendentes' || hash === '#/operacoes') {
+    const ativa = hash === '#/pendentes' ? 'pendentes' : 'operacoes';
     return (
       <>
         <Abas ativa="pendentes" pendentes={total} />
-        <ListaPendentes pendentes={pendentes} />
+        <SubAbas ativa={ativa} pendentes={total} operacoes={totalOperacoes} />
+        {ativa === 'pendentes' ? <ListaPendentes pendentes={pendentes} /> : <ChecklistOperacoes operacoes={operacoes} />}
       </>
     );
   }
