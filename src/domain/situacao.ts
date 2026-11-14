@@ -1,4 +1,5 @@
 import type { Demanda } from './demanda';
+import type { Andamento } from './encaminhamento';
 import { siglaDoDestino, unidadesParaEncaminhar } from './unidades';
 
 // Os status da planilha que dependem da data são calculados na hora, não gravados.
@@ -13,21 +14,28 @@ export const ROTULO_SITUACAO: Record<Situacao, string> = {
   em_aberto: 'Em aberto',
 };
 
+type BaseSituacao = Pick<Demanda, 'status' | 'prazoCPA' | 'prazoCia'> & Partial<Pick<Demanda, 'destinos' | 'ciasAceitas'>>;
+
+/** Quantas Cias a demanda tem e quantas já responderam (resposta enviada ou aceita). */
+export function contarRespostas(d: BaseSituacao, andamento: Andamento): { total: number; responderam: number } {
+  const unidades = unidadesParaEncaminhar(d.destinos ?? []);
+  const aceitas = (d.ciasAceitas ?? []).filter((u) => unidades.includes(u)).length;
+  return { total: unidades.length, responderam: Math.min(unidades.length, andamento.respondidas + aceitas) };
+}
+
 /**
  * Prioridade: Concluído > Atrasado > Vence Hoje > Cia Atrasada > Cias responderam > Em aberto.
- * `ciasPendentes`: quantas Cias ainda devem resposta (sem a informação, vale só o prazo).
+ * `andamento`: respostas das Cias (sem a informação, vale só o prazo).
+ * "Cias responderam" só aparece quando TODAS as Cias da demanda enviaram resposta (ou tiveram aceite).
  */
-export function situacaoDaDemanda(
-  d: Pick<Demanda, 'status' | 'prazoCPA' | 'prazoCia'> & Partial<Pick<Demanda, 'destinos'>>,
-  hoje: string,
-  ciasPendentes?: number,
-): Situacao {
+export function situacaoDaDemanda(d: BaseSituacao, hoje: string, andamento?: Andamento): Situacao {
   if (d.status === 'concluido') return 'concluido';
   if (d.prazoCPA && d.prazoCPA < hoje) return 'atrasado';
   if (d.prazoCPA && d.prazoCPA === hoje) return 'vence_hoje';
-  const ciaDeve = ciasPendentes === undefined || ciasPendentes > 0;
-  if (ciaDeve && d.prazoCia && d.prazoCia < hoje) return 'cia_atrasada';
-  if (ciasPendentes === 0 && d.destinos && unidadesParaEncaminhar(d.destinos).length > 0) return 'respondida';
+  const respostas = andamento ? contarRespostas(d, andamento) : undefined;
+  const todasResponderam = !!respostas && respostas.total > 0 && andamento!.pendentes === 0 && respostas.responderam >= respostas.total;
+  if (!todasResponderam && d.prazoCia && d.prazoCia < hoje) return 'cia_atrasada';
+  if (todasResponderam) return 'respondida';
   return 'em_aberto';
 }
 
@@ -41,11 +49,11 @@ export function filtrarDemandas<T extends Demanda>(
   texto: string,
   situacao: Situacao | 'todas',
   hoje: string,
-  pendentesDe: (d: T) => number | undefined = () => undefined,
+  andamentoDe: (d: T) => Andamento | undefined = () => undefined,
 ): T[] {
   const termo = normalizarTexto(texto.trim());
   return lista.filter((d) => {
-    if (situacao !== 'todas' && situacaoDaDemanda(d, hoje, pendentesDe(d)) !== situacao) return false;
+    if (situacao !== 'todas' && situacaoDaDemanda(d, hoje, andamentoDe(d)) !== situacao) return false;
     if (!termo) return true;
     const alvo = [
       String(d.numero),

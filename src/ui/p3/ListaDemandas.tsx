@@ -4,8 +4,8 @@ import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { formatarData, hojeISO } from '../../domain/datas';
 import type { Demanda } from '../../domain/demanda';
 import { andamentoPorDemanda, type Andamento, type Encaminhamento } from '../../domain/encaminhamento';
-import { filtrarDemandas, ROTULO_SITUACAO, situacaoDaDemanda, type Situacao } from '../../domain/situacao';
-import { siglaDoDestino, unidadesParaEncaminhar } from '../../domain/unidades';
+import { contarRespostas, filtrarDemandas, ROTULO_SITUACAO, situacaoDaDemanda, type Situacao } from '../../domain/situacao';
+import { siglaDoDestino } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { useDemandasAbertas } from '../../lib/useDemandasAbertas';
@@ -25,7 +25,8 @@ export function ListaDemandas() {
     [encsAbertos.valor],
   );
   // Sem os encaminhamentos carregados, a situação usa só os prazos.
-  const pendentesDe = (d: Demanda) => (andamento ? (andamento[d.id]?.pendentes ?? 0) : undefined);
+  const SEM_ABERTOS: Andamento = { pendentes: 0, respondidas: 0 };
+  const andamentoDe = (d: Demanda): Andamento | undefined => (andamento ? (andamento[d.id] ?? SEM_ABERTOS) : undefined);
 
   const [concluidas, setConcluidas] = useState<Demanda[]>([]);
   const [temMais, setTemMais] = useState(true);
@@ -71,7 +72,7 @@ export function ListaDemandas() {
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todas: abertas.lista.length };
     for (const d of abertas.lista) {
-      const s = situacaoDaDemanda(d, hoje, pendentesDe(d));
+      const s = situacaoDaDemanda(d, hoje, andamentoDe(d));
       c[s] = (c[s] ?? 0) + 1;
     }
     return c;
@@ -79,7 +80,7 @@ export function ListaDemandas() {
   }, [abertas.lista, hoje, andamento]);
 
   const base = aba === 'abertas' ? abertas.lista : concluidas;
-  const visiveis = filtrarDemandas(base, texto, aba === 'abertas' ? filtro : 'todas', hoje, pendentesDe);
+  const visiveis = filtrarDemandas(base, texto, aba === 'abertas' ? filtro : 'todas', hoje, andamentoDe);
   const carregando = aba === 'abertas' ? abertas.carregando : carregandoMais && concluidas.length === 0;
   const erro = aba === 'abertas' ? abertas.erro : erroConcluidas;
 
@@ -159,7 +160,7 @@ export function ListaDemandas() {
       <ul className="lista">
         {visiveis.map((d) => (
           <li key={d.id}>
-            <ItemDemanda demanda={d} hoje={hoje} andamento={andamento?.[d.id]} carregado={!!andamento} />
+            <ItemDemanda demanda={d} hoje={hoje} andamento={andamentoDe(d)} />
           </li>
         ))}
       </ul>
@@ -173,14 +174,13 @@ export function ListaDemandas() {
   );
 }
 
-type PropsItem = { demanda: Demanda; hoje: string; andamento?: Andamento; carregado: boolean };
+type PropsItem = { demanda: Demanda; hoje: string; andamento?: Andamento };
 
-function ItemDemanda({ demanda: d, hoje, andamento, carregado }: PropsItem) {
-  const pendentes = carregado ? (andamento?.pendentes ?? 0) : undefined;
-  const situacao = situacaoDaDemanda(d, hoje, pendentes);
-  const total = unidadesParaEncaminhar(d.destinos).length;
+function ItemDemanda({ demanda: d, hoje, andamento }: PropsItem) {
+  const situacao = situacaoDaDemanda(d, hoje, andamento);
+  const conta = andamento ? contarRespostas(d, andamento) : undefined;
   const respostas =
-    d.status === 'em_aberto' && total > 0 && pendentes !== undefined ? ` (${total - pendentes}/${total} responderam)` : '';
+    d.status === 'em_aberto' && conta && conta.total > 0 ? ` (${conta.responderam}/${conta.total} responderam)` : '';
   const destinos = d.destinos.map(siglaDoDestino).join(', ') + respostas;
   const prazo = d.prazoCPA ? `Prazo CPA ${formatarData(d.prazoCPA)}` : d.prazoCia ? `Prazo Cia ${formatarData(d.prazoCia)}` : '';
   return (

@@ -105,7 +105,10 @@ describe('resposta da Cia e decisão da P/3', () => {
     [e] = await listaDaCia('1cia');
     expect(e).toMatchObject({ status: 'respondido', resposta: 'Policiamento realizado.', respondidoPor: 'Sd Silva' });
 
+    await aceitarResposta(p3, e);
+    expect((await obterDemanda(p3, id))?.ciasAceitas).toEqual(['1cia']);
     await devolverResposta(p3, e, 'Falta o efetivo empregado.');
+    expect((await obterDemanda(p3, id))?.ciasAceitas).toEqual([]);
     [e] = await listaDaCia('1cia');
     expect(e).toMatchObject({ status: 'devolvido', motivoDevolucao: 'Falta o efetivo empregado.' });
 
@@ -114,8 +117,10 @@ describe('resposta da Cia e decisão da P/3', () => {
     await aceitarResposta(p3, e);
     expect(await statusPorUnidade(id)).toEqual({ '1cia': 'aceito' });
 
+    expect((await obterDemanda(p3, id))?.ciasAceitas).toEqual(['1cia']);
+
     const hist = await getDocs(collection(p3, 'demandas', id, 'historico'));
-    expect(hist.docs.map((h) => h.data().acao).sort()).toEqual(['criada', 'resposta_aceita', 'resposta_devolvida']);
+    expect(hist.docs.map((h) => h.data().acao).sort()).toEqual(['criada', 'resposta_aceita', 'resposta_aceita', 'resposta_devolvida']);
   });
 
   test('concluir a demanda aceita o que foi respondido e cancela o que estava pendente', async () => {

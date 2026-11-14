@@ -56,7 +56,7 @@ export function montarCsv(demandas: readonly Demanda[], encaminhamentos: readonl
   const linhas = [...demandas]
     .sort((a, b) => b.numero - a.numero)
     .map((d) => {
-      const situacao = situacaoDaDemanda(d, hoje, andamento[d.id]?.pendentes ?? 0);
+      const situacao = situacaoDaDemanda(d, hoje, andamento[d.id] ?? { pendentes: 0, respondidas: 0 });
       return [
         d.numero,
         d.saida,

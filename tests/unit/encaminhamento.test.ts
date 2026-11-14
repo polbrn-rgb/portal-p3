@@ -96,14 +96,27 @@ describe('andamento e visão da Cia', () => {
 });
 
 describe('situação com as respostas das Cias', () => {
-  test('prazo da Cia vencido só conta se alguma Cia ainda deve', () => {
-    const d = demanda({ destinos: ['1cia'], prazoCPA: '2026-11-20', prazoCia: '2026-11-12' });
-    expect(situacaoDaDemanda(d, HOJE, 1)).toBe('cia_atrasada');
-    expect(situacaoDaDemanda(d, HOJE, 0)).toBe('respondida');
-    expect(situacaoDaDemanda(d, HOJE)).toBe('cia_atrasada');
+  const duasCias = demanda({ destinos: ['1cia', '2cia'], prazoCPA: '2026-11-20', prazoCia: '2026-11-12' });
+  const sem = { pendentes: 0, respondidas: 0 };
+
+  test('"Cias responderam" só quando TODAS responderam', () => {
+    expect(situacaoDaDemanda(duasCias, HOJE, { pendentes: 1, respondidas: 1 })).toBe('cia_atrasada');
+    expect(situacaoDaDemanda(duasCias, HOJE, { pendentes: 0, respondidas: 2 })).toBe('respondida');
   });
 
-  test('sem Cia nos destinos nunca fica "Cias responderam"', () => {
-    expect(situacaoDaDemanda(demanda({ destinos: ['p1'] }), HOJE, 0)).toBe('em_aberto');
+  test('sem encaminhamentos encontrados não vira "Cias responderam" (era o erro)', () => {
+    expect(situacaoDaDemanda(duasCias, HOJE, sem)).toBe('cia_atrasada');
+    expect(situacaoDaDemanda({ ...duasCias, prazoCia: '' }, HOJE, sem)).toBe('em_aberto');
+  });
+
+  test('respostas aceitas pela P/3 contam; aceite de Cia que saiu da demanda não conta', () => {
+    expect(situacaoDaDemanda({ ...duasCias, ciasAceitas: ['1cia', '2cia'] }, HOJE, sem)).toBe('respondida');
+    expect(situacaoDaDemanda({ ...duasCias, ciasAceitas: ['1cia'] }, HOJE, { pendentes: 0, respondidas: 1 })).toBe('respondida');
+    expect(situacaoDaDemanda({ ...duasCias, ciasAceitas: ['1cia', '5cia'] }, HOJE, sem)).toBe('cia_atrasada');
+  });
+
+  test('sem as respostas carregadas vale só o prazo; sem Cia nos destinos nunca é "Cias responderam"', () => {
+    expect(situacaoDaDemanda(duasCias, HOJE)).toBe('cia_atrasada');
+    expect(situacaoDaDemanda(demanda({ destinos: ['p1'] }), HOJE, sem)).toBe('em_aberto');
   });
 });

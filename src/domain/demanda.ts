@@ -14,7 +14,7 @@ import {
   type RespostaSN,
   type TipoSaida,
 } from './listas';
-import { ORDEM_DESTINOS, UNIDADES, type DestinoId } from './unidades';
+import { ORDEM_DESTINOS, UNIDADES, type DestinoId, type UnidadeId } from './unidades';
 
 export type StatusDemanda = 'em_aberto' | 'concluido';
 
@@ -50,6 +50,8 @@ export type Demanda = DadosDemanda & {
   /** Preenchido pelo Apps Script da P/3 (agenda, pasta CFP). */
   automacao?: Automacao;
   automacaoPendente?: boolean;
+  /** Cias cuja resposta a P/3 aceitou (gravado pela P/3 ao aceitar). */
+  ciasAceitas?: UnidadeId[];
 };
 
 export type ErrosDemanda = Partial<Record<keyof DadosDemanda, string>>;

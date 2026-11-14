@@ -1,4 +1,6 @@
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   doc,
   limit,
@@ -37,20 +39,30 @@ export function observarDaDemanda(db: Firestore, demandaId: string, aoMudar: Ouv
   return onSnapshot(q, (s) => aoMudar(lista(s)), aoFalhar);
 }
 
-async function decidir(db: Firestore, e: Encaminhamento, mudanca: Record<string, unknown>, acao: string) {
+async function decidir(
+  db: Firestore,
+  e: Encaminhamento,
+  mudanca: Record<string, unknown>,
+  acao: string,
+  aceita: boolean,
+) {
   const agora = serverTimestamp();
   const lote = writeBatch(db);
   lote.update(doc(db, 'encaminhamentos', e.id), { ...mudanca, atualizadoEm: agora });
+  // A demanda guarda quais Cias tiveram a resposta aceita (para a situação "Cias responderam").
+  lote.update(doc(db, 'demandas', e.demandaId), {
+    ciasAceitas: aceita ? arrayUnion(e.unidadeId) : arrayRemove(e.unidadeId),
+  });
   lote.set(doc(collection(db, 'demandas', e.demandaId, 'historico')), { acao, unidade: e.unidadeId, em: agora });
   await lote.commit();
 }
 
 export function aceitarResposta(db: Firestore, e: Encaminhamento): Promise<void> {
-  return decidir(db, e, { status: 'aceito', aceitoEm: serverTimestamp() }, 'resposta_aceita');
+  return decidir(db, e, { status: 'aceito', aceitoEm: serverTimestamp() }, 'resposta_aceita', true);
 }
 
 export function devolverResposta(db: Firestore, e: Encaminhamento, motivo: string): Promise<void> {
-  return decidir(db, e, { status: 'devolvido', motivoDevolucao: motivo.trim() }, 'resposta_devolvida');
+  return decidir(db, e, { status: 'devolvido', motivoDevolucao: motivo.trim() }, 'resposta_devolvida', false);
 }
 
 // ---------- Cia ----------

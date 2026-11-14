@@ -1,4 +1,5 @@
 import {
+  arrayRemove,
   collection,
   doc,
   getDoc,
@@ -123,9 +124,13 @@ export async function atualizarDemanda(
       const resumo = resumoDaDemanda(final);
       const agora = serverTimestamp();
 
+      // Cia retirada ou recolocada perde o "aceito" antigo.
+      const unidadeDe = new Map(existentes.map((e) => [e.id, e.unidadeId]));
+      const semAceite = [...plano.cancelar, ...plano.reativar].map((e) => unidadeDe.get(e)).filter(Boolean);
       tx.update(ref, {
         ...mudancas,
         ...(edicaoPrecisaAutomacao(meus) ? { automacaoPendente: true } : {}),
+        ...(semAceite.length ? { ciasAceitas: arrayRemove(...semAceite) } : {}),
         atualizadoEm: agora,
       });
       tx.set(doc(collection(ref, 'historico')), { acao: 'editada', campos: meus, em: agora });
