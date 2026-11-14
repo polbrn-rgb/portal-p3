@@ -33,18 +33,21 @@ beforeEach(async () => {
   db = env.authenticatedContext('conta-p3', { perfil: 'p3' }).firestore() as unknown as Firestore;
 });
 
-function pendentesAgora(): Promise<Pendente[]> {
+/** Espera a lista ao vivo chegar no estado esperado (a 1ª resposta pode vir só do cache local). */
+function pendentesQuando(condicao: (lista: Pendente[]) => boolean = () => true): Promise<Pendente[]> {
   return new Promise((ok, falha) => {
     const parar = observarPendentes(
       db,
       (lista) => {
-        parar();
+        if (!condicao(lista)) return;
+        setTimeout(parar);
         ok(lista);
       },
       falha,
     );
   });
 }
+const pendentesAgora = () => pendentesQuando();
 
 async function novaSei(texto = 'Ofício 12/2026 - escolta') {
   return criarPendente(db, { ...pendenteManualVazia('sei', '2026-11-14'), texto, numeroSei: '006.1/2026' });
@@ -75,7 +78,8 @@ describe('Demandas Pendentes', () => {
         texto: 'x',
       });
     });
-    expect((await pendentesAgora()).map((p) => p.id)[0]).toBe('email_abc');
+    const lista = await pendentesQuando((l) => l.length === 2);
+    expect(lista.map((p) => p.id)[0]).toBe('email_abc');
   });
 
   test('dar destino cria a demanda e tira a pendente da lista na mesma gravação', async () => {
