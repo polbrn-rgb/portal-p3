@@ -90,7 +90,7 @@ export function ListaPendentes({ pendentes }: { pendentes: AoVivo<Pendente[]> })
         <p className="vazio">{lista.length ? 'Nenhuma pendente encontrada.' : 'Nenhuma demanda pendente.'}</p>
       )}
 
-      <ul className="lista">
+      <ul className="lista lista-pendentes">
         {visiveis.map((p) => (
           <li key={p.id}>
             <CartaoPendente

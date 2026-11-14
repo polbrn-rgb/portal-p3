@@ -43,7 +43,7 @@ export function FormPendente({ tipo }: { tipo: TipoManual }) {
   }
 
   return (
-    <form className="painel formulario-demanda" onSubmit={salvar} noValidate>
+    <form className="painel painel-estreito" onSubmit={salvar} noValidate>
       <div className="painel-cabecalho">
         <h2>{ehSEI ? 'Nova pendente — SEI' : 'Nova pendente — Ordem Verbal'}</h2>
       </div>
