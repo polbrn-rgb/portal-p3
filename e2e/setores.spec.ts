@@ -13,7 +13,7 @@ function hoje(): string {
 }
 
 test('Sala de Operações lança os resultados da operação do dia', async ({ page }, info) => {
-  const numero = String(90000 + (info.project.name === 'celular' ? 1 : 2));
+  const numero = String(90000 + info.retry * 10 + (info.project.name === 'celular' ? 1 : 2));
   await admin()
     .doc(`operacoes/${numero}`)
     .set({
@@ -49,8 +49,9 @@ test('Sala de Operações lança os resultados da operação do dia', async ({ p
   await page.getByRole('button', { name: 'Salvar resultados' }).click();
   await expect(page.getByRole('status')).toContainText('Salvo. Gravando na planilha');
 
-  const salvo = (await admin().doc(`resultados/${numero}_${hoje()}`).get()).data();
-  expect(salvo).toMatchObject({ protocoloResultado: 'RES-1', valores: { '9': 12 }, gravado: false, salvoPor: 'Sd PM Teste' });
+  await expect
+    .poll(async () => (await admin().doc(`resultados/${numero}_${hoje()}`).get()).data())
+    .toMatchObject({ protocoloResultado: 'RES-1', valores: { '9': 12 }, gravado: false, salvoPor: 'Sd PM Teste' });
 });
 
 test('CFP vê as missões do dia com a pasta', async ({ page }, info) => {
