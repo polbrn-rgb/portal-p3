@@ -138,3 +138,31 @@ test('P/3 manda recado para a Sala de Operações, que vê como do Cmt do P3 (e 
   await expect(page.getByRole('heading', { name: 'Missões do CFP' })).toBeVisible();
   await expect(page.getByText(recado)).toHaveCount(0);
 });
+
+test('tela da Cia: respondida com prazo vencido há um dia sai; atrasada sem resposta fica', async ({ page }, info) => {
+  const marca = `${info.project.name} ${info.retry} ${Date.now()}`;
+  const dia = (desloca: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + desloca);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const base = { categoria: 'Diversos', tipoSaida: 'OFÍCIO', origem: 'SEI', numeroOrigem: '', observacao: '', unidadeId: '6cia', resposta: '', respondidoPor: '', motivoDevolucao: '' };
+  const casos = [
+    { id: 'sai', saida: `Respondida vencida ${marca}`, status: 'aceito', prazoCia: dia(-1) },
+    { id: 'fica1', saida: `Atrasada sem resposta ${marca}`, status: 'novo', prazoCia: dia(-5) },
+    { id: 'fica2', saida: `Respondida no prazo ${marca}`, status: 'respondido', prazoCia: dia(0) },
+  ];
+  for (const [i, c] of casos.entries()) {
+    const numero = 900000 + Math.floor(Math.random() * 90000) + i;
+    await admin()
+      .doc(`encaminhamentos/${numero}_6cia`)
+      .set({ ...base, numero, demandaId: String(numero), saida: c.saida, status: c.status, prazoCia: c.prazoCia, atualizadoEm: FieldValue.serverTimestamp() });
+  }
+  await entrar(page, '6cia', SENHA_TESTE);
+  await expect(page.getByText(`Atrasada sem resposta ${marca}`)).toBeVisible();
+  await page.getByRole('tab', { name: /Respondidas/ }).click();
+  await expect(page.getByText(`Respondida no prazo ${marca}`)).toBeVisible();
+  await page.getByRole('tab', { name: /Finalizadas/ }).click();
+  await expect(page.getByRole('heading', { name: '6ª CIA' })).toBeVisible();
+  await expect(page.getByText(`Respondida vencida ${marca}`)).toHaveCount(0);
+});

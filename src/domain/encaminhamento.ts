@@ -36,6 +36,8 @@ export type Encaminhamento = ResumoEnc & {
   resposta: string;
   respondidoPor: string;
   motivoDevolucao: string;
+  /** Última mudança (Timestamp do Firestore); serve para saber quando foi finalizado. */
+  atualizadoEm?: { toDate: () => Date } | null;
 };
 
 type BaseResumo = Pick<
@@ -119,6 +121,28 @@ export function andamentoPorDemanda(abertos: readonly Pick<Encaminhamento, 'dema
 /** Visão da Cia: atrasado = prazo passou e ela ainda não respondeu. */
 export function encAtrasado(e: Pick<Encaminhamento, 'status' | 'prazoCia'>, hoje: string): boolean {
   return STATUS_PENDENTES.includes(e.status) && !!e.prazoCia && e.prazoCia < hoje;
+}
+
+/** Data AAAA-MM-DD (no horário do aparelho) de um Timestamp do Firestore. '' se não tiver. */
+function diaDe(t: Encaminhamento['atualizadoEm']): string {
+  if (!t || typeof t.toDate !== 'function') return '';
+  const d = t.toDate();
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Sai da tela da Cia (só da tela: o Numerador, a resposta e o backup continuam):
+ * - com prazo: um dia depois do prazo, se a Cia já respondeu (ou foi finalizada);
+ * - sem prazo: no dia seguinte ao aceite/cancelamento pela P/3.
+ * O que ainda depende da Cia (pendente, devolvida, atrasada) nunca sai.
+ */
+export function saiDaTelaDaCia(e: Pick<Encaminhamento, 'status' | 'prazoCia' | 'atualizadoEm'>, hoje: string): boolean {
+  if (STATUS_PENDENTES.includes(e.status)) return false;
+  if (e.prazoCia) return e.prazoCia < hoje;
+  if (e.status !== 'aceito' && e.status !== 'cancelado') return false;
+  const finalizado = diaDe(e.atualizadoEm);
+  return !!finalizado && finalizado < hoje;
 }
 
 export type AbaUnidade = 'pendentes' | 'respondidas' | 'finalizadas';

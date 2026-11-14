@@ -66,6 +66,8 @@ histórico das demandas.
   Cias e do Checklist Operações; o motor apaga os eventos dela nas agendas (a pasta do Drive fica). O número não é
   reaproveitado e aparece como "Excluída" no backup.
 - **Painel**: prazos.
+- **Tela das Cias se limpa sozinha**: a demanda respondida/finalizada sai da tela da Cia um dia depois do prazo (sem
+  prazo: no dia seguinte ao aceite). O que a Cia ainda não respondeu fica, mesmo atrasado. Nada some do Numerador.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **Sala Op.**: o botão **Recado para a Sala**, que funciona igual: aparece no alto da página da Sala de Operações.

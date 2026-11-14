@@ -7,6 +7,7 @@ import {
   abaDoEncaminhamento,
   encAtrasado,
   ROTULO_ENC,
+  saiDaTelaDaCia,
   type AbaUnidade,
   type Encaminhamento,
 } from '../../domain/encaminhamento';
@@ -35,7 +36,9 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     (ok, erro) => observarSolicitacoesDaUnidade(db, unidade, ok, erro),
     [unidade],
   );
-  const lista = encs.valor ?? [];
+  // Respondidas/finalizadas com o prazo vencido há um dia saem da tela (continuam no Numerador da P/3).
+  const hoje = hojeISO();
+  const lista = (encs.valor ?? []).filter((e) => !saiDaTelaDaCia(e, hoje));
   const aberto = /^#\/enc\/(.+)$/.exec(hash)?.[1];
   const efetivo = /^#\/efetivo\/(.+)$/.exec(hash)?.[1];
 
