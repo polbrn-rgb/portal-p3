@@ -672,6 +672,91 @@ a.botao {
 .borda-tipo-sei { border-left-color: #4b3aa8; }
 .borda-tipo-ordem_verbal { border-left-color: #e0a100; }
 
+/* ---------- Checklist Operações ---------- */
+.subabas {
+  margin-top: 8px;
+  background: transparent;
+  box-shadow: none;
+  border: 1px solid #d6dbe3;
+}
+
+.subabas a[aria-current='page'] {
+  background: var(--cor-secundaria);
+}
+
+.barra-progresso {
+  height: 8px;
+  border-radius: 999px;
+  background: #e4e7ec;
+  overflow: hidden;
+}
+
+.barra-progresso span {
+  display: block;
+  height: 100%;
+  background: #2e8b57;
+  transition: width 0.2s;
+}
+
+.selo-completo {
+  background: #e3f4ea;
+  color: #1e6b3f;
+}
+
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checklist > li {
+  border-top: 1px solid #eef0f3;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.item-check input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.detalhe-item {
+  margin: 0 0 0 32px;
+  color: var(--cor-suave);
+  font-size: 0.9rem;
+}
+
+.botao-item {
+  margin-left: 32px;
+  align-self: flex-start;
+}
+
+.protocolos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.protocolos .campo {
+  font-size: 0.85rem;
+}
+
 /* ---------- Formulário de demanda ---------- */
 .grupo {
   margin: 0;

@@ -33,7 +33,7 @@ import { COLECAO_PENDENTES } from './pendentes';
 
 export const TAMANHO_PAGINA = 30;
 
-function paraDemanda(s: QueryDocumentSnapshot): Demanda {
+export function paraDemanda(s: QueryDocumentSnapshot): Demanda {
   return { ...(s.data() as Omit<Demanda, 'id'>), id: s.id };
 }
 
