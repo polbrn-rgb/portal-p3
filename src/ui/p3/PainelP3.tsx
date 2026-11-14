@@ -6,6 +6,8 @@ import type { Situacao } from '../../domain/situacao';
 import { db } from '../../lib/firebase';
 import { useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { MissoesCfp } from '../setores/PainelCfp';
+import { RecadosCfp } from '../setores/RecadosCfp';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
@@ -15,7 +17,7 @@ import { PainelPrazos } from './PainelPrazos';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-type AbaP3 = 'pendentes' | 'numerador' | 'painel';
+type AbaP3 = 'pendentes' | 'numerador' | 'painel' | 'cfp';
 
 function Abas({ ativa, pendentes }: { ativa: AbaP3; pendentes?: number }) {
   const atual = (aba: AbaP3) => (ativa === aba ? 'page' : undefined);
@@ -30,6 +32,9 @@ function Abas({ ativa, pendentes }: { ativa: AbaP3; pendentes?: number }) {
       </a>
       <a href="#/painel" aria-current={atual('painel')}>
         Painel
+      </a>
+      <a href="#/cfp" aria-current={atual('cfp')}>
+        CFP
       </a>
     </nav>
   );
@@ -71,6 +76,15 @@ export function PainelP3() {
       <>
         <Abas ativa="painel" pendentes={total} />
         <PainelPrazos />
+      </>
+    );
+  }
+  if (hash === '#/cfp') {
+    return (
+      <>
+        <Abas ativa="cfp" pendentes={total} />
+        <RecadosCfp podeEnviar />
+        <MissoesCfp />
       </>
     );
   }

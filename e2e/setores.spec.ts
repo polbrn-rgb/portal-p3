@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { entrar, sobraLateral } from './ajuda';
+import { entrar, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Os dados que o motor (Apps Script) gravaria são criados direto no emulador.
@@ -84,5 +84,31 @@ test('CFP vê as missões do dia direto da agenda do CFP, com a pasta', async ({
   const proxima = page.getByRole('article', { name: `Sem pasta ${titulo}` });
   await expect(proxima).toContainText('Sem pasta anexada.');
   await expect(proxima).not.toContainText('Nº');
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+});
+
+test('P/3 tem a aba CFP com as missões e manda recado que o CFP vê como do Cmt do P3', async ({ page }, info) => {
+  const recado = `Conferir efetivo da operação (${info.project.name} ${info.retry})`;
+  // Garante que o motor "já leu" a agenda (sem isso a página mostra o aviso de agenda não lida).
+  await admin().doc('agendaCfp/eventos').set({ conferidoEm: new Date().toISOString() }, { merge: true });
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: 'CFP', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Missões do CFP' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Missões de hoje' })).toBeVisible();
+
+  await page.getByRole('button', { name: '✉️ Recado para o CFP' }).click();
+  await page.getByRole('button', { name: 'Enviar recado' }).click();
+  await expect(page.getByText('Escreva o recado.')).toBeVisible();
+  await page.getByRole('textbox', { name: /^Recado \(aparece/ }).fill(recado);
+  await page.getByRole('button', { name: 'Enviar recado' }).click();
+  await expect(page.getByRole('status')).toContainText('Recado enviado');
+  await expect(page.getByRole('article', { name: 'Recado do Cmt do P3' }).filter({ hasText: recado })).toBeVisible();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
+  await sair(page);
+  await entrar(page, 'cfp', SENHA_TESTE);
+  const cartao = page.getByRole('article', { name: 'Recado do Cmt do P3' }).filter({ hasText: recado });
+  await expect(cartao).toContainText('📢 Recado do Cmt do P3');
+  await expect(cartao.getByRole('button', { name: 'Apagar recado' })).toHaveCount(0);
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });

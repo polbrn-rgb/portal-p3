@@ -4,6 +4,7 @@ import { formatarData, hojeISO } from '../../domain/datas';
 import { db } from '../../lib/firebase';
 import { cutucarMotor, URL_MOTOR } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { RecadosCfp } from './RecadosCfp';
 
 function horaDe(isoCompleto: string): string {
   const d = new Date(isoCompleto);
@@ -11,8 +12,18 @@ function horaDe(isoCompleto: string): string {
   return `${formatarData(hojeISO(d))} às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** CFP: eventos da agenda do CFP no dia escolhido (com a pasta) e os próximos. */
+/** Página do CFP: recados do Cmt do P3 e as missões da agenda. */
 export function PainelCfp() {
+  return (
+    <>
+      <RecadosCfp />
+      <MissoesCfp />
+    </>
+  );
+}
+
+/** Eventos da agenda do CFP no dia escolhido (com a pasta) e os próximos. Também aparece na aba CFP da P/3. */
+export function MissoesCfp() {
   const [dia, setDia] = useState(hojeISO);
   const [pediu, setPediu] = useState(false);
   const missoes = useAoVivo<AgendaCfp | null>((ok, erro) => observarAgendaCfp(db, ok, erro), []);
