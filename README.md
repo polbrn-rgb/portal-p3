@@ -63,7 +63,8 @@ histórico das demandas.
   preenchida; ao salvar, ela ganha número e sai das pendentes.
 - **Numerador**: as demandas com número (abertas e concluídas).
 - **Excluir demanda**: lixeira 🗑️ ao lado de cada demanda do Numerador, com confirmação. Some do Numerador, das
-  Cias e do Checklist Operações; o motor apaga os eventos dela nas agendas (a pasta do Drive fica). O número não é
+  Cias e do Checklist Operações; o motor apaga os eventos dela nas agendas (inclusive a do CFP) e manda a pasta do CFP
+  para a lixeira do Drive (recuperável por 30 dias). O número não é
   reaproveitado e aparece como "Excluída" no backup.
 - **Painel**: prazos.
 - **Tela das Cias se limpa sozinha**: a demanda respondida/finalizada sai da tela da Cia um dia depois do prazo (sem
