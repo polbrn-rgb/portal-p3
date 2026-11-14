@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { observarSolicitacoesDaUnidade } from '../../data/efetivo';
 import { marcarEmAndamento, marcarVisualizado, observarDaUnidade, responder } from '../../data/encaminhamentos';
 import { formatarData, hojeISO } from '../../domain/datas';
+import type { SolicitacaoEfetivo } from '../../domain/efetivo';
 import {
   abaDoEncaminhamento,
   encAtrasado,
@@ -12,6 +14,7 @@ import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { irPara, useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'pendentes', rotulo: 'Pendentes' },
@@ -28,8 +31,27 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     [unidade],
     'Não foi possível carregar as demandas.',
   );
+  const solicitacoes = useAoVivo<SolicitacaoEfetivo[]>(
+    (ok, erro) => observarSolicitacoesDaUnidade(db, unidade, ok, erro),
+    [unidade],
+  );
   const lista = encs.valor ?? [];
   const aberto = /^#\/enc\/(.+)$/.exec(hash)?.[1];
+  const efetivo = /^#\/efetivo\/(.+)$/.exec(hash)?.[1];
+
+  if (efetivo) {
+    const s = solicitacoes.valor?.find((x) => x.id === efetivo);
+    if (s) return <PreencherEfetivo key={s.id} s={s} />;
+    if (solicitacoes.carregando) return <p className="carregando">Carregando…</p>;
+    return (
+      <section className="painel">
+        <p className="mensagem erro" role="alert">
+          Solicitação não encontrada.
+        </p>
+        <a href="#/">Voltar</a>
+      </section>
+    );
+  }
 
   if (aberto) {
     const enc = lista.find((e) => e.id === aberto);
@@ -44,10 +66,24 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       </section>
     );
   }
-  return <ListaUnidade sigla={sigla} lista={lista} carregando={encs.carregando} erro={encs.erro} />;
+  return (
+    <ListaUnidade
+      sigla={sigla}
+      lista={lista}
+      carregando={encs.carregando}
+      erro={encs.erro}
+      solicitacoes={solicitacoes.valor ?? []}
+    />
+  );
 }
 
-function ListaUnidade(p: { sigla: string; lista: Encaminhamento[]; carregando: boolean; erro: string }) {
+function ListaUnidade(p: {
+  sigla: string;
+  lista: Encaminhamento[];
+  carregando: boolean;
+  erro: string;
+  solicitacoes: SolicitacaoEfetivo[];
+}) {
   const hoje = hojeISO();
   const [aba, setAba] = useState<AbaUnidade>('pendentes');
   const porAba = (a: AbaUnidade) => p.lista.filter((e) => abaDoEncaminhamento(e.status) === a);
@@ -58,6 +94,7 @@ function ListaUnidade(p: { sigla: string; lista: Encaminhamento[]; carregando: b
       <div className="painel-cabecalho">
         <h2>{p.sigla}</h2>
       </div>
+      <SolicitacoesEfetivo lista={p.solicitacoes} />
       <div className="abas" role="tablist">
         {ABAS.map((a) => (
           <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}>

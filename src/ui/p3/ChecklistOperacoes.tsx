@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { concluirOperacao, marcarItem, salvarProtocolo } from '../../data/operacoes';
+import { atualizarPlanilha, concluirOperacao, marcarItem, pedirPlanilha, salvarProtocolo } from '../../data/operacoes';
 import { formatarData } from '../../domain/datas';
 import {
   diasDaOperacao,
@@ -10,8 +10,11 @@ import {
   type ItemChecklist,
   type Operacao,
 } from '../../domain/operacao';
+import { diasMudaram } from '../../domain/resultado';
 import { db } from '../../lib/firebase';
+import { cutucarMotor } from '../../lib/motor';
 import type { AoVivo } from '../../lib/useAoVivo';
+import { AndamentoEfetivo, FormPedidoEfetivo } from './EfetivoOperacao';
 
 export function ChecklistOperacoes({ operacoes }: { operacoes: AoVivo<Operacao[]> }) {
   const [concluida, setConcluida] = useState<string | null>(null);
@@ -91,6 +94,7 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
   const [salvando, setSalvando] = useState(false);
   // A marcação aparece na hora; quando o banco confirma, volta a valer o que veio dele.
   const [marcando, setMarcando] = useState<Partial<Record<ItemChecklist, boolean>>>({});
+  const [pedindoEfetivo, setPedindoEfetivo] = useState(false);
   useEffect(() => setMarcando({}), [salvo]);
   const c = { ...salvo, ...marcando };
   const { feitos, total } = progresso(c);
@@ -116,6 +120,27 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
       setErro('Não foi possível concluir. Tente de novo.');
       setSalvando(false);
     }
+  }
+
+  const efetivoEnviado = Boolean(c.efetivo?.enviadaEm);
+  const planilha = c.planilha;
+
+  function pedirPlanilhaDeResultado() {
+    if (!pasta) {
+      setErro('Para gerar a planilha, a pasta do CFP precisa existir: marque “Adicionar e gerar pasta CFP” na demanda.');
+      return;
+    }
+    void executar(async () => {
+      await pedirPlanilha(db, d.id);
+      cutucarMotor();
+    });
+  }
+
+  /** Efetivo e planilha não são só marcar: abrem o pedido / pedem a cópia da planilha. */
+  function aoMarcar(item: ItemChecklist, valor: boolean) {
+    if (item === 'efetivoOk' && !efetivoEnviado) return setPedindoEfetivo(valor);
+    if (item === 'resultadoOk' && valor && (!planilha || planilha.status === 'erro')) return pedirPlanilhaDeResultado();
+    marcar(item, valor);
   }
 
   function marcar(item: ItemChecklist, valor: boolean) {
@@ -155,9 +180,57 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
         {ITENS_CHECKLIST.map((item) => (
           <li key={item.id}>
             <label className="item-check">
-              <input type="checkbox" checked={c[item.id]} onChange={(e) => marcar(item.id, e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={item.id === 'efetivoOk' && !efetivoEnviado ? pedindoEfetivo : c[item.id]}
+                disabled={(item.id === 'efetivoOk' && efetivoEnviado) || (item.id === 'resultadoOk' && !!planilha && planilha.status !== 'erro')}
+                onChange={(e) => aoMarcar(item.id, e.target.checked)}
+              />
               {item.rotulo}
             </label>
+
+            {item.id === 'efetivoOk' &&
+              (efetivoEnviado && c.efetivo ? (
+                <AndamentoEfetivo numero={d.id} pedido={c.efetivo} />
+              ) : (
+                pedindoEfetivo && <FormPedidoEfetivo demanda={d} aoFechar={() => setPedindoEfetivo(false)} />
+              ))}
+
+            {item.id === 'resultadoOk' && planilha && (
+              <div className="detalhe-item">
+                {planilha.status === 'pedida' && <span>Gerando a planilha na pasta do CFP… (até 5 minutos)</span>}
+                {planilha.status === 'erro' && (
+                  <span className="erro-campo">
+                    Não foi possível gerar: {planilha.erro}{' '}
+                    <button className="botao-link" type="button" onClick={pedirPlanilhaDeResultado}>
+                      Tentar de novo
+                    </button>
+                  </span>
+                )}
+                {planilha.status === 'pronta' && (
+                  <>
+                    <a className="botao secundario" href={planilha.url} target="_blank" rel="noreferrer">
+                      📊 Abrir planilha de resultado
+                    </a>
+                    <span className="pendente-detalhe">A Sala de Operações já pode lançar os resultados.</span>
+                    {diasMudaram(planilha, dias) && (
+                      <button
+                        className="botao-link"
+                        type="button"
+                        onClick={() =>
+                          void executar(async () => {
+                            await atualizarPlanilha(db, d.id);
+                            cutucarMotor();
+                          })
+                        }
+                      >
+                        As datas da operação mudaram: atualizar a planilha
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {item.id === 'pastaOk' &&
               (pasta ? (

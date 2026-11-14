@@ -1,4 +1,4 @@
-// Cria as contas do portal (P/3 + 7 Cias) e grava o perfil de cada uma.
+// Cria as contas do portal (P/3, 7 Cias, Sala de Operações e CFP) e grava o perfil de cada uma.
 //
 // Uso:
 //   npm run usuarios                       cria o que falta e confere os perfis

@@ -757,6 +757,148 @@ a.botao {
   font-size: 0.85rem;
 }
 
+/* ---------- Efetivo e resultados ---------- */
+.pedido-efetivo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-left: 0;
+  padding: 12px;
+  background: var(--cor-fundo);
+  border-radius: 8px;
+  color: inherit;
+}
+
+.grupo-simples {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grupo-simples legend {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.quantidades {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #dfe3ea;
+}
+
+.grade-postos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.grade-postos .campo {
+  font-size: 0.85rem;
+}
+
+.lista-efetivo,
+.escalados {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lista-efetivo summary {
+  cursor: pointer;
+  min-height: 36px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.escalados li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eef0f3;
+  overflow-wrap: anywhere;
+}
+
+.situacao-respondida { background: #e3f4ea; color: #1e6b3f; }
+.situacao-aguardando { background: #e7f1fb; color: #1d4f86; }
+.situacao-atrasada { background: #fbebeb; color: #8a1c1c; }
+.borda-situacao-respondida { border-left-color: #2e8b57; }
+.borda-situacao-aguardando { border-left-color: #1d4f86; }
+.borda-situacao-atrasada { border-left-color: #c0392b; }
+
+.bloco-efetivo h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.link-cartao {
+  color: inherit;
+  text-decoration: none;
+}
+
+.contador-posto {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--cor-fundo);
+  font-size: 0.9rem;
+}
+
+.contador-posto.completo {
+  background: #e3f4ea;
+  color: #1e6b3f;
+}
+
+.linha-busca {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.linha-busca .campo {
+  flex: 1;
+}
+
+.policial-achado {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #e3f4ea;
+  color: #1e6b3f;
+  font-weight: 600;
+}
+
+.formulario-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grade-indicadores {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 768px) {
+  .grade-indicadores {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 /* ---------- Formulário de demanda ---------- */
 .grupo {
   margin: 0;

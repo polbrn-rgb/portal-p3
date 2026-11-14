@@ -3,6 +3,8 @@ import type { Sessao } from '../domain/contas';
 import { auth } from '../lib/firebase';
 import { PainelUnidade } from './cia/PainelUnidade';
 import { PainelP3 } from './p3/PainelP3';
+import { PainelCfp } from './setores/PainelCfp';
+import { PainelSala } from './setores/PainelSala';
 import { Topo } from './Topo';
 
 export function Inicio({ sessao }: { sessao: Sessao }) {
@@ -15,6 +17,8 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
       </Topo>
       {sessao.tipo === 'p3' && <PainelP3 />}
       {sessao.tipo === 'unidade' && <PainelUnidade unidade={sessao.unidade} sigla={sessao.sigla} />}
+      {sessao.tipo === 'sala' && <PainelSala />}
+      {sessao.tipo === 'cfp' && <PainelCfp />}
       {sessao.tipo === 'sem-perfil' && (
         <section className="cartao" role="alert">
           <h2>Conta sem perfil</h2>

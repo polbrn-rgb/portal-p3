@@ -61,8 +61,19 @@ export function marcarItem(db: Firestore, numero: string, item: ItemChecklist, v
   return salvar(db, numero, { [item]: valor });
 }
 
+/** Protocolo do Mapa Força de um dia; se a planilha já existe, o motor atualiza a linha 2. */
 export function salvarProtocolo(db: Firestore, numero: string, dia: string, protocolo: string) {
-  return salvar(db, numero, { protocolos: { [dia]: protocolo.trim() } });
+  return salvar(db, numero, { protocolos: { [dia]: protocolo.trim() }, planilhaDesatualizada: true });
+}
+
+/** Pede ao motor a cópia do modelo de resultados na pasta do CFP. */
+export function pedirPlanilha(db: Firestore, numero: string) {
+  return salvar(db, numero, { resultadoOk: true, planilha: { status: 'pedida' } });
+}
+
+/** Datas da operação mudaram depois de gerar a planilha: o motor reescreve as linhas 1 e 2. */
+export function atualizarPlanilha(db: Firestore, numero: string) {
+  return salvar(db, numero, { planilhaDesatualizada: true });
 }
 
 export function concluirOperacao(db: Firestore, numero: string, concluida = true) {

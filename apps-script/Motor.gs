@@ -20,7 +20,12 @@ var CONFIG_P3 = {
   // Demandas Pendentes: só entram e-mails encaminhados por esta caixa
   EMAIL_FUNCIONAL: '8bpmmp3@policiamilitar.sp.gov.br',
   ETIQUETA_GMAIL: 'Portal P3', // marca no Gmail os e-mails já trazidos
-  PASTA_ANEXOS: '' // vazio = cria a pasta "Portal P3 - Anexos" no Drive na primeira vez
+  PASTA_ANEXOS: '', // vazio = cria a pasta "Portal P3 - Anexos" no Drive na primeira vez
+  // Checklist Operações
+  PLANILHA_RESULTADO_MODELO: '1mI3hKilIloD0i3KYdvSXRLoNXgWpwoKBXdWUG-AIse0',
+  PLANILHA_EFETIVO: '1IlTIPxp0rR4rzjFygxtldvQja4GgCsap2kLIK28z8Ck',
+  ABA_EFETIVO: 'BD Efetivo', // lida primeiro; as outras abas com RE e NOME DE GUERRA completam
+  HORA_EFETIVO: 5 // atualização diária do banco de efetivo
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -31,9 +36,12 @@ function instalarAutomacao() {
   ScriptApp.newTrigger('processarPendentes').timeBased().everyMinutes(5).create();
   // O resumo diário por e-mail foi retirado: apaga o gatilho antigo, se ainda existir.
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'enviarResumoDiario') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'enviarResumoDiario' || t.getHandlerFunction() === 'sincronizarEfetivo') ScriptApp.deleteTrigger(t);
   });
+  ScriptApp.newTrigger('sincronizarEfetivo').timeBased().atHour(CONFIG_P3.HORA_EFETIVO).everyDays(1).create();
   testarConexao();
+  sincronizarEfetivo();
+  sincronizarMissoesCfp();
 }
 
 /** Confere a chave e o acesso ao Firestore (mostra no registro de execução). */
@@ -68,6 +76,8 @@ function diagnostico() {
   ok('E-mails do funcional (últimos 2 dias)', function () {
     return GmailApp.search('from:' + CONFIG_P3.EMAIL_FUNCIONAL + ' newer_than:2d', 0, 50).length + ' conversa(s)';
   });
+  ok('Modelo de resultados', function () { return DriveApp.getFileById(CONFIG_P3.PLANILHA_RESULTADO_MODELO).getName(); });
+  ok('Banco de efetivo', function () { return SpreadsheetApp.openById(CONFIG_P3.PLANILHA_EFETIVO).getName(); });
   ok('Firestore (chave)', function () {
     var p = consultarPendentes_();
     return p.length + ' demanda(s) esperando' + (p.length ? ': nº ' + p.map(function (d) { return d.dados.numero; }).join(', ') : '');
@@ -144,6 +154,12 @@ function rodarMotor_(esperaMs) {
       if (!pendentes.length) break;
       pendentes.forEach(processarDemanda_);
     }
+    try {
+      processarPlanilhas_();
+      gravarResultados_();
+    } catch (e2) {
+      console.error('Planilhas de resultado: ' + e2.message);
+    }
   } finally {
     trava.releaseLock();
   }
@@ -167,6 +183,11 @@ function processarDemanda_(doc) {
   feito.processadoEm = new Date().toISOString();
   // Com erro, continua pendente: o gatilho tenta de novo a cada 5 minutos até dar certo.
   gravarResultado_(doc, feito, erros.length > 0);
+  try {
+    atualizarMissaoCfp_(d, feito);
+  } catch (e) {
+    console.error('Missão CFP nº ' + d.numero + ': ' + e.message);
+  }
 }
 
 function agenda_(qual) {
@@ -388,4 +409,210 @@ function salvarAnexos_(msg) {
 /** Rode pelo editor para buscar os e-mails agora e ver quantos entraram. */
 function testarEmails() {
   Logger.log(importarEmails_() + ' e-mail(s) novo(s) na aba Demandas Pendentes.');
+}
+
+// ---------- Firestore: consultas e gravações simples ----------
+
+function consultar_(colecao, campo, valor, limite) {
+  var r = firestore_('post', caminhoDocs_() + ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: colecao }],
+      where: { fieldFilter: { field: { fieldPath: campo }, op: 'EQUAL', value: jsParaValor(valor) } },
+      limit: limite || 20
+    }
+  });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  return r.json
+    .filter(function (x) { return x.document; })
+    .map(function (x) {
+      return { nome: x.document.name, id: x.document.name.split('/').pop(), dados: camposParaJs(x.document.fields) };
+    });
+}
+
+function obterDoc_(caminho) {
+  var r = firestore_('get', caminhoDocs_() + '/' + caminho);
+  if (r.status === 404) return null;
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  return camposParaJs(r.json.fields);
+}
+
+/** Grava só os campos de "obj" (os outros campos do documento ficam como estão). Cria se não existir. */
+function gravarCampos_(caminho, obj) {
+  var mascara = Object.keys(obj).map(function (k) { return 'updateMask.fieldPaths=' + encodeURIComponent(k); }).join('&');
+  var r = firestore_('patch', caminhoDocs_() + '/' + caminho + '?' + mascara, { fields: jsParaValor(obj).mapValue.fields });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+}
+
+// ---------- Planilha de resultados (Checklist Operações) ----------
+
+function idDaPasta_(url) {
+  var m = /folders\/([\w-]+)/.exec(url || '') || /[?&]id=([\w-]+)/.exec(url || '');
+  return m ? m[1] : '';
+}
+
+function pastaDaDemanda_(d) {
+  var a = d.automacao || {};
+  return a.cfpPasta || (a.cfp && a.cfp.pastaUrl) || '';
+}
+
+/** Gera as planilhas pedidas no checklist e atualiza datas/protocolos das que mudaram. */
+function processarPlanilhas_() {
+  consultar_('operacoes', 'planilha.status', 'pedida').forEach(function (op) {
+    try {
+      gerarPlanilha_(op);
+    } catch (e) {
+      gravarCampos_('operacoes/' + op.id, { planilha: { status: 'erro', erro: e.message } });
+    }
+  });
+  consultar_('operacoes', 'planilhaDesatualizada', true).forEach(function (op) {
+    try {
+      if (op.dados.planilha && op.dados.planilha.status === 'pronta') atualizarCabecalho_(op);
+      gravarCampos_('operacoes/' + op.id, { planilhaDesatualizada: false });
+    } catch (e) {
+      console.error('Planilha nº ' + op.id + ': ' + e.message);
+    }
+  });
+}
+
+function gerarPlanilha_(op) {
+  var d = obterDoc_('demandas/' + op.id);
+  if (!d) throw new Error('Demanda nº ' + op.id + ' não encontrada');
+  var pastaId = idDaPasta_(pastaDaDemanda_(d));
+  if (!pastaId) throw new Error('A pasta do CFP ainda não foi gerada (marque "Adicionar e gerar pasta CFP" na demanda)');
+  var copia = DriveApp.getFileById(CONFIG_P3.PLANILHA_RESULTADO_MODELO)
+    .makeCopy('Resultados - Nº ' + d.numero + ' - ' + d.saida, DriveApp.getFolderById(pastaId));
+  var aba = SpreadsheetApp.openById(copia.getId()).getSheets()[0];
+  var dias = diasDaOperacao(d.inicioBtl, d.terminoBtl);
+  escreverCabecalho_(aba, dias, op.dados.protocolos || {});
+  var campos = camposDaPlanilha(aba.getRange(1, 1, aba.getLastRow(), 2).getValues());
+  gravarCampos_('operacoes/' + op.id, {
+    planilha: {
+      status: 'pronta',
+      id: copia.getId(),
+      url: copia.getUrl(),
+      campos: campos,
+      observacao: aba.getRange('B1').getDisplayValue(),
+      dias: dias,
+      saida: d.saida
+    },
+    planilhaDesatualizada: false
+  });
+}
+
+/** Linha 1 = datas (a partir da coluna C), linha 2 = protocolo do Mapa Força de cada dia. */
+function escreverCabecalho_(aba, dias, protocolos) {
+  var precisa = 2 + Math.max(dias.length, 1);
+  if (aba.getMaxColumns() < precisa) {
+    var antes = aba.getMaxColumns();
+    aba.insertColumnsAfter(antes, precisa - antes);
+    aba.getRange(1, 3, aba.getMaxRows(), 1).copyTo(aba.getRange(1, antes + 1, aba.getMaxRows(), precisa - antes), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  }
+  // Limpa datas antigas (se a operação ficou mais curta).
+  var ultima = aba.getLastColumn();
+  if (ultima > 2 + dias.length) aba.getRange(1, 3 + dias.length, 2, ultima - 2 - dias.length).clearContent();
+  if (!dias.length) return;
+  aba.getRange(1, 3, 1, dias.length).setValues([dias.map(dataLocal)]).setNumberFormat('dd/MM/yyyy');
+  aba.getRange(2, 3, 1, dias.length).setValues([dias.map(function (dia) { return protocolos[dia] || ''; })]);
+}
+
+function atualizarCabecalho_(op) {
+  var d = obterDoc_('demandas/' + op.id);
+  if (!d) return;
+  var dias = diasDaOperacao(d.inicioBtl, d.terminoBtl);
+  escreverCabecalho_(SpreadsheetApp.openById(op.dados.planilha.id).getSheets()[0], dias, op.dados.protocolos || {});
+  var p = op.dados.planilha;
+  p.dias = dias;
+  gravarCampos_('operacoes/' + op.id, { planilha: p });
+}
+
+/** Lançamentos da Sala de Operações -> coluna do dia na planilha (como o portal antigo fazia). */
+function gravarResultados_() {
+  consultar_('resultados', 'gravado', false).forEach(function (r) {
+    var res = r.dados;
+    try {
+      var op = obterDoc_('operacoes/' + res.numero);
+      if (!op || !op.planilha || !op.planilha.id) throw new Error('planilha da operação não encontrada');
+      var aba = SpreadsheetApp.openById(op.planilha.id).getSheets()[0];
+      var datas = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+      var col = -1;
+      for (var i = 2; i < datas.length && col < 0; i++) {
+        if (datas[i] instanceof Date && Utilities.formatDate(datas[i], 'America/Sao_Paulo', 'yyyy-MM-dd') === res.dia) col = i + 1;
+      }
+      if (col < 0) throw new Error('o dia ' + res.dia + ' não está na linha 1 da planilha');
+      aba.getRange(3, col).setValue(res.protocoloResultado || '');
+      Object.keys(res.valores || {}).forEach(function (linha) {
+        aba.getRange(Number(linha), col).setValue(Number(res.valores[linha]));
+      });
+      gravarCampos_('resultados/' + r.id, { gravado: true, gravadoEm: new Date().toISOString(), erro: '' });
+    } catch (e) {
+      // Fica "não gravado" para tentar de novo; o erro aparece para a Sala.
+      gravarCampos_('resultados/' + r.id, { erro: e.message });
+    }
+  });
+}
+
+// ---------- Missões do CFP (o login do CFP vê as operações com pasta) ----------
+
+function atualizarMissaoCfp_(d, feito) {
+  var caminho = 'missoesCfp/' + d.numero;
+  if (feito.cfp && d.adicionarCFP) {
+    gravarCampos_(caminho, {
+      numero: d.numero,
+      titulo: feito.cfp.titulo,
+      saida: d.saida,
+      inicio: feito.cfp.inicio,
+      fim: feito.cfp.fim,
+      pastaUrl: feito.cfpPasta || feito.cfp.pastaUrl || ''
+    });
+  } else if (!d.adicionarCFP) {
+    firestore_('delete', caminhoDocs_() + '/' + caminho);
+  }
+}
+
+/** Rode pelo editor (o instalarAutomacao já roda): leva para o login do CFP as missões que já existiam. */
+function sincronizarMissoesCfp() {
+  var lista = consultar_('demandas', 'adicionarCFP', true, 500);
+  lista.forEach(function (doc) {
+    var a = doc.dados.automacao || {};
+    if (a.cfp) atualizarMissaoCfp_(doc.dados, { cfp: a.cfp, cfpPasta: a.cfpPasta });
+  });
+  Logger.log(lista.length + ' demanda(s) com CFP conferidas.');
+}
+
+// ---------- Banco de efetivo (busca por RE no portal) ----------
+
+/** Gatilho diário (e pelo editor): copia o banco de efetivo da planilha para o portal. */
+function sincronizarEfetivo() {
+  var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_EFETIVO);
+  var abas = ss.getSheets().sort(function (a, b) {
+    return (b.getName() === CONFIG_P3.ABA_EFETIVO) - (a.getName() === CONFIG_P3.ABA_EFETIVO);
+  });
+  var porRE = {};
+  var resumo = [];
+  abas.forEach(function (aba) {
+    var linhas = aba.getLastRow();
+    var colunas = aba.getLastColumn();
+    if (linhas < 2 || colunas < 2) return;
+    var lidos = linhasDoEfetivo(aba.getRange(1, 1, Math.min(linhas, 5000), Math.min(colunas, 30)).getValues());
+    var novos = 0;
+    lidos.forEach(function (p) {
+      if (!porRE[p.chave]) { porRE[p.chave] = p; novos++; }
+    });
+    if (lidos.length) resumo.push(aba.getName() + ': ' + novos + ' novo(s) de ' + lidos.length);
+  });
+  var chaves = Object.keys(porRE);
+  for (var i = 0; i < chaves.length; i += 400) {
+    var writes = chaves.slice(i, i + 400).map(function (k) {
+      var p = porRE[k];
+      return {
+        update: {
+          name: caminhoDocs_() + '/efetivo/' + k,
+          fields: jsParaValor({ re: p.re, posto: p.posto, nomeGuerra: p.nomeGuerra, telefone: p.telefone }).mapValue.fields
+        }
+      };
+    });
+    var r = firestore_('post', caminhoDocs_() + ':commit', { writes: writes });
+    if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  }
+  Logger.log('Banco de efetivo: ' + chaves.length + ' policiais. ' + resumo.join(' | '));
 }

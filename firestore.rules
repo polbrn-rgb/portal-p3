@@ -3,6 +3,7 @@ rules_version = '2';
 // O perfil vem do token do login (custom claims gravados pelo script de usuários):
 //   P/3    -> perfil = 'p3'
 //   Cia    -> perfil = 'unidade' e unidade = '1cia' ... '6cia' | 'ft'
+//   Sala de Operações -> perfil = 'sala';  CFP -> perfil = 'cfp'
 // Tudo que não estiver liberado aqui fica bloqueado.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -13,6 +14,10 @@ service cloud.firestore {
 
     function ehP3() {
       return logado() && request.auth.token.perfil == 'p3';
+    }
+
+    function ehPerfil(perfil) {
+      return logado() && request.auth.token.perfil == perfil;
     }
 
     function ehDaMinhaUnidade(dados) {
@@ -50,9 +55,51 @@ service cloud.firestore {
       allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaDaUnidadeValida());
     }
 
-    // Checklist Operações (id = número da demanda).
+    // Checklist Operações (id = número da demanda). A Sala lê para lançar os resultados.
     match /operacoes/{numero} {
-      allow read, write: if ehP3();
+      allow read: if ehP3() || ehPerfil('sala');
+      allow write: if ehP3();
+    }
+
+    // Resultados lançados pela Sala de Operações (id = numero_dia); o motor grava na planilha.
+    function resultadoValido(id) {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['numero', 'dia', 'protocoloResultado', 'valores', 'salvoPor', 'salvoEm', 'gravado'])
+        && r.numero is string && r.dia is string && id == r.numero + '_' + r.dia
+        && r.protocoloResultado is string && r.valores is map
+        && r.salvoPor is string && r.salvoPor.size() > 0
+        && r.gravado == false;
+    }
+
+    match /resultados/{id} {
+      allow read: if ehP3() || ehPerfil('sala');
+      allow create, update: if ehPerfil('sala') && resultadoValido(id);
+    }
+
+    // Solicitação de efetivo: a P/3 cria uma por Cia; a Cia só informa os policiais.
+    function respostaEfetivoValida() {
+      let novo = request.resource.data;
+      return novo.diff(resource.data).affectedKeys()
+          .hasOnly(['policiais', 'status', 'respondidoPor', 'respondidoEm', 'atualizadoEm'])
+        && novo.status == 'respondida'
+        && novo.policiais is list && novo.policiais.size() > 0
+        && novo.respondidoPor is string && novo.respondidoPor.size() > 0;
+    }
+
+    match /solicitacoesEfetivo/{id} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create, delete: if ehP3();
+      allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaEfetivoValida());
+    }
+
+    // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
+    match /efetivo/{re} {
+      allow read: if logado();
+    }
+
+    // Missões com pasta do CFP: gravadas pelo motor, lidas pelo CFP.
+    match /missoesCfp/{numero} {
+      allow read: if ehP3() || ehPerfil('cfp');
     }
 
     match /caixaEntrada/{itemId} {
