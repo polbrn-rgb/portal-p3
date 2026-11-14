@@ -581,6 +581,97 @@ a.botao {
   }
 }
 
+/* ---------- Demandas Pendentes ---------- */
+/* Três abas no celular: o texto pode quebrar em duas linhas sem estourar a tela. */
+.abas-p3 a {
+  gap: 6px;
+  padding: 4px 6px;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.contador-aba {
+  flex: none;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--cor-destaque);
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.ajuda-pendentes {
+  margin: 0;
+  color: var(--cor-suave);
+  font-size: 0.9rem;
+}
+
+.item-pendente {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  border-radius: var(--raio);
+  padding: 12px 14px;
+  border-left: 6px solid var(--cor-secundaria);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
+}
+
+.pendente-assunto {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.pendente-detalhe,
+.pendente-data {
+  margin: 0;
+  color: var(--cor-suave);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.pendente-texto summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--cor-secundaria);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.pendente-texto .texto-resposta {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--cor-fundo);
+  border-radius: 8px;
+}
+
+.pendente-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.pendente-links a {
+  overflow-wrap: anywhere;
+}
+
+.origem-pendente {
+  gap: 6px;
+}
+
+.selo-tipo-email { background: #e7f1fb; color: #1d4f86; }
+.selo-tipo-sei { background: #efedff; color: #4b3aa8; }
+.selo-tipo-ordem_verbal { background: #f9eeda; color: #7a4b00; }
+.borda-tipo-email { border-left-color: #1d4f86; }
+.borda-tipo-sei { border-left-color: #4b3aa8; }
+.borda-tipo-ordem_verbal { border-left-color: #e0a100; }
+
 /* ---------- Formulário de demanda ---------- */
 .grupo {
   margin: 0;

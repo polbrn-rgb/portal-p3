@@ -32,19 +32,24 @@ na agenda do CFP e a linha na aba Operações.
 Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 5 minutos. No portal, dentro da demanda, o bloco
 **Agenda e pasta** mostra ⏳ enquanto espera e ✅ quando o evento foi criado, com o botão **Abrir pasta CFP**.
 
-## Resumo diário por e-mail (7h, dias úteis)
+## E-mails do funcional → aba Demandas Pendentes
 
-O `instalarAutomacao` também liga o resumo das pendências às 7h. Ajuste no `CONFIG_P3` do `Motor.gs`:
-- `URL_PORTAL`: endereço do portal (vai no botão do e-mail);
-- `EMAILS_RESUMO_P3`: quem recebe o resumo geral;
-- `EMAILS_CIAS`: e-mail de cada Cia para receber só as pendências dela (vazio = não recebe);
-- `SO_DIAS_UTEIS`: `false` para mandar também sábado e domingo.
+A cada rodada o motor procura no Gmail da P/3 os e-mails **encaminhados pela caixa funcional**
+(`EMAIL_FUNCIONAL` no `CONFIG_P3`, hoje `8bpmmp3@policiamilitar.sp.gov.br`). Cada um vira um item
+na aba **Demandas Pendentes** do portal, com assunto, quem mandou o original, texto e anexos.
+E-mails de qualquer outro endereço são ignorados.
 
-Depois de colar a versão com o resumo, rode **instalarAutomacao** de novo (ele pede a permissão de enviar
-e-mail) e **testarResumo** para receber um exemplo na hora.
+- Os anexos são salvos na pasta **Portal P3 - Anexos** do Drive (criada sozinha na primeira vez).
+- O e-mail recebe a etiqueta **Portal P3** no Gmail. Mesmo sem ela, o mesmo e-mail nunca entra duas vezes.
+- Na primeira vez ele busca os e-mails das últimas 24 horas.
+
+Depois de colar esta versão, rode **instalarAutomacao** de novo: ele pede a permissão do Gmail e apaga o
+gatilho antigo do resumo diário por e-mail (que foi retirado). Para testar na hora, rode **testarEmails**.
 
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.
 - `Falta a propriedade CHAVE_SERVICO`: refaça o passo 4.
 - `Firestore 403`: a chave colada não é do projeto `portal-p3`.
+- E-mail encaminhado não apareceu: rode **diagnostico** e veja a linha *E-mails do funcional*. Erros do Gmail
+  aparecem em **Execuções** começando com `E-mails:`.

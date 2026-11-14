@@ -11,18 +11,10 @@ type Motor = {
   jsParaValor: (x: unknown) => unknown;
   valorParaJs: (v: unknown) => unknown;
   camposParaJs: (f: Record<string, unknown>) => Record<string, unknown>;
-  montarResumoDiario: (d: unknown[], e: unknown[], hoje: string) => Resumo;
-  htmlResumoP3: (r: Resumo, hoje: string, url: string) => string;
-  htmlResumoCia: (c: Resumo['porCia'][string], hoje: string, url: string) => string;
-  assuntoResumoP3: (r: Resumo, hoje: string) => string;
-};
-type Item = { numero: number; saida: string; prazo: string; sigla?: string };
-type Resumo = {
-  atrasadas: Item[];
-  venceHoje: Item[];
-  proximos: Item[];
-  aguardandoAceite: Item[];
-  porCia: Record<string, { sigla: string; pendentes: Item[]; atrasadas: Item[] }>;
+  ehDoFuncional: (de: string, funcional: string) => boolean;
+  limparAssunto: (assunto: string) => string;
+  remetenteOriginal: (corpo: string) => string;
+  pendenteDoEmail: (m: Record<string, string>, anexos?: { nome: string; url: string }[]) => Record<string, unknown>;
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -105,46 +97,57 @@ describe('conversão Firestore <-> objeto (Apps Script)', () => {
   });
 });
 
-describe('resumo diário por e-mail (Apps Script)', () => {
-  const HOJE = '2026-11-13';
-  const demandas = [
-    { numero: 1, saida: 'Atrasada', prazoCPA: '2026-11-10' },
-    { numero: 2, saida: 'Hoje', prazoCPA: HOJE },
-    { numero: 3, saida: 'Daqui 2 dias', prazoCPA: '2026-11-15' },
-    { numero: 4, saida: 'Longe', prazoCPA: '2026-12-20' },
-    { numero: 5, saida: 'Sem prazo', prazoCPA: '' },
-  ];
-  const encs = [
-    { numero: 3, saida: 'Daqui 2 dias', unidadeId: '1cia', status: 'novo', prazoCia: '2026-11-12' },
-    { numero: 4, saida: 'Longe', unidadeId: '1cia', status: 'em_andamento', prazoCia: '2026-12-10' },
-    { numero: 4, saida: 'Longe', unidadeId: 'ft', status: 'respondido', prazoCia: '2026-12-10' },
-  ];
-  const r = motor.montarResumoDiario(demandas, encs, HOJE);
+describe('e-mails do funcional para Demandas Pendentes (Apps Script)', () => {
+  const FUNCIONAL = '8bpmmp3@policiamilitar.sp.gov.br';
 
-  test('separa atrasadas, vencem hoje, próximos 3 dias e aguardando aceite', () => {
-    expect(r.atrasadas.map((i) => i.numero)).toEqual([1]);
-    expect(r.venceHoje.map((i) => i.numero)).toEqual([2]);
-    expect(r.proximos.map((i) => i.numero)).toEqual([3]);
-    expect(r.aguardandoAceite.map((i) => i.sigla)).toEqual(['CIA FT']);
+  test('só aceita o que veio da caixa funcional', () => {
+    expect(motor.ehDoFuncional('P3 8º BPM/M <8BPMMP3@PoliciaMilitar.sp.gov.br>', FUNCIONAL)).toBe(true);
+    expect(motor.ehDoFuncional('8bpmmp3@policiamilitar.sp.gov.br', FUNCIONAL)).toBe(true);
+    expect(motor.ehDoFuncional('Google <no-reply@accounts.google.com>', FUNCIONAL)).toBe(false);
+    expect(motor.ehDoFuncional('Fulano <fulano@policiamilitar.sp.gov.br>', FUNCIONAL)).toBe(false);
   });
 
-  test('por Cia: pendentes em ordem de prazo e atrasadas', () => {
-    expect(r.porCia['1cia'].pendentes.map((i) => i.numero)).toEqual([3, 4]);
-    expect(r.porCia['1cia'].atrasadas.map((i) => i.numero)).toEqual([3]);
-    expect(r.porCia.ft).toBeUndefined();
+  test('tira ENC:/FW:/Fwd: do assunto', () => {
+    expect(motor.limparAssunto('ENC: Pedido de policiamento')).toBe('Pedido de policiamento');
+    expect(motor.limparAssunto('Fwd: FW: enc:  Escolta')).toBe('Escolta');
+    expect(motor.limparAssunto('RES: Reunião')).toBe('RES: Reunião');
+    expect(motor.limparAssunto('ENC:')).toBe('(sem assunto)');
   });
 
-  test('e-mail da P/3 e da Cia com as seções e o link do portal; assunto resume', () => {
-    const html = motor.htmlResumoP3(r, HOJE, 'https://portal.exemplo');
-    expect(html).toContain('pendências de 13/11/2026');
-    expect(html).toContain('Atrasadas (1)');
-    expect(html).toContain('href="https://portal.exemplo"');
-    expect(motor.htmlResumoCia(r.porCia['1cia'], HOJE, '')).toContain('1ª CIA');
-    expect(motor.assuntoResumoP3(r, HOJE)).toBe('Portal P3 — 13/11/2026 — 1 atrasada(s), 1 vence(m) hoje, 1 aguardando aceite');
+  test('acha quem mandou o e-mail original no texto encaminhado', () => {
+    const outlook = 'Segue.\n\n________________________________\nDe: CPA/M-11 <cpam11@policiamilitar.sp.gov.br>\nEnviado: quinta-feira\nPara: 8bpmmp3';
+    expect(motor.remetenteOriginal(outlook)).toBe('CPA/M-11 <cpam11@policiamilitar.sp.gov.br>');
+    expect(motor.remetenteOriginal('---------- Forwarded message ---------\nFrom: *Fulano* <f@x.com>')).toBe('Fulano <f@x.com>');
+    expect(motor.remetenteOriginal('sem cabeçalho')).toBe('');
   });
 
-  test('protege o HTML contra texto da demanda', () => {
-    const r2 = motor.montarResumoDiario([{ numero: 9, saida: '<b>x</b>', prazoCPA: '2026-11-01' }], [], HOJE);
-    expect(motor.htmlResumoP3(r2, HOJE, '')).toContain('&lt;b&gt;x&lt;/b&gt;');
+  test('monta o item pendente com texto limpo e anexos', () => {
+    const item = motor.pendenteDoEmail(
+      {
+        assunto: 'ENC: Operação Natal',
+        corpo: 'Linha 1\r\n\r\n\r\n\r\nDe: CPA <c@pm>\r\n',
+        dataEntrada: '2026-11-14',
+        recebidoEm: '2026-11-14T11:00:00.000Z',
+        link: 'https://mail.google.com/x',
+      },
+      [{ nome: 'oficio.pdf', url: 'https://drive/x' }],
+    );
+    expect(item).toEqual({
+      tipo: 'email',
+      status: 'pendente',
+      dataEntrada: '2026-11-14',
+      recebidoEm: '2026-11-14T11:00:00.000Z',
+      assunto: 'Operação Natal',
+      texto: 'Linha 1\n\nDe: CPA <c@pm>',
+      remetente: 'CPA <c@pm>',
+      linkGmail: 'https://mail.google.com/x',
+      anexos: [{ nome: 'oficio.pdf', url: 'https://drive/x' }],
+    });
+  });
+
+  test('e-mail enorme é cortado com aviso', () => {
+    const item = motor.pendenteDoEmail({ assunto: 'x', corpo: 'a'.repeat(30000), dataEntrada: '', recebidoEm: '' });
+    expect(String(item.texto).length).toBeLessThan(20100);
+    expect(String(item.texto)).toContain('abra o e-mail no Gmail');
   });
 });

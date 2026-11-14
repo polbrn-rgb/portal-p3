@@ -27,6 +27,7 @@ import {
   type Encaminhamento,
 } from '../domain/encaminhamento';
 import { UNIDADES, unidadesParaEncaminhar } from '../domain/unidades';
+import { COLECAO_PENDENTES } from './pendentes';
 
 // Acesso ao banco. Recebe o Firestore por parâmetro para poder ser testado no emulador.
 
@@ -36,14 +37,28 @@ function paraDemanda(s: QueryDocumentSnapshot): Demanda {
   return { ...(s.data() as Omit<Demanda, 'id'>), id: s.id };
 }
 
+/** Duas pessoas deram destino à mesma pendente: a segunda é avisada e nada é gravado. */
+export class PendenteJaResolvida extends Error {
+  constructor(public readonly numeroDemanda?: number) {
+    super(numeroDemanda ? `Já virou a demanda nº ${numeroDemanda}.` : 'Esta pendente já foi resolvida.');
+    this.name = 'PendenteJaResolvida';
+  }
+}
+
 /**
  * Cria a demanda com o próximo número, numa transação: dois cadastros ao mesmo
  * tempo nunca recebem o mesmo número. O id do documento é o próprio número.
+ * Vindo da aba Demandas Pendentes, a pendente sai da lista na mesma gravação.
  */
-export async function criarDemanda(db: Firestore, dados: DadosDemanda): Promise<number> {
+export async function criarDemanda(db: Firestore, dados: DadosDemanda, pendenteId?: string): Promise<number> {
   return runTransaction(db, async (tx) => {
     const refContador = doc(db, 'contadores', 'demandas');
     const contador = await tx.get(refContador);
+    const refPendente = pendenteId ? doc(db, COLECAO_PENDENTES, pendenteId) : null;
+    const pendente = refPendente ? await tx.get(refPendente) : null;
+    if (pendente && (!pendente.exists() || pendente.data().status !== 'pendente')) {
+      throw new PendenteJaResolvida(pendente.exists() ? pendente.data().numeroDemanda : undefined);
+    }
     const numero = (contador.exists() ? Number(contador.data().ultimo) : 0) + 1;
     const ref = doc(db, 'demandas', String(numero));
 
@@ -56,7 +71,14 @@ export async function criarDemanda(db: Firestore, dados: DadosDemanda): Promise<
       criadoEm: serverTimestamp(),
       atualizadoEm: serverTimestamp(),
     });
-    tx.set(doc(collection(ref, 'historico')), { acao: 'criada', em: serverTimestamp() });
+    tx.set(doc(collection(ref, 'historico')), {
+      acao: 'criada',
+      em: serverTimestamp(),
+      ...(pendenteId ? { pendenteId } : {}),
+    });
+    if (refPendente) {
+      tx.update(refPendente, { status: 'destinada', numeroDemanda: numero, resolvidoEm: serverTimestamp() });
+    }
 
     // Cada Cia marcada recebe o seu encaminhamento na mesma gravação.
     const resumo = resumoDaDemanda({ ...dados, numero });

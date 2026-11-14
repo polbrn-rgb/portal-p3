@@ -52,6 +52,15 @@ Informe o último número usado no numerador (a próxima demanda continua dele):
 Os eventos de Prazo CPA/Cia e a pasta + agenda do CFP + aba Operações são criados por um Apps Script
 na conta da P/3, a cada 5 minutos. Instalação em `apps-script/LEIAME.md`.
 
+## Abas da P/3
+
+- **Demandas Pendentes**: o que chegou e ainda não tem número. Os e-mails encaminhados pela caixa funcional
+  (`8bpmmp3@policiamilitar.sp.gov.br`) para o Gmail da P/3 entram sozinhos (Apps Script). SEI (texto colado) e
+  Ordem Verbal são lançados pelos botões **+ SEI** e **+ Ordem Verbal**. **Dar destino** abre a demanda nova já
+  preenchida; ao salvar, ela ganha número e sai das pendentes.
+- **Numerador**: as demandas com número (abertas e concluídas).
+- **Painel**: prazos.
+
 ## Backup
 
 Na lista de demandas, **Baixar planilha** gera um `.csv` com todas as demandas (colunas do numerador

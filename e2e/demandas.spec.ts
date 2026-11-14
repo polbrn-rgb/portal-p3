@@ -31,7 +31,7 @@ test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ p
 
   await item.click();
   await page.getByRole('button', { name: 'Concluir' }).click();
-  await expect(page.getByRole('heading', { name: 'Demandas', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
   await expect(page.getByRole('link', { name: new RegExp(assunto) })).toHaveCount(0);
 
   await page.getByRole('tab', { name: 'Concluídas' }).click();
@@ -65,7 +65,7 @@ test('Cia não vê o cadastro de demandas', async ({ page }) => {
 
 test('lista e formulário cabem na tela, no celular e no computador', async ({ page }) => {
   await entrar(page, 'p3', SENHA_TESTE);
-  await expect(page.getByRole('heading', { name: 'Demandas', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
