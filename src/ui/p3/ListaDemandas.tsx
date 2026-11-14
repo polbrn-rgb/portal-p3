@@ -87,7 +87,7 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
   return (
     <section className="painel">
       <div className="painel-cabecalho">
-        <h2>Demandas</h2>
+        <h2>Numerador</h2>
         <div className="acoes-cabecalho">
           <button className="botao secundario" type="button" disabled={baixando} onClick={backup}>
             {baixando ? 'Gerando…' : 'Baixar planilha'}

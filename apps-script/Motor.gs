@@ -7,6 +7,7 @@
  *  - Adicionar e gerar pasta CFP -> pasta (com P3 e CFP), evento na agenda do CFP com o link da pasta
  *    e linha na aba Operações.
  * Se o prazo ou as datas mudarem, move o evento em vez de criar outro.
+ * Também traz para a aba "Demandas Pendentes" os e-mails encaminhados pela caixa funcional.
  * Instalação: veja LEIAME.md nesta pasta.
  */
 var CONFIG_P3 = {
@@ -16,13 +17,10 @@ var CONFIG_P3 = {
   PLANILHA_OPERACOES: '1cY1jbA7AGNLN66tTqH0CyuwHe9X-Xz_DVdcv0xWjado', // Numerador 2026 (aba "Operações")
   ABA_OPERACOES: 'Operações',
   POR_RODADA: 10,
-  // Resumo diário por e-mail
-  URL_PORTAL: '', // endereço do portal na Vercel (vai no botão do e-mail)
-  EMAILS_RESUMO_P3: ['8bpmmp3@gmail.com'],
-  // E-mail de cada Cia para receber as próprias pendências (vazio = Cia não recebe). Ex.: { '1cia': 'x@y' }
-  EMAILS_CIAS: {},
-  HORA_RESUMO: 7,
-  SO_DIAS_UTEIS: true
+  // Demandas Pendentes: só entram e-mails encaminhados por esta caixa
+  EMAIL_FUNCIONAL: '8bpmmp3@policiamilitar.sp.gov.br',
+  ETIQUETA_GMAIL: 'Portal P3', // marca no Gmail os e-mails já trazidos
+  PASTA_ANEXOS: '' // vazio = cria a pasta "Portal P3 - Anexos" no Drive na primeira vez
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -31,10 +29,10 @@ function instalarAutomacao() {
     if (t.getHandlerFunction() === 'processarPendentes') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('processarPendentes').timeBased().everyMinutes(5).create();
+  // O resumo diário por e-mail foi retirado: apaga o gatilho antigo, se ainda existir.
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'enviarResumoDiario') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('enviarResumoDiario').timeBased().atHour(CONFIG_P3.HORA_RESUMO).everyDays(1).create();
   testarConexao();
 }
 
@@ -66,6 +64,9 @@ function diagnostico() {
     var n = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'processarPendentes'; }).length;
     if (!n) throw new Error('não instalado: rode instalarAutomacao');
     return 'instalado';
+  });
+  ok('E-mails do funcional (últimos 2 dias)', function () {
+    return GmailApp.search('from:' + CONFIG_P3.EMAIL_FUNCIONAL + ' newer_than:2d', 0, 50).length + ' conversa(s)';
   });
   ok('Firestore (chave)', function () {
     var p = consultarPendentes_();
@@ -132,6 +133,12 @@ function rodarMotor_(esperaMs) {
   if (!trava.tryLock(esperaMs)) return;
   try {
     // Repete enquanto houver pendentes (pega também o que foi salvo durante a rodada).
+    try {
+      importarEmails_();
+    } catch (e) {
+      // Falha no Gmail não pode travar a agenda: registra e tenta de novo na próxima rodada.
+      console.error('E-mails: ' + e.message);
+    }
     for (var i = 0; i < 3; i++) {
       var pendentes = consultarPendentes_();
       if (!pendentes.length) break;
@@ -302,53 +309,83 @@ function gravarResultado_(doc, feito, continuarPendente) {
   firestore_('patch', doc.nome + '?updateMask.fieldPaths=automacao', { fields: { automacao: jsParaValor(feito) } });
 }
 
-// ---------- Resumo diário por e-mail (gatilho às 7h) ----------
+// ---------- E-mails do funcional -> aba Demandas Pendentes ----------
 
-function consultar_(colecao, onde) {
-  var r = firestore_('post', 'projects/' + CONFIG_P3.PROJETO + '/databases/(default)/documents:runQuery', {
-    structuredQuery: { from: [{ collectionId: colecao }], where: onde }
-  });
-  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
-  return r.json.filter(function (x) { return x.document; }).map(function (x) { return camposParaJs(x.document.fields); });
-}
+var FOLGA_EMAILS_MS = 10 * 60 * 1000;
 
-function dadosDoResumo_(hoje) {
-  var demandas = consultar_('demandas', {
-    fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'em_aberto' } }
-  });
-  var encs = consultar_('encaminhamentos', {
-    fieldFilter: { field: { fieldPath: 'status' }, op: 'IN', value: jsParaValor(PENDENTES_P3.concat(['respondido'])) }
-  });
-  return montarResumoDiario(demandas, encs, hoje);
-}
-
-function enviarResumoDiario() {
-  var agora = new Date();
-  if (CONFIG_P3.SO_DIAS_UTEIS && (agora.getDay() === 0 || agora.getDay() === 6)) return;
-  enviarResumo_(agora, true);
-}
-
-/** Rode pelo editor para receber o resumo agora (só para a P/3, qualquer dia). */
-function testarResumo() {
-  enviarResumo_(new Date(), false);
-}
-
-function enviarResumo_(agora, incluirCias) {
-  var hoje = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
-  var r = dadosDoResumo_(hoje);
-  MailApp.sendEmail({
-    to: CONFIG_P3.EMAILS_RESUMO_P3.join(','),
-    subject: assuntoResumoP3(r, hoje),
-    htmlBody: htmlResumoP3(r, hoje, CONFIG_P3.URL_PORTAL)
-  });
-  if (!incluirCias) return;
-  Object.keys(CONFIG_P3.EMAILS_CIAS).forEach(function (u) {
-    var c = r.porCia[u];
-    if (!c || !c.pendentes.length || !CONFIG_P3.EMAILS_CIAS[u]) return;
-    MailApp.sendEmail({
-      to: CONFIG_P3.EMAILS_CIAS[u],
-      subject: 'Portal P3 — ' + c.sigla + ': ' + c.pendentes.length + ' demanda(s) pendente(s)' + (c.atrasadas.length ? ', ' + c.atrasadas.length + ' atrasada(s)' : ''),
-      htmlBody: htmlResumoCia(c, hoje, CONFIG_P3.URL_PORTAL)
+/**
+ * Traz os e-mails que a caixa funcional encaminhou desde a última busca.
+ * Cada e-mail vira um documento com id fixo ("email_" + id da mensagem): nunca entra duas vezes.
+ * Se algum falhar, a marca de tempo não avança e a próxima rodada tenta de novo.
+ */
+function importarEmails_() {
+  var props = PropertiesService.getScriptProperties();
+  var agora = Date.now();
+  // Primeira vez: busca as últimas 24 horas.
+  var desde = (Number(props.getProperty('EMAILS_DESDE')) || agora - 24 * 3600 * 1000) - FOLGA_EMAILS_MS;
+  var busca = 'from:' + CONFIG_P3.EMAIL_FUNCIONAL + ' after:' + Math.floor(desde / 1000) + ' -in:trash -in:spam';
+  var etiqueta = GmailApp.getUserLabelByName(CONFIG_P3.ETIQUETA_GMAIL) || GmailApp.createLabel(CONFIG_P3.ETIQUETA_GMAIL);
+  var erros = [];
+  var novos = 0;
+  GmailApp.search(busca, 0, 50).forEach(function (conversa) {
+    conversa.getMessages().forEach(function (msg) {
+      if (msg.getDate().getTime() < desde || !ehDoFuncional(msg.getFrom(), CONFIG_P3.EMAIL_FUNCIONAL)) return;
+      try {
+        if (importarEmail_(msg, conversa)) novos++;
+      } catch (e) {
+        erros.push(msg.getSubject() + ': ' + e.message);
+      }
     });
+    conversa.addLabel(etiqueta);
   });
+  if (erros.length) throw new Error(erros.join(' | '));
+  props.setProperty('EMAILS_DESDE', String(agora));
+  return novos;
+}
+
+function caminhoDocs_() {
+  return 'projects/' + CONFIG_P3.PROJETO + '/databases/(default)/documents';
+}
+
+/** true = entrou agora; false = já estava no portal. */
+function importarEmail_(msg, conversa) {
+  var id = 'email_' + msg.getId();
+  var existe = firestore_('get', caminhoDocs_() + '/caixaEntrada/' + id + '?mask.fieldPaths=status');
+  if (existe.status === 200) return false;
+  var item = pendenteDoEmail({
+    assunto: msg.getSubject(),
+    corpo: msg.getPlainBody(),
+    dataEntrada: Utilities.formatDate(msg.getDate(), 'America/Sao_Paulo', 'yyyy-MM-dd'),
+    recebidoEm: msg.getDate().toISOString(),
+    link: conversa.getPermalink()
+  }, salvarAnexos_(msg));
+  var r = firestore_('post', caminhoDocs_() + '/caixaEntrada?documentId=' + id, { fields: jsParaValor(item).mapValue.fields });
+  if (r.status === 409) return false;
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  return true;
+}
+
+function pastaAnexos_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = CONFIG_P3.PASTA_ANEXOS || props.getProperty('PASTA_ANEXOS');
+  if (id) return DriveApp.getFolderById(id);
+  var pasta = DriveApp.createFolder('Portal P3 - Anexos');
+  props.setProperty('PASTA_ANEXOS', pasta.getId());
+  return pasta;
+}
+
+/** Anexos vão para o Drive da P/3; o portal guarda só o nome e o link. */
+function salvarAnexos_(msg) {
+  var lista = msg.getAttachments({ includeInlineImages: false });
+  if (!lista.length) return [];
+  var pasta = pastaAnexos_();
+  return lista.map(function (a) {
+    var arquivo = pasta.createFile(a.copyBlob()).setName(a.getName());
+    return { nome: a.getName(), url: arquivo.getUrl() };
+  });
+}
+
+/** Rode pelo editor para buscar os e-mails agora e ver quantos entraram. */
+function testarEmails() {
+  Logger.log(importarEmails_() + ' e-mail(s) novo(s) na aba Demandas Pendentes.');
 }

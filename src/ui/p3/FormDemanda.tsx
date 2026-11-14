@@ -1,7 +1,15 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
-import { alterarStatus, atualizarDemanda, ConflitoEdicao, criarDemanda, obterDemanda } from '../../data/demandas';
+import {
+  alterarStatus,
+  atualizarDemanda,
+  ConflitoEdicao,
+  criarDemanda,
+  obterDemanda,
+  PendenteJaResolvida,
+} from '../../data/demandas';
+import { obterPendente } from '../../data/pendentes';
 import { edicaoPrecisaAutomacao, precisaAutomacao } from '../../domain/automacao';
-import { hojeISO } from '../../domain/datas';
+import { formatarData, hojeISO } from '../../domain/datas';
 import {
   dadosDe,
   demandaVazia,
@@ -21,6 +29,7 @@ import {
   TIPOS_SAIDA,
   URL_PLANILHA_EVENTO,
 } from '../../domain/listas';
+import { demandaDaPendente, detalheDaPendente, ORIGEM_DO_TIPO, type Pendente } from '../../domain/pendente';
 import { ROTULO_SITUACAO, situacaoDaDemanda } from '../../domain/situacao';
 import { ORDEM_DESTINOS, siglaDoDestino, UNIDADES, type DestinoId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
@@ -31,6 +40,67 @@ import { StatusAutomacao } from './StatusAutomacao';
 
 export function NovaDemanda() {
   return <FormDemanda />;
+}
+
+/** "Dar destino" a uma pendente: formulário de demanda nova já preenchido. */
+export function DestinarPendente({ id }: { id: string }) {
+  const [pendente, setPendente] = useState<Pendente | null | undefined>(undefined);
+  useEffect(() => {
+    obterPendente(db, id).then(setPendente, () => setPendente(null));
+  }, [id]);
+
+  if (pendente === undefined) return <p className="carregando">Carregando…</p>;
+  if (pendente === null || pendente.status !== 'pendente') {
+    return (
+      <section className="painel">
+        <p className="mensagem erro" role="alert">
+          {pendente?.numeroDemanda
+            ? `Esta pendente já virou a demanda nº ${pendente.numeroDemanda}.`
+            : 'Esta pendente não está mais na lista.'}
+        </p>
+        <a href="#/pendentes">Voltar para Demandas Pendentes</a>
+      </section>
+    );
+  }
+  return <FormDemanda key={pendente.id} pendente={pendente} />;
+}
+
+function OrigemPendente({ pendente: p }: { pendente: Pendente }) {
+  const detalhe = detalheDaPendente(p);
+  return (
+    <section className="cartao grupo origem-pendente" aria-label="Pendente de origem">
+      <span className="item-topo">
+        <span className={`selo selo-tipo-${p.tipo}`}>{ORIGEM_DO_TIPO[p.tipo]}</span>
+        <span className="pendente-data">{formatarData(p.dataEntrada)}</span>
+      </span>
+      <strong className="pendente-assunto">{p.assunto}</strong>
+      {detalhe && <span className="pendente-detalhe">{detalhe}</span>}
+      {p.texto && p.texto !== p.assunto && (
+        <details className="pendente-texto">
+          <summary>Ver texto</summary>
+          <p className="texto-resposta">{p.texto}</p>
+        </details>
+      )}
+      {(Boolean(p.anexos?.length) || Boolean(p.linkGmail)) && (
+        <ul className="pendente-links">
+          {p.anexos?.map((a) => (
+            <li key={a.url}>
+              <a href={a.url} target="_blank" rel="noreferrer">
+                📎 {a.nome}
+              </a>
+            </li>
+          ))}
+          {p.linkGmail && (
+            <li>
+              <a href={p.linkGmail} target="_blank" rel="noreferrer">
+                ✉️ Abrir no Gmail
+              </a>
+            </li>
+          )}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 export function EditarDemanda({ id }: { id: string }) {
@@ -46,7 +116,7 @@ export function EditarDemanda({ id }: { id: string }) {
         <p className="mensagem erro" role="alert">
           Demanda nº {id} não encontrada.
         </p>
-        <a href="#/demandas">Voltar para a lista</a>
+        <a href="#/demandas">Voltar para o Numerador</a>
       </section>
     );
   }
@@ -77,7 +147,7 @@ function novaComResponsavel(): DadosDemanda {
   return nova;
 }
 
-function Registrada({ numero, aoNova }: { numero: number; aoNova: () => void }) {
+function Registrada({ numero, aoNova, dePendente }: { numero: number; aoNova: () => void; dePendente: boolean }) {
   const [copiado, setCopiado] = useState(false);
   async function copiar() {
     try {
@@ -97,9 +167,15 @@ function Registrada({ numero, aoNova }: { numero: number; aoNova: () => void }) 
           <button className="botao secundario" type="button" onClick={copiar}>
             {copiado ? 'Copiado!' : 'Copiar número'}
           </button>
-          <button className="botao destaque" type="button" onClick={aoNova}>
-            Lançar outra
-          </button>
+          {dePendente ? (
+            <a className="botao destaque" href="#/pendentes">
+              Próxima pendente
+            </a>
+          ) : (
+            <button className="botao destaque" type="button" onClick={aoNova}>
+              Lançar outra
+            </button>
+          )}
         </div>
         <a href="#/demandas">Ver lista</a>
       </div>
@@ -107,8 +183,10 @@ function Registrada({ numero, aoNova }: { numero: number; aoNova: () => void }) 
   );
 }
 
-function FormDemanda({ existente }: { existente?: Demanda }) {
-  const [original] = useState<DadosDemanda>(() => (existente ? dadosDe(existente) : novaComResponsavel()));
+function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: Pendente }) {
+  const [original] = useState<DadosDemanda>(() =>
+    existente ? dadosDe(existente) : pendente ? demandaDaPendente(pendente, novaComResponsavel()) : novaComResponsavel(),
+  );
   const [dados, setDados] = useState<DadosDemanda>(original);
   const [registrada, setRegistrada] = useState<number | null>(null);
   const [erros, setErros] = useState<ErrosDemanda>({});
@@ -149,7 +227,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
         if (edicaoPrecisaAutomacao(campos)) cutucarMotor();
         irPara('#/demandas');
       } else {
-        const numero = await criarDemanda(db, limpo);
+        const numero = await criarDemanda(db, limpo, pendente?.id);
         if (precisaAutomacao(limpo)) cutucarMotor();
         setRegistrada(numero);
         setSalvando(false);
@@ -159,6 +237,8 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
         const campos = e.campos.map((c) => ROTULO_CAMPO[c]).join(', ');
         setErroGeral(`Outra pessoa alterou ${campos} desta demanda enquanto você editava. Nada foi salvo.`);
         setConflito(true);
+      } else if (e instanceof PendenteJaResolvida) {
+        setErroGeral(`Outra pessoa já resolveu esta pendente${e.numeroDemanda ? ` (demanda nº ${e.numeroDemanda})` : ''}. Nada foi salvo.`);
       } else {
         setErroGeral('Não foi possível salvar. Verifique a conexão e tente de novo.');
       }
@@ -183,6 +263,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
     return (
       <Registrada
         numero={registrada}
+        dePendente={Boolean(pendente)}
         aoNova={() => {
           setDados(novaComResponsavel());
           setErros({});
@@ -205,6 +286,8 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
           </span>
         )}
       </div>
+
+      {pendente && <OrigemPendente pendente={pendente} />}
 
       <fieldset className="cartao grupo">
         <legend>Entrada</legend>
@@ -361,7 +444,7 @@ function FormDemanda({ existente }: { existente?: Demanda }) {
       )}
 
       <div className="barra-acoes">
-        <a className="botao secundario" href="#/demandas">
+        <a className="botao secundario" href={pendente ? '#/pendentes' : '#/demandas'}>
           Voltar
         </a>
         {existente && (

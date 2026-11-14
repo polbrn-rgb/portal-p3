@@ -10,9 +10,9 @@ test('Cia entra, vê o nome da própria unidade e sai', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
 });
 
-test('P/3 entra direto na lista de demandas', async ({ page }) => {
+test('P/3 entra direto no Numerador', async ({ page }) => {
   await entrar(page, 'p3', SENHA_TESTE);
-  await expect(page.getByRole('heading', { name: 'Demandas', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
 });
 
 test('senha errada mostra aviso e não entra', async ({ page }) => {
