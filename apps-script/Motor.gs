@@ -63,14 +63,28 @@ function diagnostico() {
   Logger.log(linhas.join('\n'));
 }
 
-/** Rode pelo editor: mostra as 3 demandas mais recentes como o motor as vê e o que ele faria com cada uma. */
-function verUltimasDemandas() {
+function ultimasDemandas_(quantas) {
   var r = firestore_('post', 'projects/' + CONFIG_P3.PROJETO + '/databases/(default)/documents:runQuery', {
-    structuredQuery: { from: [{ collectionId: 'demandas' }], orderBy: [{ field: { fieldPath: 'numero' }, direction: 'DESCENDING' }], limit: 3 }
+    structuredQuery: { from: [{ collectionId: 'demandas' }], orderBy: [{ field: { fieldPath: 'numero' }, direction: 'DESCENDING' }], limit: quantas }
   });
   if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
-  r.json.filter(function (x) { return x.document; }).forEach(function (x) {
-    var d = camposParaJs(x.document.fields);
+  return r.json
+    .filter(function (x) { return x.document; })
+    .map(function (x) { return { nome: x.document.name, atualizadoEm: x.document.updateTime, dados: camposParaJs(x.document.fields) }; });
+}
+
+/** Rode pelo editor: refaz agora o que faltou na demanda mais recente (sem repetir o que já foi feito). */
+function reprocessarUltima() {
+  var ultima = ultimasDemandas_(1)[0];
+  if (!ultima) return Logger.log('Nenhuma demanda.');
+  processarDemanda_(ultima);
+  verUltimasDemandas();
+}
+
+/** Rode pelo editor: mostra as 3 demandas mais recentes como o motor as vê e o que ele faria com cada uma. */
+function verUltimasDemandas() {
+  ultimasDemandas_(3).forEach(function (doc) {
+    var d = doc.dados;
     var a = d.automacao || {};
     Logger.log([
       'Nº ' + d.numero + ' — ' + d.saida,
