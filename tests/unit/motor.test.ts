@@ -15,6 +15,10 @@ type Motor = {
   limparAssunto: (assunto: string) => string;
   remetenteOriginal: (corpo: string) => string;
   pendenteDoEmail: (m: Record<string, string>, anexos?: { nome: string; url: string }[]) => Record<string, unknown>;
+  diasDaOperacao: (inicio: string, termino: string) => string[];
+  camposDaPlanilha: (valores: unknown[][], linhaInicial?: number) => { linha: number; rotulo: string; grupo: string }[];
+  normalizarRE: (re: unknown) => string;
+  linhasDoEfetivo: (valores: unknown[][]) => Record<string, string>[];
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -149,5 +153,68 @@ describe('e-mails do funcional para Demandas Pendentes (Apps Script)', () => {
     const item = motor.pendenteDoEmail({ assunto: 'x', corpo: 'a'.repeat(30000), dataEntrada: '', recebidoEm: '' });
     expect(String(item.texto).length).toBeLessThan(20100);
     expect(String(item.texto)).toContain('abra o e-mail no Gmail');
+  });
+});
+
+describe('Checklist Operações (Apps Script)', () => {
+  test('dias da operação iguais aos do portal', async () => {
+    const { diasDaOperacao } = await import('../../src/domain/operacao');
+    for (const [i, t] of [
+      ['2026-11-29', '2026-12-02'],
+      ['2026-11-20', ''],
+      ['2026-11-20', '2026-11-18'],
+      ['', '2026-11-20'],
+    ]) {
+      expect(motor.diasDaOperacao(i, t)).toEqual(diasDaOperacao(i, t));
+    }
+  });
+
+  test('lê os indicadores do modelo de resultados', () => {
+    // Igual ao modelo: linha 7 cabeçalho, 8 grupo na coluna A, indicadores numerados, grupos na coluna B.
+    const linhas: unknown[][] = [
+      ['', ''],
+      ['', 'Nº PROTOCOLO - MAPA FORÇA'],
+      ['', 'Nº PROTOCOLO - RESULTADO'],
+      ['', ''],
+      ['', 'Planilha de Resultados SICoordOp'],
+      ['', ''],
+      ['OPM:', ''],
+      ['OCOR. COMUNS', ''],
+      [1, 'Pessoas Abordadas'],
+      [2, 'Estabelecimentos Vistoriados'],
+      ['', 'FLAG./PESSOAS'],
+      [7, 'Ato Infracional'],
+      ['', ''],
+      ['28', 'Medicamentos(cx)'],
+    ];
+    expect(motor.camposDaPlanilha(linhas)).toEqual([
+      { linha: 9, rotulo: 'Pessoas Abordadas', grupo: 'OCOR. COMUNS' },
+      { linha: 10, rotulo: 'Estabelecimentos Vistoriados', grupo: 'OCOR. COMUNS' },
+      { linha: 12, rotulo: 'Ato Infracional', grupo: 'FLAG./PESSOAS' },
+      { linha: 14, rotulo: 'Medicamentos(cx)', grupo: 'FLAG./PESSOAS' },
+    ]);
+  });
+
+  test('RE igual ao do portal', async () => {
+    const { normalizarRE } = await import('../../src/domain/efetivo');
+    for (const re of ['123456-7', '1234567', '123456-A', ' 123456 ', '']) expect(motor.normalizarRE(re)).toBe(normalizarRE(re));
+    expect(motor.normalizarRE(1234567)).toBe('123456');
+  });
+
+  test('lê o banco de efetivo pelo cabeçalho, onde ele estiver', () => {
+    const aba: unknown[][] = [
+      ['PREENCHA OS DADOS ABAIXO', '', '', '', '', ''],
+      ['CIA', '4ªCia', '', '', '', ''],
+      ['', '', '', '', '', ''],
+      ['Coluna 1', 'Post/Grad', 'RE', 'NOME COMPLETO', 'NOME DE GUERRA', 'Telefone'],
+      [1, 'Cb PM', '123456-7', 'FULANO DE TAL', 'FULANO', '(11) 90000-0000'],
+      [2, 'Sd PM', '', 'SEM RE', 'X', ''],
+      [3, '1º Sgt PM', 234567, 'BELTRANO', 'BELTRANO', ''],
+    ];
+    expect(motor.linhasDoEfetivo(aba)).toEqual([
+      { chave: '123456', re: '123456-7', posto: 'Cb PM', nomeGuerra: 'FULANO', telefone: '(11) 90000-0000' },
+      { chave: '234567', re: '234567', posto: '1º Sgt PM', nomeGuerra: 'BELTRANO', telefone: '' },
+    ]);
+    expect(motor.linhasDoEfetivo([['sem', 'cabeçalho']])).toEqual([]);
   });
 });

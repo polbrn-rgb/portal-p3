@@ -148,3 +148,86 @@ function pendenteDoEmail(m, anexos) {
     anexos: anexos || []
   };
 }
+
+// ---------- Checklist Operações: planilha de resultados e banco de efetivo ----------
+
+/** Dias da operação, do início ao término (AAAA-MM-DD), no máximo 60. */
+function diasDaOperacao(inicio, termino) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio || '')) return [];
+  var fim = /^\d{4}-\d{2}-\d{2}$/.test(termino || '') ? termino : inicio;
+  if (fim < inicio) return [inicio];
+  var dias = [];
+  var d = new Date(inicio + 'T12:00:00Z');
+  while (dias.length < 60) {
+    var iso = d.toISOString().slice(0, 10);
+    dias.push(iso);
+    if (iso >= fim) break;
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return dias;
+}
+
+/**
+ * Indicadores da planilha modelo (colunas A e B, a partir da linha 8).
+ * Linha com número na coluna A e nome na B = indicador; linha só com texto = título do grupo.
+ */
+function camposDaPlanilha(valoresAB, linhaInicial) {
+  var inicio = linhaInicial || 8;
+  var campos = [];
+  var grupo = '';
+  for (var i = inicio - 1; i < valoresAB.length; i++) {
+    var a = String(valoresAB[i][0] === null || valoresAB[i][0] === undefined ? '' : valoresAB[i][0]).trim();
+    var b = String(valoresAB[i][1] === null || valoresAB[i][1] === undefined ? '' : valoresAB[i][1]).trim();
+    if (/^\d+$/.test(a) && b) {
+      campos.push({ linha: i + 1, rotulo: b, grupo: grupo });
+    } else if (b || a) {
+      grupo = b || a;
+    }
+  }
+  return campos;
+}
+
+/** Mesma regra do portal: "123456-7" / "1234567" / "123456" -> "123456". */
+function normalizarRE(re) {
+  var n = String(re === null || re === undefined ? '' : re).replace(/\D/g, '');
+  return n.length > 6 ? n.slice(0, 6) : n;
+}
+
+/**
+ * Lê uma aba do banco de efetivo: acha o cabeçalho (RE e NOME DE GUERRA) nas 10 primeiras linhas
+ * e devolve { chave, re, posto, nomeGuerra, telefone } de cada linha com RE.
+ */
+function linhasDoEfetivo(valores) {
+  var cab = -1;
+  var col = {};
+  for (var i = 0; i < Math.min(10, valores.length) && cab < 0; i++) {
+    var linha = valores[i].map(function (v) { return String(v).trim().toUpperCase(); });
+    var re = linha.indexOf('RE');
+    var guerra = -1;
+    linha.forEach(function (v, j) { if (guerra < 0 && v.indexOf('NOME DE GUERRA') >= 0) guerra = j; });
+    if (re >= 0 && guerra >= 0) {
+      cab = i;
+      col.re = re;
+      col.guerra = guerra;
+      linha.forEach(function (v, j) {
+        if (col.posto === undefined && /POST|GRAD/.test(v)) col.posto = j;
+        if (col.tel === undefined && /TELEFONE|CELULAR/.test(v)) col.tel = j;
+      });
+    }
+  }
+  if (cab < 0) return [];
+  var lista = [];
+  for (var k = cab + 1; k < valores.length; k++) {
+    var l = valores[k];
+    var chave = normalizarRE(l[col.re]);
+    if (chave.length < 5) continue;
+    lista.push({
+      chave: chave,
+      re: String(l[col.re]).trim(),
+      posto: col.posto === undefined ? '' : String(l[col.posto]).trim(),
+      nomeGuerra: String(l[col.guerra]).trim(),
+      telefone: col.tel === undefined ? '' : String(l[col.tel]).trim()
+    });
+  }
+  return lista;
+}

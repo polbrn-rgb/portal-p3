@@ -46,6 +46,20 @@ E-mails de qualquer outro endereço são ignorados.
 Depois de colar esta versão, rode **instalarAutomacao** de novo: ele pede a permissão do Gmail e apaga o
 gatilho antigo do resumo diário por e-mail (que foi retirado). Para testar na hora, rode **testarEmails**.
 
+## Checklist Operações (planilha de resultados, efetivo e missões do CFP)
+
+- **Planilha de resultado:** quando a P/3 marca o item no checklist, o motor copia a planilha modelo
+  (`PLANILHA_RESULTADO_MODELO`) para a pasta do CFP da operação e preenche a linha 1 (datas, a partir da
+  coluna C) e a linha 2 (protocolo do Mapa Força de cada dia). Os resultados que a Sala de Operações lança no
+  portal são gravados na coluna do dia (linha 3 = protocolo do resultado, demais linhas = indicadores).
+- **Banco de efetivo:** todo dia às 5h (e ao rodar **instalarAutomacao**) o motor copia RE, posto/graduação,
+  nome de guerra e telefone da planilha `PLANILHA_EFETIVO` para o portal. A aba `BD Efetivo` é lida primeiro; as
+  outras abas com as colunas RE e NOME DE GUERRA completam. Para atualizar na hora, rode **sincronizarEfetivo**.
+- **Missões do CFP:** as demandas com pasta CFP aparecem para o login do CFP. O **instalarAutomacao** já leva as
+  que existiam; para refazer, rode **sincronizarMissoesCfp**.
+
+Depois de colar esta versão, rode **instalarAutomacao** de novo (ele cria o gatilho diário do efetivo).
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

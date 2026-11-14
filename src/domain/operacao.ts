@@ -1,5 +1,7 @@
 import { ehDataISO } from './datas';
 import type { Demanda } from './demanda';
+import type { PedidoEfetivo } from './efetivo';
+import type { PlanilhaResultado } from './resultado';
 
 // Checklist Operações: toda demanda "ORDEM DE SERVIÇO" + "Operações Policiais" vira uma operação a acompanhar.
 
@@ -15,7 +17,7 @@ export const ITENS_CHECKLIST = [
   { id: 'efetivoOk', rotulo: 'Solicitação de efetivo' },
   { id: 'pastaOk', rotulo: 'Pasta do CFP (OS incluída)' },
   { id: 'mapaForcaOk', rotulo: 'Mapa força Sicoordop' },
-  { id: 'resultadoOk', rotulo: 'Resultado' },
+  { id: 'resultadoOk', rotulo: 'Planilha de resultado' },
 ] as const;
 
 export type ItemChecklist = (typeof ITENS_CHECKLIST)[number]['id'];
@@ -25,6 +27,10 @@ export type Checklist = Record<ItemChecklist, boolean> & {
   /** Protocolo do Mapa Força no Sicoordop, um por dia de operação (AAAA-MM-DD -> nº). */
   protocolos: Record<string, string>;
   concluida: boolean;
+  /** Preenchido ao enviar a solicitação de efetivo às Cias. */
+  efetivo?: PedidoEfetivo;
+  /** Cópia do modelo de resultados na pasta do CFP (o motor cria). */
+  planilha?: PlanilhaResultado;
 };
 
 export function checklistVazio(): Checklist {
@@ -47,6 +53,8 @@ export function lerChecklist(dados: Partial<Checklist> | undefined): Checklist {
   for (const item of ITENS_CHECKLIST) c[item.id] = dados[item.id] === true;
   c.protocolos = { ...(dados.protocolos ?? {}) };
   c.concluida = dados.concluida === true;
+  if (dados.efetivo) c.efetivo = dados.efetivo;
+  if (dados.planilha) c.planilha = dados.planilha;
   return c;
 }
 

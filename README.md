@@ -29,7 +29,7 @@ O `npm install` cria o `package-lock.json`. Ele deve ir para o GitHub junto com 
 
 ## Contas e perfis (Fase 1)
 
-São 8 contas: P/3 (`8bpmmp3@gmail.com`) e uma por Cia (`8bpmmp3+1cia@gmail.com` … `8bpmmp3+ft@gmail.com`).
+São 10 contas: P/3 (`8bpmmp3@gmail.com`), uma por Cia (`8bpmmp3+1cia@gmail.com` … `8bpmmp3+ft@gmail.com`), Sala de Operações (`8bpmmp3+sala@gmail.com`) e CFP (`8bpmmp3+cfp@gmail.com`).
 Na tela de login a pessoa só escolhe a unidade e digita a senha. O link de "Esqueci a senha" sempre chega na caixa da P/3.
 
 1. Firebase → Configurações do projeto → **Contas de serviço** → **Gerar nova chave privada**.

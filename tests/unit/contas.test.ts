@@ -10,14 +10,17 @@ describe('contas', () => {
     expect(emailDaConta('ft')).toBe('8bpmmp3+ft@gmail.com');
   });
 
-  test('são 8 contas: P/3 + 7 unidades, sem e-mail repetido', () => {
-    expect(CONTAS.map((c) => c.id)).toEqual(['p3', '1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft']);
-    expect(new Set(CONTAS.map((c) => c.email)).size).toBe(8);
+  test('são 10 contas: P/3 + 7 unidades + Sala de Operações + CFP, sem e-mail repetido', () => {
+    expect(CONTAS.map((c) => c.id)).toEqual(['p3', '1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft', 'sala', 'cfp']);
+    expect(new Set(CONTAS.map((c) => c.email)).size).toBe(10);
+    expect(emailDaConta('sala')).toBe('8bpmmp3+sala@gmail.com');
+    expect(emailDaConta('cfp')).toBe('8bpmmp3+cfp@gmail.com');
   });
 
   test('perfil gravado de cada conta', () => {
     expect(CONTAS[0].claims).toEqual({ perfil: 'p3' });
     expect(CONTAS.find((c) => c.id === '5cia')?.claims).toEqual({ perfil: 'unidade', unidade: '5cia' });
+    expect(CONTAS.find((c) => c.id === 'sala')?.claims).toEqual({ perfil: 'sala' });
   });
 });
 
@@ -32,6 +35,11 @@ describe('sessaoDosClaims', () => {
       unidade: 'ft',
       sigla: 'CIA FT',
     });
+  });
+
+  test('Sala de Operações e CFP', () => {
+    expect(sessaoDosClaims({ perfil: 'sala' })).toEqual({ tipo: 'sala', sigla: 'Sala de Operações' });
+    expect(sessaoDosClaims({ perfil: 'cfp' })).toEqual({ tipo: 'cfp', sigla: 'CFP' });
   });
 
   test('sem perfil, perfil estranho ou unidade inexistente', () => {
