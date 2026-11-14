@@ -32,6 +32,17 @@ na agenda do CFP e a linha na aba Operações.
 Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 5 minutos. No portal, dentro da demanda, o bloco
 **Agenda e pasta** mostra ⏳ enquanto espera e ✅ quando o evento foi criado, com o botão **Abrir pasta CFP**.
 
+## Resumo diário por e-mail (7h, dias úteis)
+
+O `instalarAutomacao` também liga o resumo das pendências às 7h. Ajuste no `CONFIG_P3` do `Motor.gs`:
+- `URL_PORTAL`: endereço do portal (vai no botão do e-mail);
+- `EMAILS_RESUMO_P3`: quem recebe o resumo geral;
+- `EMAILS_CIAS`: e-mail de cada Cia para receber só as pendências dela (vazio = não recebe);
+- `SO_DIAS_UTEIS`: `false` para mandar também sábado e domingo.
+
+Depois de colar a versão com o resumo, rode **instalarAutomacao** de novo (ele pede a permissão de enviar
+e-mail) e **testarResumo** para receber um exemplo na hora.
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

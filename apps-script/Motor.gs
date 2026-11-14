@@ -15,7 +15,14 @@ var CONFIG_P3 = {
   PASTA_CFP: '1rqCpo4l64qmFG1FhPUWF1ivCL6DYffjo',
   PLANILHA_OPERACOES: '1cY1jbA7AGNLN66tTqH0CyuwHe9X-Xz_DVdcv0xWjado', // Numerador 2026 (aba "Operações")
   ABA_OPERACOES: 'Operações',
-  POR_RODADA: 10
+  POR_RODADA: 10,
+  // Resumo diário por e-mail
+  URL_PORTAL: '', // endereço do portal na Vercel (vai no botão do e-mail)
+  EMAILS_RESUMO_P3: ['8bpmmp3@gmail.com'],
+  // E-mail de cada Cia para receber as próprias pendências (vazio = Cia não recebe). Ex.: { '1cia': 'x@y' }
+  EMAILS_CIAS: {},
+  HORA_RESUMO: 7,
+  SO_DIAS_UTEIS: true
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -24,6 +31,10 @@ function instalarAutomacao() {
     if (t.getHandlerFunction() === 'processarPendentes') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('processarPendentes').timeBased().everyMinutes(5).create();
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'enviarResumoDiario') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('enviarResumoDiario').timeBased().atHour(CONFIG_P3.HORA_RESUMO).everyDays(1).create();
   testarConexao();
 }
 
@@ -289,4 +300,55 @@ function gravarResultado_(doc, feito, continuarPendente) {
   });
   if (r.status === 200) return;
   firestore_('patch', doc.nome + '?updateMask.fieldPaths=automacao', { fields: { automacao: jsParaValor(feito) } });
+}
+
+// ---------- Resumo diário por e-mail (gatilho às 7h) ----------
+
+function consultar_(colecao, onde) {
+  var r = firestore_('post', 'projects/' + CONFIG_P3.PROJETO + '/databases/(default)/documents:runQuery', {
+    structuredQuery: { from: [{ collectionId: colecao }], where: onde }
+  });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  return r.json.filter(function (x) { return x.document; }).map(function (x) { return camposParaJs(x.document.fields); });
+}
+
+function dadosDoResumo_(hoje) {
+  var demandas = consultar_('demandas', {
+    fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'em_aberto' } }
+  });
+  var encs = consultar_('encaminhamentos', {
+    fieldFilter: { field: { fieldPath: 'status' }, op: 'IN', value: jsParaValor(PENDENTES_P3.concat(['respondido'])) }
+  });
+  return montarResumoDiario(demandas, encs, hoje);
+}
+
+function enviarResumoDiario() {
+  var agora = new Date();
+  if (CONFIG_P3.SO_DIAS_UTEIS && (agora.getDay() === 0 || agora.getDay() === 6)) return;
+  enviarResumo_(agora, true);
+}
+
+/** Rode pelo editor para receber o resumo agora (só para a P/3, qualquer dia). */
+function testarResumo() {
+  enviarResumo_(new Date(), false);
+}
+
+function enviarResumo_(agora, incluirCias) {
+  var hoje = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var r = dadosDoResumo_(hoje);
+  MailApp.sendEmail({
+    to: CONFIG_P3.EMAILS_RESUMO_P3.join(','),
+    subject: assuntoResumoP3(r, hoje),
+    htmlBody: htmlResumoP3(r, hoje, CONFIG_P3.URL_PORTAL)
+  });
+  if (!incluirCias) return;
+  Object.keys(CONFIG_P3.EMAILS_CIAS).forEach(function (u) {
+    var c = r.porCia[u];
+    if (!c || !c.pendentes.length || !CONFIG_P3.EMAILS_CIAS[u]) return;
+    MailApp.sendEmail({
+      to: CONFIG_P3.EMAILS_CIAS[u],
+      subject: 'Portal P3 — ' + c.sigla + ': ' + c.pendentes.length + ' demanda(s) pendente(s)' + (c.atrasadas.length ? ', ' + c.atrasadas.length + ' atrasada(s)' : ''),
+      htmlBody: htmlResumoCia(c, hoje, CONFIG_P3.URL_PORTAL)
+    });
+  });
 }

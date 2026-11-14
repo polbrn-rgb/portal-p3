@@ -13,11 +13,11 @@ import { useDemandasAbertas } from '../../lib/useDemandasAbertas';
 type Aba = 'abertas' | 'concluidas';
 const FILTROS: (Situacao | 'todas')[] = ['todas', 'atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-export function ListaDemandas() {
+export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Situacao | 'todas' }) {
   const hoje = hojeISO();
   const [aba, setAba] = useState<Aba>('abertas');
   const [texto, setTexto] = useState('');
-  const [filtro, setFiltro] = useState<Situacao | 'todas'>('todas');
+  const [filtro, setFiltro] = useState<Situacao | 'todas'>(filtroInicial);
   const abertas = useDemandasAbertas();
   const encsAbertos = useAoVivo<Encaminhamento[]>((ok, erro) => observarAbertosP3(db, ok, erro), []);
   const andamento = useMemo(

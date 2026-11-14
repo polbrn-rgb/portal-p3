@@ -117,3 +117,22 @@ test('CFP pede as datas do Btl e a demanda mostra a agenda aguardando o Apps Scr
   await expect(bloco).toContainText('Agenda CFP');
   await expect(bloco).toContainText('aguardando');
 });
+
+test('painel de prazos conta a demanda atrasada e leva para a lista filtrada', async ({ page }, info) => {
+  const assunto = `Painel teste ${info.project.name} ${Date.now()}`;
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await page.getByLabel('Prazo CPA').fill('2020-01-10');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await page.getByRole('link', { name: 'Ver lista' }).click();
+
+  await page.getByRole('link', { name: 'Painel', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+  await expect(page.getByRole('table')).toContainText('CIA FT');
+
+  await page.getByRole('link', { name: /Atrasadas/ }).click();
+  await expect(page.getByRole('button', { name: /^Atrasado/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('link', { name: new RegExp(assunto) })).toContainText('Atrasado');
+});

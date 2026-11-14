@@ -11,6 +11,18 @@ type Motor = {
   jsParaValor: (x: unknown) => unknown;
   valorParaJs: (v: unknown) => unknown;
   camposParaJs: (f: Record<string, unknown>) => Record<string, unknown>;
+  montarResumoDiario: (d: unknown[], e: unknown[], hoje: string) => Resumo;
+  htmlResumoP3: (r: Resumo, hoje: string, url: string) => string;
+  htmlResumoCia: (c: Resumo['porCia'][string], hoje: string, url: string) => string;
+  assuntoResumoP3: (r: Resumo, hoje: string) => string;
+};
+type Item = { numero: number; saida: string; prazo: string; sigla?: string };
+type Resumo = {
+  atrasadas: Item[];
+  venceHoje: Item[];
+  proximos: Item[];
+  aguardandoAceite: Item[];
+  porCia: Record<string, { sigla: string; pendentes: Item[]; atrasadas: Item[] }>;
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -90,5 +102,49 @@ describe('conversão Firestore <-> objeto (Apps Script)', () => {
     expect(motor.valorParaJs({ integerValue: '42' })).toBe(42);
     expect(motor.valorParaJs({ arrayValue: {} })).toEqual([]);
     expect(motor.valorParaJs({ mapValue: {} })).toEqual({});
+  });
+});
+
+describe('resumo diário por e-mail (Apps Script)', () => {
+  const HOJE = '2026-11-13';
+  const demandas = [
+    { numero: 1, saida: 'Atrasada', prazoCPA: '2026-11-10' },
+    { numero: 2, saida: 'Hoje', prazoCPA: HOJE },
+    { numero: 3, saida: 'Daqui 2 dias', prazoCPA: '2026-11-15' },
+    { numero: 4, saida: 'Longe', prazoCPA: '2026-12-20' },
+    { numero: 5, saida: 'Sem prazo', prazoCPA: '' },
+  ];
+  const encs = [
+    { numero: 3, saida: 'Daqui 2 dias', unidadeId: '1cia', status: 'novo', prazoCia: '2026-11-12' },
+    { numero: 4, saida: 'Longe', unidadeId: '1cia', status: 'em_andamento', prazoCia: '2026-12-10' },
+    { numero: 4, saida: 'Longe', unidadeId: 'ft', status: 'respondido', prazoCia: '2026-12-10' },
+  ];
+  const r = motor.montarResumoDiario(demandas, encs, HOJE);
+
+  test('separa atrasadas, vencem hoje, próximos 3 dias e aguardando aceite', () => {
+    expect(r.atrasadas.map((i) => i.numero)).toEqual([1]);
+    expect(r.venceHoje.map((i) => i.numero)).toEqual([2]);
+    expect(r.proximos.map((i) => i.numero)).toEqual([3]);
+    expect(r.aguardandoAceite.map((i) => i.sigla)).toEqual(['CIA FT']);
+  });
+
+  test('por Cia: pendentes em ordem de prazo e atrasadas', () => {
+    expect(r.porCia['1cia'].pendentes.map((i) => i.numero)).toEqual([3, 4]);
+    expect(r.porCia['1cia'].atrasadas.map((i) => i.numero)).toEqual([3]);
+    expect(r.porCia.ft).toBeUndefined();
+  });
+
+  test('e-mail da P/3 e da Cia com as seções e o link do portal; assunto resume', () => {
+    const html = motor.htmlResumoP3(r, HOJE, 'https://portal.exemplo');
+    expect(html).toContain('pendências de 13/11/2026');
+    expect(html).toContain('Atrasadas (1)');
+    expect(html).toContain('href="https://portal.exemplo"');
+    expect(motor.htmlResumoCia(r.porCia['1cia'], HOJE, '')).toContain('1ª CIA');
+    expect(motor.assuntoResumoP3(r, HOJE)).toBe('Portal P3 — 13/11/2026 — 1 atrasada(s), 1 vence(m) hoje, 1 aguardando aceite');
+  });
+
+  test('protege o HTML contra texto da demanda', () => {
+    const r2 = motor.montarResumoDiario([{ numero: 9, saida: '<b>x</b>', prazoCPA: '2026-11-01' }], [], HOJE);
+    expect(motor.htmlResumoP3(r2, HOJE, '')).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 });
