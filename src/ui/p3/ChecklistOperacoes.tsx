@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { concluirOperacao, marcarItem, salvarProtocolo } from '../../data/operacoes';
 import { formatarData } from '../../domain/datas';
 import {
@@ -85,10 +85,14 @@ function periodo(inicio: string, termino: string): string {
 }
 
 function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConcluir: () => void }) {
-  const { demanda: d, checklist: c } = operacao;
+  const { demanda: d, checklist: salvo } = operacao;
   const [erro, setErro] = useState('');
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  // A marcação aparece na hora; quando o banco confirma, volta a valer o que veio dele.
+  const [marcando, setMarcando] = useState<Partial<Record<ItemChecklist, boolean>>>({});
+  useEffect(() => setMarcando({}), [salvo]);
+  const c = { ...salvo, ...marcando };
   const { feitos, total } = progresso(c);
   const dias = diasDaOperacao(d.inicioBtl, d.terminoBtl);
   const pasta = pastaCfpDa(d);
@@ -115,7 +119,15 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
   }
 
   function marcar(item: ItemChecklist, valor: boolean) {
-    void executar(() => marcarItem(db, d.id, item, valor));
+    setMarcando((m) => ({ ...m, [item]: valor }));
+    void executar(async () => {
+      try {
+        await marcarItem(db, d.id, item, valor);
+      } catch (e) {
+        setMarcando((m) => ({ ...m, [item]: !valor }));
+        throw e;
+      }
+    });
   }
 
   return (
