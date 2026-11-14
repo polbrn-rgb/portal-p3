@@ -52,6 +52,19 @@ describe('quando chamar o motor (portal)', () => {
 });
 
 describe('planejarAutomacao (Apps Script)', () => {
+  test('demanda excluída: só apaga os eventos que tinha (nada é criado nem movido)', () => {
+    const feito = {
+      agendaCPA: evento('2026-11-20', 'Prazo CPA: Operação Natal'),
+      cfp: { ...evento('2026-12-20', 'Operação Natal'), pastaUrl: 'https://drive.google.com/p', operacoes: true },
+    };
+    const excluida = { ...base, status: 'excluido', prazoCPA: '2026-11-25', prazoCia: '2026-11-18', adicionarCFP: true, inicioBtl: '2026-12-20', terminoBtl: '2026-12-21' };
+    expect(motor.planejarAutomacao(excluida, feito).map((a) => [a.tipo, a.chave, a.agenda])).toEqual([
+      ['apagar', 'agendaCPA', 'principal'],
+      ['apagar', 'cfp', 'cfp'],
+    ]);
+    expect(motor.planejarAutomacao(excluida, {})).toEqual([]);
+  });
+
   test('prazos novos viram eventos com os mesmos títulos do painel do numerador', () => {
     const acoes = motor.planejarAutomacao({ ...base, prazoCPA: '2026-11-20', prazoCia: '2026-11-18' });
     expect(acoes.map((a) => [a.tipo, a.chave, a.titulo])).toEqual([

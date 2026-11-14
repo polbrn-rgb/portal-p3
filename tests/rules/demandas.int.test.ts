@@ -8,7 +8,10 @@ import {
   buscarConcluidas,
   ConflitoEdicao,
   criarDemanda,
+  encaminhamentosDaDemanda,
+  excluirDemanda,
   obterDemanda,
+  observarAbertas,
 } from '../../src/data/demandas';
 import { dadosDe, demandaVazia, type DadosDemanda } from '../../src/domain/demanda';
 
@@ -145,5 +148,32 @@ describe('buscarConcluidas', () => {
     const p2 = await buscarConcluidas(db, p1.lista.at(-1)!.numero);
     expect(p2.lista.map((d) => d.numero)).toEqual([2, 1]);
     expect(p2.temMais).toBe(false);
+  });
+});
+
+describe('excluirDemanda', () => {
+  test('some das abertas, das Cias e do checklist; o número fica registrado e o motor limpa a agenda', async () => {
+    const numero = await criarDemanda(db, { ...dados(), destinos: ['1cia', '2cia'] });
+    const fica = await criarDemanda(db, dados('Outra'));
+    const id = String(numero);
+    await setDoc(doc(db, 'operacoes', id), { osOk: true });
+    expect(await encaminhamentosDaDemanda(db, id)).toHaveLength(2);
+
+    await excluirDemanda(db, id);
+
+    const d = await obterDemanda(db, id);
+    expect(d?.status).toBe('excluido');
+    expect(d?.automacaoPendente).toBe(true);
+    expect(await historico(numero)).toEqual(['criada', 'excluida']);
+    expect(await encaminhamentosDaDemanda(db, id)).toEqual([]);
+    expect((await getDoc(doc(db, 'operacoes', id))).exists()).toBe(false);
+
+    const abertas = await new Promise<number[]>((ok, falha) => {
+      const parar = observarAbertas(db, (l) => { parar(); ok(l.map((x) => x.numero)); }, falha);
+    });
+    expect(abertas).toEqual([fica]);
+    expect((await buscarConcluidas(db)).lista).toEqual([]);
+    // O próximo cadastro não reaproveita o número excluído.
+    expect(await criarDemanda(db, dados())).toBe(fica + 1);
   });
 });

@@ -16,7 +16,8 @@ import {
 } from './listas';
 import { ORDEM_DESTINOS, UNIDADES, type DestinoId, type UnidadeId } from './unidades';
 
-export type StatusDemanda = 'em_aberto' | 'concluido';
+// 'excluido': some de todas as listas; o documento fica só para o número não se perder (e o motor limpar as agendas).
+export type StatusDemanda = 'em_aberto' | 'concluido' | 'excluido';
 
 // Campos que a P/3 preenche (as colunas do numerador). Datas no formato AAAA-MM-DD.
 // `saida` guarda a coluna "Demanda" (o resumo do assunto); `meioSaida` é a coluna "Saída" (SEI/E-mail/Físico).

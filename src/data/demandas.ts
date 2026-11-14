@@ -205,6 +205,22 @@ export async function alterarStatus(db: Firestore, id: string, status: StatusDem
   await lote.commit();
 }
 
+/**
+ * Exclui a demanda: sai do Numerador, das Cias (os encaminhamentos são apagados) e do Checklist Operações.
+ * O número não é reaproveitado. O motor apaga os eventos dela nas agendas (a pasta do Drive fica).
+ */
+export async function excluirDemanda(db: Firestore, id: string): Promise<void> {
+  const ref = doc(db, 'demandas', id);
+  const agora = serverTimestamp();
+  const encs = await encaminhamentosDaDemanda(db, id);
+  const lote = writeBatch(db);
+  lote.update(ref, { status: 'excluido', excluidoEm: agora, automacaoPendente: true, atualizadoEm: agora });
+  lote.set(doc(collection(ref, 'historico')), { acao: 'excluida', em: agora });
+  for (const e of encs) lote.delete(doc(db, 'encaminhamentos', e.id));
+  lote.delete(doc(db, 'operacoes', id));
+  await lote.commit();
+}
+
 /** Uma demanda em tempo real (para ver o motor terminar a agenda/pasta). */
 export function observarDemanda(
   db: Firestore,

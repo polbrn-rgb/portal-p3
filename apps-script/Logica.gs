@@ -22,6 +22,14 @@ function planejarAutomacao(d, feito) {
   var acoes = [];
   var obs = d.observacao || '';
 
+  // Demanda excluída no portal: só apaga os eventos que ela tinha (a pasta do Drive fica).
+  if (d.status === 'excluido') {
+    if (feito.agendaCPA) acoes.push({ tipo: 'apagar', chave: 'agendaCPA', agenda: 'principal', eventoId: feito.agendaCPA.eventoId });
+    if (feito.agendaCia) acoes.push({ tipo: 'apagar', chave: 'agendaCia', agenda: 'principal', eventoId: feito.agendaCia.eventoId });
+    if (feito.cfp) acoes.push({ tipo: 'apagar', chave: 'cfp', agenda: 'cfp', eventoId: feito.cfp.eventoId });
+    return acoes;
+  }
+
   function prazo(chave, data, titulo, descricao) {
     var atual = feito[chave];
     if (data && !atual) {

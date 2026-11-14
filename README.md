@@ -62,6 +62,9 @@ histórico das demandas.
   Ordem Verbal são lançados pelos botões **+ SEI** e **+ Ordem Verbal**. **Dar destino** abre a demanda nova já
   preenchida; ao salvar, ela ganha número e sai das pendentes.
 - **Numerador**: as demandas com número (abertas e concluídas).
+- **Excluir demanda**: lixeira 🗑️ ao lado de cada demanda do Numerador, com confirmação. Some do Numerador, das
+  Cias e do Checklist Operações; o motor apaga os eventos dela nas agendas (a pasta do Drive fica). O número não é
+  reaproveitado e aparece como "Excluída" no backup.
 - **Painel**: prazos.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).

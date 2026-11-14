@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { buscarConcluidas } from '../../data/demandas';
+import { buscarConcluidas, excluirDemanda } from '../../data/demandas';
 import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { formatarData, hojeISO } from '../../domain/datas';
 import type { Demanda } from '../../domain/demanda';
@@ -34,6 +34,24 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
   const [erroConcluidas, setErroConcluidas] = useState('');
   const [baixando, setBaixando] = useState(false);
   const [avisoBackup, setAvisoBackup] = useState('');
+  const [aExcluir, setAExcluir] = useState<Demanda | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [avisoExclusao, setAvisoExclusao] = useState('');
+
+  async function confirmarExclusao() {
+    if (!aExcluir) return;
+    setExcluindo(true);
+    try {
+      await excluirDemanda(db, aExcluir.id);
+      setConcluidas((lista) => lista.filter((d) => d.id !== aExcluir.id));
+      setAvisoExclusao(`Demanda nº ${aExcluir.numero} excluída.`);
+      setAExcluir(null);
+    } catch {
+      setAvisoExclusao('Não foi possível excluir. Tente de novo.');
+      setAExcluir(null);
+    }
+    setExcluindo(false);
+  }
 
   // O código do backup só é baixado quando alguém clica no botão.
   async function backup() {
@@ -102,6 +120,11 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
           {avisoBackup}
         </p>
       )}
+      {avisoExclusao && (
+        <p className="mensagem aviso" role="status">
+          {avisoExclusao}
+        </p>
+      )}
 
       <div className="abas" role="tablist">
         <button type="button" role="tab" aria-selected={aba === 'abertas'} onClick={() => setAba('abertas')}>
@@ -148,7 +171,7 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
       {!carregando && !erro && visiveis.length === 0 && <p className="vazio">Nenhuma demanda encontrada.</p>}
 
       {visiveis.length > 0 && (
-        <div className="cabecalho-lista" aria-hidden="true">
+        <div className="cabecalho-lista com-lixeira" aria-hidden="true">
           <span>Nº</span>
           <span>Saída</span>
           <span>Categoria</span>
@@ -159,11 +182,27 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
       )}
       <ul className="lista">
         {visiveis.map((d) => (
-          <li key={d.id}>
+          <li key={d.id} className="linha-com-lixeira">
             <ItemDemanda demanda={d} hoje={hoje} andamento={andamentoDe(d)} />
+            <button
+              className="botao-lixeira"
+              type="button"
+              title="Excluir demanda"
+              aria-label={`Excluir demanda nº ${d.numero}`}
+              onClick={() => {
+                setAvisoExclusao('');
+                setAExcluir(d);
+              }}
+            >
+              🗑️
+            </button>
           </li>
         ))}
       </ul>
+
+      {aExcluir && (
+        <ConfirmarExclusao demanda={aExcluir} excluindo={excluindo} aoConfirmar={confirmarExclusao} aoCancelar={() => setAExcluir(null)} />
+      )}
 
       {aba === 'concluidas' && temMais && concluidas.length > 0 && (
         <button className="botao secundario" type="button" disabled={carregandoMais} onClick={carregarMais}>
@@ -171,6 +210,47 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
         </button>
       )}
     </section>
+  );
+}
+
+type PropsConfirmar = { demanda: Demanda; excluindo: boolean; aoConfirmar: () => void; aoCancelar: () => void };
+
+/** Confirmação antes de excluir (na própria página, sem a janela do navegador). */
+function ConfirmarExclusao({ demanda: d, excluindo, aoConfirmar, aoCancelar }: PropsConfirmar) {
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !excluindo) aoCancelar();
+    };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [excluindo, aoCancelar]);
+
+  return (
+    <div className="fundo-dialogo" onClick={() => !excluindo && aoCancelar()}>
+      <div
+        className="dialogo"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="titulo-excluir"
+        aria-describedby="texto-excluir"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id="titulo-excluir">Excluir a demanda nº {d.numero}?</h3>
+        <p className="dialogo-saida">{d.saida}</p>
+        <p id="texto-excluir">
+          Ela some do Numerador, das Cias e do Checklist Operações, e os eventos dela nas agendas são apagados. O número
+          não é reaproveitado e isso não pode ser desfeito pelo portal.
+        </p>
+        <div className="acoes-linha">
+          <button className="botao secundario" type="button" autoFocus disabled={excluindo} onClick={aoCancelar}>
+            Cancelar
+          </button>
+          <button className="botao perigo" type="button" disabled={excluindo} onClick={aoConfirmar}>
+            {excluindo ? 'Excluindo…' : '🗑️ Sim, excluir'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
