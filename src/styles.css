@@ -1142,3 +1142,31 @@ a.botao {
     padding-inline: 18px;
   }
 }
+
+/* ---------- Recados do Cmt do P3 para o CFP ---------- */
+.lista-recados {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.cartao-recado {
+  display: grid;
+  gap: 8px;
+  background: #fff8e1;
+  border-left: 4px solid #e0a100;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.recado-texto {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cartao-recado .botao {
+  justify-self: start;
+}

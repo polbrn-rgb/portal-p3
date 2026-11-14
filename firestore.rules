@@ -98,6 +98,18 @@ service cloud.firestore {
     }
 
     // Missões com pasta do CFP: gravadas pelo motor, lidas pelo CFP.
+    // Recado do Cmt do P3 para o CFP: a P/3 escreve e apaga; o CFP só lê.
+    match /recadosCfp/{recadoId} {
+      allow read: if ehP3() || ehPerfil('cfp');
+      allow create: if ehP3()
+        && request.resource.data.keys().hasOnly(['texto', 'criadoEm'])
+        && request.resource.data.texto is string
+        && request.resource.data.texto.size() > 0
+        && request.resource.data.texto.size() <= 2000
+        && request.resource.data.criadoEm == request.time;
+      allow delete: if ehP3();
+    }
+
     // Cópia da agenda do CFP (gravada só pelo Apps Script).
     match /agendaCfp/{docId} {
       allow read: if ehP3() || ehPerfil('cfp');
