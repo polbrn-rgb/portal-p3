@@ -4,7 +4,7 @@ import { doc, getDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { atualizarDemanda, criarDemanda, obterDemanda } from '../../src/data/demandas';
 import { concluirOperacao, marcarItem, observarOperacoes, salvarProtocolo } from '../../src/data/operacoes';
-import { dadosDe, demandaVazia } from '../../src/domain/demanda';
+import { dadosDe, demandaVazia, type DadosDemanda } from '../../src/domain/demanda';
 import type { Operacao } from '../../src/domain/operacao';
 
 // Código real do Checklist Operações, no emulador, com as regras ligadas.
@@ -42,14 +42,14 @@ function operacoesQuando(condicao: (lista: Operacao[]) => boolean): Promise<Oper
   });
 }
 
-const operacao = (saida: string) => ({
+const operacao = (saida: string): DadosDemanda => ({
   ...demandaVazia('2026-11-14'),
   saida,
   tipoSaida: 'ORDEM DE SERVIÇO',
   categoria: 'Operações Policiais',
   inicioBtl: '2026-11-20',
   terminoBtl: '2026-11-21',
-});
+} as DadosDemanda);
 
 describe('Checklist Operações', () => {
   test('demanda Ordem de Serviço + Operações Policiais entra sozinha; outras não', async () => {
