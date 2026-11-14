@@ -238,8 +238,9 @@ function ConfirmarExclusao({ demanda: d, excluindo, aoConfirmar, aoCancelar }: P
         <h3 id="titulo-excluir">Excluir a demanda nº {d.numero}?</h3>
         <p className="dialogo-saida">{d.saida}</p>
         <p id="texto-excluir">
-          Ela some do Numerador, das Cias e do Checklist Operações, e os eventos dela nas agendas são apagados. O número
-          não é reaproveitado e isso não pode ser desfeito pelo portal.
+          Ela some do Numerador, das Cias e do Checklist Operações. Os eventos dela nas agendas (inclusive a do CFP) são
+          apagados e a pasta do CFP vai para a lixeira do Drive. O número não é reaproveitado e isso não pode ser desfeito
+          pelo portal.
         </p>
         <div className="acoes-linha">
           <button className="botao secundario" type="button" autoFocus disabled={excluindo} onClick={aoCancelar}>

@@ -22,11 +22,14 @@ function planejarAutomacao(d, feito) {
   var acoes = [];
   var obs = d.observacao || '';
 
-  // Demanda excluída no portal: só apaga os eventos que ela tinha (a pasta do Drive fica).
+  // Demanda excluída no portal: apaga os eventos que ela tinha (inclusive na agenda do CFP)
+  // e manda a pasta do CFP para a lixeira do Drive (fica lá 30 dias, dá para recuperar).
   if (d.status === 'excluido') {
     if (feito.agendaCPA) acoes.push({ tipo: 'apagar', chave: 'agendaCPA', agenda: 'principal', eventoId: feito.agendaCPA.eventoId });
     if (feito.agendaCia) acoes.push({ tipo: 'apagar', chave: 'agendaCia', agenda: 'principal', eventoId: feito.agendaCia.eventoId });
     if (feito.cfp) acoes.push({ tipo: 'apagar', chave: 'cfp', agenda: 'cfp', eventoId: feito.cfp.eventoId });
+    var pasta = feito.cfpPasta || (feito.cfp && feito.cfp.pastaUrl) || '';
+    if (idDaPasta(pasta)) acoes.push({ tipo: 'apagarPasta', chave: 'cfpPasta', agenda: 'cfp', pastaId: idDaPasta(pasta) });
     return acoes;
   }
 
@@ -59,6 +62,12 @@ function planejarAutomacao(d, feito) {
     }
   }
   return acoes;
+}
+
+/** ID da pasta a partir do link do Drive (".../folders/ID" ou "...?id=ID"). '' se não der. */
+function idDaPasta(url) {
+  var m = /\/folders\/([\w-]+)/.exec(String(url || '')) || /[?&]id=([\w-]+)/.exec(String(url || ''));
+  return m ? m[1] : '';
 }
 
 /** "2026-11-20" -> Date local (meia-noite). */

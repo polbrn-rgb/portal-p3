@@ -5,7 +5,7 @@ import { edicaoPrecisaAutomacao, precisaAutomacao } from '../../src/domain/autom
 import { demandaVazia, validarDemanda } from '../../src/domain/demanda';
 
 // Carrega o Logica.gs do Apps Script exatamente como ele é, sem cópia.
-type Acao = { tipo: string; chave: string; agenda: string; inicio?: string; fim?: string; titulo?: string; eventoId?: string; nomePasta?: string };
+type Acao = { tipo: string; chave: string; agenda: string; inicio?: string; fim?: string; titulo?: string; eventoId?: string; nomePasta?: string; pastaId?: string };
 type Motor = {
   planejarAutomacao: (d: Record<string, unknown>, feito?: Record<string, unknown>) => Acao[];
   jsParaValor: (x: unknown) => unknown;
@@ -52,7 +52,7 @@ describe('quando chamar o motor (portal)', () => {
 });
 
 describe('planejarAutomacao (Apps Script)', () => {
-  test('demanda excluída: só apaga os eventos que tinha (nada é criado nem movido)', () => {
+  test('demanda excluída: apaga os eventos e manda a pasta do CFP para a lixeira (nada é criado nem movido)', () => {
     const feito = {
       agendaCPA: evento('2026-11-20', 'Prazo CPA: Operação Natal'),
       cfp: { ...evento('2026-12-20', 'Operação Natal'), pastaUrl: 'https://drive.google.com/p', operacoes: true },
@@ -61,6 +61,15 @@ describe('planejarAutomacao (Apps Script)', () => {
     expect(motor.planejarAutomacao(excluida, feito).map((a) => [a.tipo, a.chave, a.agenda])).toEqual([
       ['apagar', 'agendaCPA', 'principal'],
       ['apagar', 'cfp', 'cfp'],
+    ]);
+    // Com a pasta registrada (cfpPasta), ela vai junto.
+    const comPasta = { ...feito, cfpPasta: 'https://drive.google.com/drive/folders/1AbC-d_9' };
+    const acoes = motor.planejarAutomacao(excluida, comPasta);
+    expect(acoes.map((a) => a.tipo)).toEqual(['apagar', 'apagar', 'apagarPasta']);
+    expect(acoes[2]).toMatchObject({ chave: 'cfpPasta', pastaId: '1AbC-d_9' });
+    // Pasta criada mas o evento do CFP falhou: a pasta também vai.
+    expect(motor.planejarAutomacao(excluida, { cfpPasta: 'https://drive.google.com/open?id=XyZ' }).map((a) => [a.tipo, a.pastaId])).toEqual([
+      ['apagarPasta', 'XyZ'],
     ]);
     expect(motor.planejarAutomacao(excluida, {})).toEqual([]);
   });

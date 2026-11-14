@@ -241,6 +241,16 @@ function executar_(a, d, feito) {
     // 3) linha na aba Operações
     adicionarOperacao_(d);
     feito.cfp.operacoes = true;
+  } else if (a.tipo === 'apagarPasta') {
+    // Vai para a lixeira do Drive. Se já tinham apagado na mão, segue sem erro.
+    var alvo = null;
+    try {
+      alvo = DriveApp.getFolderById(a.pastaId);
+    } catch (e) {
+      alvo = null;
+    }
+    if (alvo && !alvo.isTrashed()) alvo.setTrashed(true);
+    feito.cfpPasta = null;
   } else if (a.tipo === 'operacoes') {
     adicionarOperacao_(d);
     feito.cfp.operacoes = true;
