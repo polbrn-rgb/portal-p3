@@ -289,7 +289,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
 
       {pendente && <OrigemPendente pendente={pendente} />}
 
-      <fieldset className="cartao grupo">
+      <fieldset className="cartao grupo grupo-entrada">
         <legend>Entrada</legend>
         <div className="grade">
           <Campo rotulo="Data de entrada" erro={erros.dataEntrada}>
@@ -384,7 +384,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
         </div>
       </fieldset>
 
-      <fieldset className="cartao grupo">
+      <fieldset className="cartao grupo grupo-prazos">
         <legend>Prazos</legend>
         <div className="grade">
           <Campo rotulo="Prazo CPA" erro={erros.prazoCPA}>

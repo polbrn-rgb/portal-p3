@@ -27,7 +27,7 @@ body {
 
 /* Celular primeiro; telas maiores só ganham espaço. */
 .tela {
-  --margem: max(16px, calc((100% - 1200px) / 2));
+  --margem: max(16px, calc((100% - 1400px) / 2));
   padding: 0 0 max(16px, env(safe-area-inset-bottom));
 }
 
@@ -833,8 +833,8 @@ a.botao {
     box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
   }
 
-  .item-topo,
-  .item-info {
+  .item-demanda .item-topo,
+  .item-demanda .item-info {
     display: contents;
   }
 
@@ -873,6 +873,45 @@ a.botao {
   }
 
   .barra-acoes > * {
-    flex: 0 0 160px;
+    flex: 0 0 auto;
+    min-width: 160px;
+    padding-inline: 20px;
+  }
+
+  /* Entrada e Prazos ocupam a linha toda, com os campos lado a lado. */
+  .formulario-demanda > .grupo-entrada,
+  .formulario-demanda > .grupo-prazos,
+  .formulario-demanda > .origem-pendente {
+    grid-column: 1 / -1;
+  }
+
+  .grupo-entrada .grade {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .grupo-prazos .grade {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Telas de um bloco só (resposta da Cia, nova pendente): centralizadas e sem esticar demais. */
+  .painel-estreito {
+    margin-inline: max(var(--margem), calc((100% - 880px) / 2));
+  }
+
+  /* Pendentes em duas colunas de cartões. */
+  .lista-pendentes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    align-items: start;
+  }
+
+  .item-pendente .acoes-linha {
+    justify-content: flex-end;
+  }
+
+  .item-pendente .acoes-linha > * {
+    flex: 0 0 auto;
+    min-width: 150px;
+    padding-inline: 18px;
   }
 }

@@ -148,7 +148,7 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
   }
 
   return (
-    <section className="painel">
+    <section className="painel painel-estreito">
       <div className="painel-cabecalho">
         <h2>Demanda nº {enc.numero}</h2>
         <span className={`selo enc-${enc.status}`}>{ROTULO_ENC[enc.status]}</span>
