@@ -53,6 +53,7 @@ export function PainelCfp() {
       )}
       {missoes.erro && <p className="mensagem erro">{missoes.erro}</p>}
       {missoes.carregando && <p className="carregando">Carregando…</p>}
+      {agenda && <h3>{dia === hojeISO() ? 'Missões de hoje' : `Missões de ${formatarData(dia)}`}</h3>}
       {!missoes.carregando && agenda && doDia.length === 0 && <p className="vazio">Nenhuma missão em {formatarData(dia)}.</p>}
       <ul className="lista lista-pendentes">
         {doDia.map((m) => (
