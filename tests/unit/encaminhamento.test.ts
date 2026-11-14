@@ -7,6 +7,7 @@ import {
   novoEncaminhamento,
   planejarEncaminhamentos,
   resumoDaDemanda,
+  saiDaTelaDaCia,
   type Encaminhamento,
   type StatusEnc,
 } from '../../src/domain/encaminhamento';
@@ -118,5 +119,32 @@ describe('situação com as respostas das Cias', () => {
   test('sem as respostas carregadas vale só o prazo; sem Cia nos destinos nunca é "Cias responderam"', () => {
     expect(situacaoDaDemanda(duasCias, HOJE)).toBe('cia_atrasada');
     expect(situacaoDaDemanda(demanda({ destinos: ['p1'] }), HOJE, sem)).toBe('em_aberto');
+  });
+});
+
+describe('saiDaTelaDaCia (limpeza automática da tela da Cia)', () => {
+  const HOJE = '2026-11-14';
+  const em = (iso: string) => ({ toDate: () => new Date(`${iso}T15:00:00`) });
+
+  test('com prazo: respondida/finalizada sai um dia depois do prazo', () => {
+    for (const status of ['respondido', 'aceito', 'cancelado'] as const) {
+      expect(saiDaTelaDaCia({ status, prazoCia: '2026-11-13' }, HOJE)).toBe(true);
+      expect(saiDaTelaDaCia({ status, prazoCia: '2026-11-14' }, HOJE)).toBe(false);
+      expect(saiDaTelaDaCia({ status, prazoCia: '2026-11-20' }, HOJE)).toBe(false);
+    }
+  });
+
+  test('o que ainda depende da Cia fica, mesmo atrasado', () => {
+    for (const status of ['novo', 'visualizado', 'em_andamento', 'devolvido'] as const) {
+      expect(saiDaTelaDaCia({ status, prazoCia: '2026-10-01' }, HOJE)).toBe(false);
+      expect(saiDaTelaDaCia({ status, prazoCia: '', atualizadoEm: em('2026-10-01') }, HOJE)).toBe(false);
+    }
+  });
+
+  test('sem prazo: sai no dia seguinte ao aceite; respondida sem aceite fica', () => {
+    expect(saiDaTelaDaCia({ status: 'aceito', prazoCia: '', atualizadoEm: em('2026-11-13') }, HOJE)).toBe(true);
+    expect(saiDaTelaDaCia({ status: 'aceito', prazoCia: '', atualizadoEm: em('2026-11-14') }, HOJE)).toBe(false);
+    expect(saiDaTelaDaCia({ status: 'respondido', prazoCia: '', atualizadoEm: em('2026-10-01') }, HOJE)).toBe(false);
+    expect(saiDaTelaDaCia({ status: 'aceito', prazoCia: '', atualizadoEm: null }, HOJE)).toBe(false);
   });
 });
