@@ -76,7 +76,7 @@ export function montarCsv(demandas: readonly Demanda[], encaminhamentos: readonl
         d.resposta ?? '',
         d.categoria,
         d.observacao,
-        ROTULO_SITUACAO[situacao],
+        d.status === 'excluido' ? 'Excluída' : ROTULO_SITUACAO[situacao],
         simNao(d.linkEvento === true),
         respostasDasCias(porDemanda.get(d.id) ?? []),
       ]

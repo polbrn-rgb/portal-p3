@@ -93,7 +93,7 @@ export function operacoesEmAndamento(
   checklists: Record<string, Partial<Checklist>>,
 ): Operacao[] {
   return demandas
-    .filter(ehOperacao)
+    .filter((d) => d.status !== 'excluido' && ehOperacao(d))
     .map((demanda) => ({ demanda, checklist: lerChecklist(checklists[demanda.id]) }))
     .filter((o) => !o.checklist.concluida)
     .sort((a, b) => {

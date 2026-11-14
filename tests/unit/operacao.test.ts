@@ -54,6 +54,7 @@ describe('Checklist Operações', () => {
         demanda(3, { inicioBtl: '' }),
         demanda(4, { categoria: 'Escoltas' }),
         demanda(5, { inicioBtl: '2026-11-01' }),
+        demanda(6, { inicioBtl: '2026-11-02', status: 'excluido' }),
       ],
       { '5': { concluida: true }, '1': { osOk: true } },
     );

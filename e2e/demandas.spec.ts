@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { entrar, sobraLateral } from './ajuda';
+import { entrar, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ page }, info) => {
@@ -135,4 +135,45 @@ test('painel de prazos conta a demanda atrasada e leva para a lista filtrada', a
   await page.getByRole('link', { name: /Atrasadas/ }).click();
   await expect(page.getByRole('button', { name: /^Atrasado/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('link', { name: new RegExp(assunto) })).toContainText('Atrasado');
+});
+
+test('P/3 exclui demanda pela lixeira, só depois de confirmar, e a Cia deixa de ver', async ({ page }, info) => {
+  const assunto = `Excluir teste ${info.project.name} ${Date.now()}`;
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await page.getByLabel(/^Origem/).selectOption('SEI');
+  await page.getByLabel('Nº do processo SEI').fill('006.00000002/2026-01');
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
+  await page.getByLabel('5ª CIA', { exact: true }).check();
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByRole('status')).toContainText('Demanda registrada');
+  await page.getByRole('link', { name: 'Ver lista' }).click();
+
+  const item = page.getByRole('link', { name: new RegExp(assunto) });
+  await expect(item).toBeVisible();
+  const numero = (await item.locator('.item-num').innerText()).replace(/\D/g, '');
+  const lixeira = page.getByRole('button', { name: `Excluir demanda nº ${numero}` });
+
+  // Cancelar não exclui.
+  await lixeira.click();
+  const dialogo = page.getByRole('alertdialog', { name: `Excluir a demanda nº ${numero}?` });
+  await expect(dialogo).toContainText(assunto);
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+  await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialogo).toHaveCount(0);
+  await expect(item).toBeVisible();
+
+  // Confirmando, some da lista.
+  await lixeira.click();
+  await dialogo.getByRole('button', { name: '🗑️ Sim, excluir' }).click();
+  await expect(page.getByRole('status')).toContainText(`Demanda nº ${numero} excluída.`);
+  await expect(item).toHaveCount(0);
+  await page.goto(`/#/demanda/${numero}`);
+  await expect(page.getByRole('alert')).toContainText(`A demanda nº ${numero} foi excluída.`);
+
+  await sair(page);
+  await entrar(page, '5cia', SENHA_TESTE);
+  await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
+  await expect(page.getByText(assunto)).toHaveCount(0);
 });

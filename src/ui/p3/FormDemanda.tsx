@@ -120,6 +120,16 @@ export function EditarDemanda({ id }: { id: string }) {
       </section>
     );
   }
+  if (demanda.status === 'excluido') {
+    return (
+      <section className="painel">
+        <p className="mensagem erro" role="alert">
+          A demanda nº {id} foi excluída.
+        </p>
+        <a href="#/demandas">Voltar para o Numerador</a>
+      </section>
+    );
+  }
   return <FormDemanda key={demanda.id} existente={demanda} />;
 }
 
