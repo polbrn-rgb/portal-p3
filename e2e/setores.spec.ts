@@ -112,3 +112,29 @@ test('P/3 tem a aba CFP com as missões e manda recado que o CFP vê como do Cmt
   await expect(cartao.getByRole('button', { name: 'Apagar recado' })).toHaveCount(0);
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });
+
+test('P/3 manda recado para a Sala de Operações, que vê como do Cmt do P3 (e o CFP não)', async ({ page }, info) => {
+  const recado = `Atenção ao lançamento dos resultados (${info.project.name} ${info.retry})`;
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: 'Sala Op.', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Recados para a Sala de Operações' })).toBeVisible();
+  await page.getByRole('button', { name: '✉️ Recado para a Sala' }).click();
+  await page.getByRole('textbox', { name: /^Recado \(aparece/ }).fill(recado);
+  await page.getByRole('button', { name: 'Enviar recado' }).click();
+  await expect(page.getByRole('status')).toContainText('A Sala de Operações já vê');
+  await expect(page.getByRole('article', { name: 'Recado do Cmt do P3' }).filter({ hasText: recado })).toBeVisible();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
+  await sair(page);
+  await entrar(page, 'sala', SENHA_TESTE);
+  await expect(page.getByRole('heading', { name: 'Resultados das operações' })).toBeVisible();
+  const cartao = page.getByRole('article', { name: 'Recado do Cmt do P3' }).filter({ hasText: recado });
+  await expect(cartao).toContainText('📢 Recado do Cmt do P3');
+  await expect(cartao.getByRole('button', { name: 'Apagar recado' })).toHaveCount(0);
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
+  await sair(page);
+  await entrar(page, 'cfp', SENHA_TESTE);
+  await expect(page.getByRole('heading', { name: 'Missões do CFP' })).toBeVisible();
+  await expect(page.getByText(recado)).toHaveCount(0);
+});

@@ -4,7 +4,7 @@ import { formatarData, hojeISO } from '../../domain/datas';
 import { db } from '../../lib/firebase';
 import { cutucarMotor, URL_MOTOR } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
-import { RecadosCfp } from './RecadosCfp';
+import { Recados } from './Recados';
 
 function horaDe(isoCompleto: string): string {
   const d = new Date(isoCompleto);
@@ -16,7 +16,7 @@ function horaDe(isoCompleto: string): string {
 export function PainelCfp() {
   return (
     <>
-      <RecadosCfp />
+      <Recados setor="cfp" />
       <MissoesCfp />
     </>
   );
