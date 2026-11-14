@@ -35,7 +35,7 @@ test('Sala de Operações lança os resultados da operação do dia', async ({ p
 
   await entrar(page, 'sala', SENHA_TESTE);
   await expect(page.getByRole('heading', { name: 'Resultados das operações' })).toBeVisible();
-  await page.getByLabel('Operação', { exact: true }).selectOption(numero);
+  await page.getByLabel(/^Operação/).selectOption(numero);
   await expect(page.getByLabel('Nº protocolo - Mapa Força')).toHaveValue('MF-555');
   await expect(page.getByText('Foco em roubos')).toBeVisible();
   await expect(page.getByRole('group', { name: 'FLAG./PESSOAS' })).toBeVisible();

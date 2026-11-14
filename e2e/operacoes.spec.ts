@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { entrar, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
@@ -26,6 +28,12 @@ test('Ordem de Serviço + Operações Policiais entra no Checklist Operações',
   await cartao.getByLabel('21/12/2099').fill('777');
   await cartao.getByLabel('20/12/2099').click(); // sai do campo: salva
   await expect(cartao).toContainText('1/5');
+  // Espera chegar no banco antes de recarregar a página.
+  const numero = (await cartao.locator('strong').first().textContent())!.replace(/\D/g, '');
+  const admin = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-portal-p3' }));
+  await expect
+    .poll(async () => (await admin.doc(`operacoes/${numero}`).get()).data()?.protocolos?.['2099-12-21'])
+    .toBe('777');
 
   await page.reload();
   const depois = page.getByRole('article').filter({ hasText: saida });
