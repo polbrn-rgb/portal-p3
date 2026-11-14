@@ -75,7 +75,7 @@ test('CFP vê as missões do dia direto da agenda do CFP, com a pasta', async ({
   await entrar(page, 'cfp', SENHA_TESTE);
   await expect(page.getByRole('heading', { name: 'Missões do CFP' })).toBeVisible();
   await expect(page.getByText('Direto da agenda do CFP')).toBeVisible();
-  const cartao = page.getByRole('article', { name: titulo });
+  const cartao = page.getByRole('article', { name: titulo, exact: true });
   await expect(cartao.getByRole('link', { name: '📂 Abrir pasta CFP' })).toHaveAttribute('href', 'https://drive.google.com/p');
   await expect(cartao).toContainText('Nº 2150');
   // Evento criado na mão na agenda (sem número): aparece nas próximas, sem "Nº".
