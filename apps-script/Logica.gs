@@ -231,3 +231,47 @@ function linhasDoEfetivo(valores) {
   }
   return lista;
 }
+
+// ---------- Agenda do CFP -> página do CFP no portal ----------
+
+/** Primeiro link de pasta do Drive na descrição do evento (texto ou HTML). Vazio se não tiver. */
+function pastaDaDescricao(descricao) {
+  var texto = String(descricao || '').replace(/&amp;/g, '&');
+  var links = texto.match(/https?:\/\/drive\.google\.com\/[^\s"'<>]+/g) || [];
+  for (var i = 0; i < links.length; i++) {
+    if (/\/folders\/|[?&]id=/.test(links[i])) return links[i];
+  }
+  return links[0] || '';
+}
+
+/** Número da demanda, se a descrição do evento trouxer ("Nº 2150"). 0 = sem número. */
+function numeroDaDescricao(descricao) {
+  var m = /N[º°]\.?\s*(\d{1,6})\b/i.exec(String(descricao || ''));
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * Evento da agenda do CFP -> missão mostrada no portal.
+ * ev = { id, titulo, descricao, inicio, fim } com datas AAAA-MM-DD (fim já é o último dia, inclusivo).
+ */
+function missaoDaAgenda(ev) {
+  var inicio = ev.inicio;
+  var fim = ev.fim && ev.fim >= inicio ? ev.fim : inicio;
+  return {
+    id: String(ev.id || ''),
+    titulo: String(ev.titulo || '').trim() || '(sem título)',
+    inicio: inicio,
+    fim: fim,
+    pastaUrl: pastaDaDescricao(ev.descricao),
+    numero: numeroDaDescricao(ev.descricao)
+  };
+}
+
+/** Ordena por início e, no mesmo dia, pelo título (a lista sai sempre igual se a agenda não mudou). */
+function ordenarMissoes(lista) {
+  return lista.slice().sort(function (a, b) {
+    if (a.inicio !== b.inicio) return a.inicio < b.inicio ? -1 : 1;
+    if (a.titulo !== b.titulo) return a.titulo < b.titulo ? -1 : 1;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}

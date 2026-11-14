@@ -55,15 +55,29 @@ gatilho antigo do resumo diário por e-mail (que foi retirado). Para testar na h
 - **Banco de efetivo:** todo dia às 5h (e ao rodar **instalarAutomacao**) o motor copia RE, posto/graduação,
   nome de guerra e telefone da planilha `PLANILHA_EFETIVO` para o portal. A aba `BD Efetivo` é lida primeiro; as
   outras abas com as colunas RE e NOME DE GUERRA completam. Para atualizar na hora, rode **sincronizarEfetivo**.
-- **Missões do CFP:** as demandas com pasta CFP aparecem para o login do CFP. O **instalarAutomacao** já leva as
-  que existiam; para refazer, rode **sincronizarMissoesCfp**.
 
 Depois de colar esta versão, rode **instalarAutomacao** de novo (ele cria o gatilho diário do efetivo).
+
+## Página do CFP = agenda do CFP
+
+A página **Missões do CFP** do portal mostra o que está na **agenda do CFP** (`AGENDA_CFP`), e não o histórico
+das demandas. A cada rodada (a cada 5 minutos, ou na hora pelo botão **Atualizar agora**) o motor lê os eventos
+de 60 dias atrás até 1 ano à frente (`AGENDA_CFP_DIAS_ANTES` / `AGENDA_CFP_DIAS_DEPOIS`) e grava no portal.
+
+- Evento criado, mudado de data ou apagado **direto na agenda** aparece igual no portal.
+- O botão **📂 Abrir pasta CFP** usa o primeiro link de pasta do Drive que estiver na descrição do evento.
+- O **Nº** da demanda aparece quando a descrição tem `Nº 1234` (o motor já escreve isso nos eventos novos).
+- Só grava no banco quando a agenda mudou (ou a cada meia hora), para não gastar o plano gratuito.
+
+Depois de colar esta versão: rode **sincronizarAgendaCfp** uma vez (leva a agenda na hora) e faça a
+**Nova versão** da implantação (passo acima). No projeto, rode `npm run deploy:regras` para liberar a leitura.
 
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.
 - `Falta a propriedade CHAVE_SERVICO`: refaça o passo 4.
 - `Firestore 403`: a chave colada não é do projeto `portal-p3`.
+- Página do CFP diz que a agenda ainda não foi lida: rode **sincronizarAgendaCfp** e veja o registro. Erros da
+  leitura aparecem em **Execuções** começando com `Agenda do CFP:`.
 - E-mail encaminhado não apareceu: rode **diagnostico** e veja a linha *E-mails do funcional*. Erros do Gmail
   aparecem em **Execuções** começando com `E-mails:`.

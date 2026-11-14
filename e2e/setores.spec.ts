@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { entrar, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
@@ -54,14 +54,33 @@ test('Sala de Operações lança os resultados da operação do dia', async ({ p
     .toMatchObject({ protocoloResultado: 'RES-1', valores: { '9': 12 }, gravado: false, salvoPor: 'Sd PM Teste' });
 });
 
-test('CFP vê as missões do dia com a pasta', async ({ page }, info) => {
-  const numero = 91000 + (info.project.name === 'celular' ? 1 : 2);
+test('CFP vê as missões do dia direto da agenda do CFP, com a pasta', async ({ page }, info) => {
+  const titulo = `Missão agenda ${info.project.name} ${info.retry}`;
+  const amanha = new Date();
+  amanha.setDate(amanha.getDate() + 1);
+  const depois = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, '0')}-${String(amanha.getDate()).padStart(2, '0')}`;
+  // O motor grava um documento só com a agenda inteira; celular e computador rodam juntos, por isso o arrayUnion.
   await admin()
-    .doc(`missoesCfp/${numero}`)
-    .set({ numero, titulo: `Missão CFP ${info.project.name}`, saida: 'x', inicio: hoje(), fim: hoje(), pastaUrl: 'https://drive.google.com/p' });
+    .doc('agendaCfp/eventos')
+    .set(
+      {
+        eventos: FieldValue.arrayUnion(
+          { id: `ev-${titulo}`, titulo, inicio: hoje(), fim: hoje(), pastaUrl: 'https://drive.google.com/p', numero: 2150 },
+          { id: `ev2-${titulo}`, titulo: `Sem pasta ${titulo}`, inicio: depois, fim: depois, pastaUrl: '', numero: 0 },
+        ),
+        conferidoEm: new Date().toISOString(),
+      },
+      { merge: true },
+    );
   await entrar(page, 'cfp', SENHA_TESTE);
   await expect(page.getByRole('heading', { name: 'Missões do CFP' })).toBeVisible();
-  const cartao = page.getByRole('article', { name: `Missão CFP ${info.project.name}` });
+  await expect(page.getByText('Direto da agenda do CFP')).toBeVisible();
+  const cartao = page.getByRole('article', { name: titulo });
   await expect(cartao.getByRole('link', { name: '📂 Abrir pasta CFP' })).toHaveAttribute('href', 'https://drive.google.com/p');
+  await expect(cartao).toContainText('Nº 2150');
+  // Evento criado na mão na agenda (sem número): aparece nas próximas, sem "Nº".
+  const proxima = page.getByRole('article', { name: `Sem pasta ${titulo}` });
+  await expect(proxima).toContainText('Sem pasta anexada.');
+  await expect(proxima).not.toContainText('Nº');
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });
