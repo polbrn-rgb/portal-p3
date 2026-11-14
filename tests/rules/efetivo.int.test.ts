@@ -9,7 +9,7 @@ import { salvarResultado } from '../../src/data/resultados';
 import { demandaVazia, type DadosDemanda } from '../../src/domain/demanda';
 import { quantidadesVazias } from '../../src/domain/efetivo';
 
-// Efetivo, resultados da Sala e missões do CFP, no emulador, com as regras ligadas.
+// Efetivo, resultados da Sala e agenda do CFP, no emulador, com as regras ligadas.
 let env: RulesTestEnvironment;
 let p3: Firestore;
 const como = (uid: string, claims: Record<string, string>) =>
@@ -32,7 +32,10 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const admin = ctx.firestore() as unknown as Firestore;
     await setDoc(doc(admin, 'efetivo/123456'), { re: '123456-7', posto: 'Cb PM', nomeGuerra: 'SILVA', telefone: '11' });
-    await setDoc(doc(admin, 'missoesCfp/10'), { numero: 10, titulo: 'Op', saida: 'Op', inicio: '2026-11-20', fim: '2026-11-20', pastaUrl: 'x' });
+    await setDoc(doc(admin, 'agendaCfp/eventos'), {
+      eventos: [{ id: 'ev1', titulo: 'Op', inicio: '2026-11-20', fim: '2026-11-20', pastaUrl: 'x', numero: 10 }],
+      conferidoEm: '2026-11-14T12:00:00.000Z',
+    });
   });
 });
 
@@ -107,12 +110,17 @@ describe('Resultados da Sala de Operações', () => {
   });
 });
 
-describe('Missões do CFP e banco de efetivo', () => {
-  test('CFP lê as missões; Cia e Sala não; ninguém escreve', async () => {
-    await assertSucceeds(getDoc(doc(como('conta-cfp', { perfil: 'cfp' }), 'missoesCfp/10')));
-    await assertFails(getDoc(doc(como('conta-1cia', { perfil: 'unidade', unidade: '1cia' }), 'missoesCfp/10')));
-    await assertFails(getDoc(doc(como('conta-sala', { perfil: 'sala' }), 'missoesCfp/10')));
-    await assertFails(setDoc(doc(p3, 'missoesCfp/11'), { numero: 11 }));
+describe('Agenda do CFP e banco de efetivo', () => {
+  test('CFP e P/3 leem a agenda do CFP; Cia e Sala não; ninguém escreve (só o Apps Script)', async () => {
+    const cfp = como('conta-cfp', { perfil: 'cfp' });
+    await assertSucceeds(getDoc(doc(cfp, 'agendaCfp/eventos')));
+    await assertSucceeds(getDoc(doc(p3, 'agendaCfp/eventos')));
+    await assertFails(getDoc(doc(como('conta-1cia', { perfil: 'unidade', unidade: '1cia' }), 'agendaCfp/eventos')));
+    await assertFails(getDoc(doc(como('conta-sala', { perfil: 'sala' }), 'agendaCfp/eventos')));
+    await assertFails(setDoc(doc(p3, 'agendaCfp/eventos'), { eventos: [] }));
+    await assertFails(setDoc(doc(cfp, 'agendaCfp/eventos'), { eventos: [] }));
+    // A cópia antiga (feita a partir das demandas) não é mais lida por ninguém.
+    await assertFails(getDoc(doc(cfp, 'missoesCfp/10')));
     await assertFails(setDoc(doc(p3, 'efetivo/111111'), { re: 'x' }));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore() as unknown as Firestore, 'efetivo/123456')));
   });

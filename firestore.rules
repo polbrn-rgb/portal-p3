@@ -98,7 +98,8 @@ service cloud.firestore {
     }
 
     // Missões com pasta do CFP: gravadas pelo motor, lidas pelo CFP.
-    match /missoesCfp/{numero} {
+    // Cópia da agenda do CFP (gravada só pelo Apps Script).
+    match /agendaCfp/{docId} {
       allow read: if ehP3() || ehPerfil('cfp');
     }
 

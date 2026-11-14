@@ -7,7 +7,8 @@
  *  - Adicionar e gerar pasta CFP -> pasta (com P3 e CFP), evento na agenda do CFP com o link da pasta
  *    e linha na aba Operações.
  * Se o prazo ou as datas mudarem, move o evento em vez de criar outro.
- * Também traz para a aba "Demandas Pendentes" os e-mails encaminhados pela caixa funcional.
+ * Também traz para a aba "Demandas Pendentes" os e-mails encaminhados pela caixa funcional
+ * e copia a agenda do CFP para a página do CFP no portal.
  * Instalação: veja LEIAME.md nesta pasta.
  */
 var CONFIG_P3 = {
@@ -25,7 +26,10 @@ var CONFIG_P3 = {
   PLANILHA_RESULTADO_MODELO: '1mI3hKilIloD0i3KYdvSXRLoNXgWpwoKBXdWUG-AIse0',
   PLANILHA_EFETIVO: '1IlTIPxp0rR4rzjFygxtldvQja4GgCsap2kLIK28z8Ck',
   ABA_EFETIVO: 'BD Efetivo', // lida primeiro; as outras abas com RE e NOME DE GUERRA completam
-  HORA_EFETIVO: 5 // atualização diária do banco de efetivo
+  HORA_EFETIVO: 5, // atualização diária do banco de efetivo
+  // Página do CFP: eventos da agenda do CFP de X dias atrás até Y dias à frente
+  AGENDA_CFP_DIAS_ANTES: 60,
+  AGENDA_CFP_DIAS_DEPOIS: 365
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -41,7 +45,7 @@ function instalarAutomacao() {
   ScriptApp.newTrigger('sincronizarEfetivo').timeBased().atHour(CONFIG_P3.HORA_EFETIVO).everyDays(1).create();
   testarConexao();
   sincronizarEfetivo();
-  sincronizarMissoesCfp();
+  sincronizarAgendaCfp();
 }
 
 /** Confere a chave e o acesso ao Firestore (mostra no registro de execução). */
@@ -160,6 +164,11 @@ function rodarMotor_(esperaMs) {
     } catch (e2) {
       console.error('Planilhas de resultado: ' + e2.message);
     }
+    try {
+      sincronizarAgendaCfp_(false);
+    } catch (e3) {
+      console.error('Agenda do CFP: ' + e3.message);
+    }
   } finally {
     trava.releaseLock();
   }
@@ -183,11 +192,11 @@ function processarDemanda_(doc) {
   feito.processadoEm = new Date().toISOString();
   // Com erro, continua pendente: o gatilho tenta de novo a cada 5 minutos até dar certo.
   gravarResultado_(doc, feito, erros.length > 0);
-  try {
-    atualizarMissaoCfp_(d, feito);
-  } catch (e) {
-    console.error('Missão CFP nº ' + d.numero + ': ' + e.message);
-  }
+}
+
+/** Texto do evento do CFP: link da pasta + número da demanda (a página do CFP lê os dois daqui). */
+function descricaoCfp_(pastaUrl, numero) {
+  return '📂 PASTA CFP:\n' + pastaUrl + (numero ? '\n\nNº ' + numero : '');
 }
 
 function agenda_(qual) {
@@ -205,7 +214,7 @@ function executar_(a, d, feito) {
     var existente = a.eventoId ? cal.getEventById(a.eventoId) : null;
     if (!existente) {
       // Apagaram o evento na mão: cria de novo.
-      var desc = a.pastaUrl ? '📂 PASTA CFP:\n' + a.pastaUrl : a.descricao || '';
+      var desc = a.pastaUrl ? descricaoCfp_(a.pastaUrl, d.numero) : a.descricao || '';
       existente = cal.createAllDayEvent(a.titulo, dataLocal(a.inicio), diaSeguinte(a.fim), { description: desc });
     } else {
       existente.setTitle(a.titulo);
@@ -227,7 +236,7 @@ function executar_(a, d, feito) {
       feito.cfpPasta = pasta.getUrl();
     }
     // 2) evento na agenda do CFP com o link da pasta
-    var evCfp = cal.createAllDayEvent(a.titulo, dataLocal(a.inicio), diaSeguinte(a.fim), { description: '📂 PASTA CFP:\n' + feito.cfpPasta });
+    var evCfp = cal.createAllDayEvent(a.titulo, dataLocal(a.inicio), diaSeguinte(a.fim), { description: descricaoCfp_(feito.cfpPasta, d.numero) });
     feito.cfp = { eventoId: evCfp.getId(), inicio: a.inicio, fim: a.fim, titulo: a.titulo, pastaUrl: feito.cfpPasta, operacoes: false };
     // 3) linha na aba Operações
     adicionarOperacao_(d);
@@ -551,32 +560,52 @@ function gravarResultados_() {
   });
 }
 
-// ---------- Missões do CFP (o login do CFP vê as operações com pasta) ----------
+// ---------- Agenda do CFP -> página do CFP no portal ----------
 
-function atualizarMissaoCfp_(d, feito) {
-  var caminho = 'missoesCfp/' + d.numero;
-  if (feito.cfp && d.adicionarCFP) {
-    gravarCampos_(caminho, {
-      numero: d.numero,
-      titulo: feito.cfp.titulo,
-      saida: d.saida,
-      inicio: feito.cfp.inicio,
-      fim: feito.cfp.fim,
-      pastaUrl: feito.cfpPasta || feito.cfp.pastaUrl || ''
-    });
-  } else if (!d.adicionarCFP) {
-    firestore_('delete', caminhoDocs_() + '/' + caminho);
-  }
+var MEIA_HORA_MS = 30 * 60 * 1000;
+
+/**
+ * Lê a agenda do CFP e grava os eventos em agendaCfp/eventos (a página do CFP mostra só isso).
+ * Evento criado, mudado ou apagado direto na agenda aparece no portal na próxima rodada (até 5 min).
+ * Para não gastar gravações, só grava se a agenda mudou (ou a cada meia hora, para o "conferido às").
+ */
+function sincronizarAgendaCfp_(forcar) {
+  var cal = agenda_('cfp');
+  var tz = cal.getTimeZone() || 'America/Sao_Paulo';
+  var iso = function (dt) { return Utilities.formatDate(dt, tz, 'yyyy-MM-dd'); };
+  var hoje = new Date();
+  var de = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - CONFIG_P3.AGENDA_CFP_DIAS_ANTES);
+  var ate = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + CONFIG_P3.AGENDA_CFP_DIAS_DEPOIS + 1);
+
+  var eventos = ordenarMissoes(cal.getEvents(de, ate).map(function (ev) {
+    var inicio;
+    var fim;
+    if (ev.isAllDayEvent()) {
+      inicio = iso(ev.getAllDayStartDate());
+      var ultimo = ev.getAllDayEndDate(); // no Google o fim é o dia seguinte ao último
+      ultimo.setDate(ultimo.getDate() - 1);
+      fim = iso(ultimo);
+    } else {
+      inicio = iso(ev.getStartTime());
+      fim = iso(new Date(ev.getEndTime().getTime() - 1)); // termina 00:00 = acabou no dia anterior
+    }
+    return missaoDaAgenda({ id: ev.getId(), titulo: ev.getTitle(), descricao: ev.getDescription(), inicio: inicio, fim: fim });
+  }));
+
+  var props = PropertiesService.getScriptProperties();
+  var resumo = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(eventos), Utilities.Charset.UTF_8));
+  var ultimaGravacao = Number(props.getProperty('AGENDA_CFP_GRAVADA_EM')) || 0;
+  if (!forcar && resumo === props.getProperty('AGENDA_CFP_RESUMO') && Date.now() - ultimaGravacao < MEIA_HORA_MS) return eventos.length;
+
+  gravarCampos_('agendaCfp/eventos', { eventos: eventos, conferidoEm: new Date().toISOString() });
+  props.setProperty('AGENDA_CFP_RESUMO', resumo);
+  props.setProperty('AGENDA_CFP_GRAVADA_EM', String(Date.now()));
+  return eventos.length;
 }
 
-/** Rode pelo editor (o instalarAutomacao já roda): leva para o login do CFP as missões que já existiam. */
-function sincronizarMissoesCfp() {
-  var lista = consultar_('demandas', 'adicionarCFP', true, 500);
-  lista.forEach(function (doc) {
-    var a = doc.dados.automacao || {};
-    if (a.cfp) atualizarMissaoCfp_(doc.dados, { cfp: a.cfp, cfpPasta: a.cfpPasta });
-  });
-  Logger.log(lista.length + ' demanda(s) com CFP conferidas.');
+/** Rode pelo editor (o instalarAutomacao já roda): copia a agenda do CFP para o portal agora. */
+function sincronizarAgendaCfp() {
+  Logger.log('Agenda do CFP: ' + sincronizarAgendaCfp_(true) + ' evento(s) levados para o portal.');
 }
 
 // ---------- Banco de efetivo (busca por RE no portal) ----------

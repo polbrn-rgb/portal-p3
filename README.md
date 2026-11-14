@@ -52,6 +52,9 @@ Informe o último número usado no numerador (a próxima demanda continua dele):
 Os eventos de Prazo CPA/Cia e a pasta + agenda do CFP + aba Operações são criados por um Apps Script
 na conta da P/3, a cada 5 minutos. Instalação em `apps-script/LEIAME.md`.
 
+A página do **CFP** mostra o que está na agenda do CFP (o mesmo script copia a agenda para o portal), não o
+histórico das demandas.
+
 ## Abas da P/3
 
 - **Demandas Pendentes**: o que chegou e ainda não tem número. Os e-mails encaminhados pela caixa funcional

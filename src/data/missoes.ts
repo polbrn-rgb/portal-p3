@@ -1,12 +1,22 @@
-import { collection, onSnapshot, type Firestore } from 'firebase/firestore';
+import { doc, onSnapshot, type Firestore } from 'firebase/firestore';
 
-// Missões com pasta do CFP (gravadas pelo motor). São poucas: lê todas e filtra na tela.
-export type MissaoCfp = { numero: number; titulo: string; saida: string; inicio: string; fim: string; pastaUrl: string };
+// Eventos da agenda do CFP, copiados pelo motor (Apps Script) para agendaCfp/eventos.
+export type MissaoCfp = { id: string; titulo: string; inicio: string; fim: string; pastaUrl: string; numero: number };
+export type AgendaCfp = { eventos: MissaoCfp[]; conferidoEm: string };
 
-export function observarMissoes(
+/** null = o motor ainda não leu a agenda. */
+export function observarAgendaCfp(
   db: Firestore,
-  aoMudar: (lista: MissaoCfp[]) => void,
+  aoMudar: (agenda: AgendaCfp | null) => void,
   aoFalhar: (erro: Error) => void,
 ): () => void {
-  return onSnapshot(collection(db, 'missoesCfp'), (s) => aoMudar(s.docs.map((d) => d.data() as MissaoCfp)), aoFalhar);
+  return onSnapshot(
+    doc(db, 'agendaCfp', 'eventos'),
+    (s) => {
+      if (!s.exists()) return aoMudar(null);
+      const d = s.data() as Partial<AgendaCfp>;
+      aoMudar({ eventos: d.eventos ?? [], conferidoEm: d.conferidoEm ?? '' });
+    },
+    aoFalhar,
+  );
 }

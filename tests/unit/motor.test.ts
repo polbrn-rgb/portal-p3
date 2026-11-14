@@ -19,6 +19,10 @@ type Motor = {
   camposDaPlanilha: (valores: unknown[][], linhaInicial?: number) => { linha: number; rotulo: string; grupo: string }[];
   normalizarRE: (re: unknown) => string;
   linhasDoEfetivo: (valores: unknown[][]) => Record<string, string>[];
+  pastaDaDescricao: (descricao: unknown) => string;
+  numeroDaDescricao: (descricao: unknown) => number;
+  missaoDaAgenda: (ev: Record<string, string>) => Record<string, unknown>;
+  ordenarMissoes: (lista: { id: string; titulo: string; inicio: string }[]) => { id: string }[];
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -216,5 +220,46 @@ describe('Checklist Operações (Apps Script)', () => {
       { chave: '234567', re: '234567', posto: '1º Sgt PM', nomeGuerra: 'BELTRANO', telefone: '' },
     ]);
     expect(motor.linhasDoEfetivo([['sem', 'cabeçalho']])).toEqual([]);
+  });
+});
+
+describe('agenda do CFP -> página do CFP', () => {
+  test('acha a pasta na descrição (texto do motor, HTML da agenda ou sem pasta)', () => {
+    const url = 'https://drive.google.com/drive/folders/1AbC-d_9';
+    expect(motor.pastaDaDescricao(`📂 PASTA CFP:\n${url}\n\nNº 2150`)).toBe(url);
+    expect(motor.pastaDaDescricao(`Ver <a href="${url}">pasta</a>`)).toBe(url);
+    expect(motor.pastaDaDescricao('doc https://drive.google.com/file/d/x/view e https://drive.google.com/open?id=Z&amp;a=1')).toBe(
+      'https://drive.google.com/open?id=Z&a=1',
+    );
+    expect(motor.pastaDaDescricao('só o arquivo https://drive.google.com/file/d/x/view')).toBe('https://drive.google.com/file/d/x/view');
+    expect(motor.pastaDaDescricao('')).toBe('');
+    expect(motor.pastaDaDescricao(null)).toBe('');
+  });
+
+  test('número da demanda só quando a descrição traz', () => {
+    expect(motor.numeroDaDescricao('📂 PASTA CFP:\nlink\n\nNº 2150')).toBe(2150);
+    expect(motor.numeroDaDescricao('N° 12 ok')).toBe(12);
+    expect(motor.numeroDaDescricao('Apoio no 5º BPM')).toBe(0);
+    expect(motor.numeroDaDescricao('Operação criada na mão')).toBe(0);
+  });
+
+  test('evento vira missão (sem título, fim antes do início)', () => {
+    expect(
+      motor.missaoDaAgenda({ id: 'ev1', titulo: ' Operação Natal ', descricao: 'https://drive.google.com/drive/folders/P', inicio: '2026-12-20', fim: '2026-12-22' }),
+    ).toEqual({ id: 'ev1', titulo: 'Operação Natal', inicio: '2026-12-20', fim: '2026-12-22', pastaUrl: 'https://drive.google.com/drive/folders/P', numero: 0 });
+    expect(motor.missaoDaAgenda({ id: 'ev2', titulo: '', descricao: '', inicio: '2026-12-20', fim: '2026-12-19' })).toMatchObject({
+      titulo: '(sem título)',
+      fim: '2026-12-20',
+    });
+  });
+
+  test('ordem estável: início, depois título', () => {
+    const lista = [
+      { id: 'c', titulo: 'B', inicio: '2026-12-02' },
+      { id: 'b', titulo: 'B', inicio: '2026-12-01' },
+      { id: 'a', titulo: 'A', inicio: '2026-12-01' },
+    ];
+    expect(motor.ordenarMissoes(lista).map((m) => m.id)).toEqual(['a', 'b', 'c']);
+    expect(lista[0].id).toBe('c');
   });
 });
