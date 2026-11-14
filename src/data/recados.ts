@@ -13,30 +13,32 @@ import {
 } from 'firebase/firestore';
 import { validarRecado } from '../domain/recado';
 
-// Recados do Cmt do P3 para o CFP: a P/3 escreve e apaga; o CFP só lê.
-export const COLECAO_RECADOS = 'recadosCfp';
+// Recados do Cmt do P3 para o CFP e para a Sala de Operações: a P/3 escreve e apaga; o setor só lê.
+export type SetorRecado = 'cfp' | 'sala';
+export const COLECAO_RECADOS: Record<SetorRecado, string> = { cfp: 'recadosCfp', sala: 'recadosSala' };
 const MAXIMO_NA_TELA = 10;
 
-export type RecadoCfp = { id: string; texto: string; criadoEm: Date | null };
+export type Recado = { id: string; texto: string; criadoEm: Date | null };
 
-export async function enviarRecadoCfp(db: Firestore, texto: string): Promise<string> {
+export async function enviarRecado(db: Firestore, setor: SetorRecado, texto: string): Promise<string> {
   const erro = validarRecado(texto);
   if (erro) throw new Error(erro);
-  const ref = await addDoc(collection(db, COLECAO_RECADOS), { texto: texto.trim(), criadoEm: serverTimestamp() });
+  const ref = await addDoc(collection(db, COLECAO_RECADOS[setor]), { texto: texto.trim(), criadoEm: serverTimestamp() });
   return ref.id;
 }
 
-export async function apagarRecadoCfp(db: Firestore, id: string): Promise<void> {
-  await deleteDoc(doc(db, COLECAO_RECADOS, id));
+export async function apagarRecado(db: Firestore, setor: SetorRecado, id: string): Promise<void> {
+  await deleteDoc(doc(db, COLECAO_RECADOS[setor], id));
 }
 
 /** Os mais novos primeiro, em tempo real. */
-export function observarRecadosCfp(
+export function observarRecados(
   db: Firestore,
-  aoMudar: (lista: RecadoCfp[]) => void,
+  setor: SetorRecado,
+  aoMudar: (lista: Recado[]) => void,
   aoFalhar: (erro: Error) => void,
 ): () => void {
-  const q = query(collection(db, COLECAO_RECADOS), orderBy('criadoEm', 'desc'), limit(MAXIMO_NA_TELA));
+  const q = query(collection(db, COLECAO_RECADOS[setor]), orderBy('criadoEm', 'desc'), limit(MAXIMO_NA_TELA));
   return onSnapshot(
     q,
     (s) =>

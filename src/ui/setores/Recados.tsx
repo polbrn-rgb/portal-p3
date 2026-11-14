@@ -1,15 +1,21 @@
 import { useState, type FormEvent } from 'react';
-import { apagarRecadoCfp, enviarRecadoCfp, observarRecadosCfp, type RecadoCfp } from '../../data/recados';
+import { apagarRecado, enviarRecado, observarRecados, type Recado, type SetorRecado } from '../../data/recados';
 import { LIMITE_RECADO, quandoFoi, validarRecado } from '../../domain/recado';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
 
+const NOMES: Record<SetorRecado, { titulo: string; botao: string }> = {
+  cfp: { titulo: 'Recados para o CFP', botao: '✉️ Recado para o CFP' },
+  sala: { titulo: 'Recados para a Sala de Operações', botao: '✉️ Recado para a Sala' },
+};
+
 /**
- * Recados do Cmt do P3. Para o CFP: só leitura, no alto da página.
- * Para a P/3 (podeEnviar): botão "Recado para o CFP" e os recados enviados, com Apagar.
+ * Recados do Cmt do P3. Para o setor (CFP ou Sala): só leitura, no alto da página.
+ * Para a P/3 (podeEnviar): botão "Recado para ..." e os recados enviados, com Apagar.
  */
-export function RecadosCfp({ podeEnviar = false }: { podeEnviar?: boolean }) {
-  const recados = useAoVivo<RecadoCfp[]>((ok, erro) => observarRecadosCfp(db, ok, erro), [], 'Não foi possível carregar os recados.');
+export function Recados({ setor, podeEnviar = false }: { setor: SetorRecado; podeEnviar?: boolean }) {
+  const nome = NOMES[setor];
+  const recados = useAoVivo<Recado[]>((ok, erro) => observarRecados(db, setor, ok, erro), [setor], 'Não foi possível carregar os recados.');
   const lista = recados.valor ?? [];
   const [escrevendo, setEscrevendo] = useState(false);
   const [texto, setTexto] = useState('');
@@ -24,10 +30,10 @@ export function RecadosCfp({ podeEnviar = false }: { podeEnviar?: boolean }) {
     if (problema) return;
     setEnviando(true);
     try {
-      await enviarRecadoCfp(db, texto);
+      await enviarRecado(db, setor, texto);
       setTexto('');
       setEscrevendo(false);
-      setAviso('Recado enviado. O CFP já vê na página dele.');
+      setAviso(`Recado enviado. ${setor === 'cfp' ? 'O CFP' : 'A Sala de Operações'} já vê na página.`);
     } catch {
       setErro('Não foi possível enviar. Tente de novo.');
     } finally {
@@ -38,7 +44,7 @@ export function RecadosCfp({ podeEnviar = false }: { podeEnviar?: boolean }) {
   async function apagar(id: string) {
     setAviso('');
     try {
-      await apagarRecadoCfp(db, id);
+      await apagarRecado(db, setor, id);
     } catch {
       setAviso('Não foi possível apagar o recado.');
     }
@@ -47,13 +53,13 @@ export function RecadosCfp({ podeEnviar = false }: { podeEnviar?: boolean }) {
   if (!podeEnviar && lista.length === 0 && !recados.erro) return null;
 
   return (
-    <section className="painel recados-cfp" aria-label="Recados para o CFP">
+    <section className="painel recados" aria-label={nome.titulo}>
       {podeEnviar && (
         <div className="painel-cabecalho">
-          <h2>Recados para o CFP</h2>
+          <h2>{nome.titulo}</h2>
           {!escrevendo && (
             <button className="botao destaque" type="button" onClick={() => { setEscrevendo(true); setAviso(''); }}>
-              ✉️ Recado para o CFP
+              {nome.botao}
             </button>
           )}
         </div>
@@ -61,7 +67,7 @@ export function RecadosCfp({ podeEnviar = false }: { podeEnviar?: boolean }) {
       {podeEnviar && escrevendo && (
         <form className="cartao-recado" onSubmit={enviar} noValidate>
           <label className="campo">
-            Recado (aparece para o CFP como "Recado do Cmt do P3")
+            Recado (aparece como "Recado do Cmt do P3")
             <textarea rows={4} maxLength={LIMITE_RECADO} value={texto} autoFocus onChange={(e) => setTexto(e.target.value)} />
             {erro && <span className="erro-campo">{erro}</span>}
           </label>

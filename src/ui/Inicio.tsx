@@ -5,6 +5,7 @@ import { PainelUnidade } from './cia/PainelUnidade';
 import { PainelP3 } from './p3/PainelP3';
 import { PainelCfp } from './setores/PainelCfp';
 import { PainelSala } from './setores/PainelSala';
+import { Recados } from './setores/Recados';
 import { Topo } from './Topo';
 
 export function Inicio({ sessao }: { sessao: Sessao }) {
@@ -17,7 +18,12 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
       </Topo>
       {sessao.tipo === 'p3' && <PainelP3 />}
       {sessao.tipo === 'unidade' && <PainelUnidade unidade={sessao.unidade} sigla={sessao.sigla} />}
-      {sessao.tipo === 'sala' && <PainelSala />}
+      {sessao.tipo === 'sala' && (
+        <>
+          <Recados setor="sala" />
+          <PainelSala />
+        </>
+      )}
       {sessao.tipo === 'cfp' && <PainelCfp />}
       {sessao.tipo === 'sem-perfil' && (
         <section className="cartao" role="alert">
