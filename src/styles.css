@@ -1429,3 +1429,133 @@ fieldset:has(> .erro-campo) > legend {
     grid-template-columns: repeat(5, 1fr);
   }
 }
+
+/* ---------- Aperfeiçoamento / EAP ---------- */
+/* Abas da P/3: com 6 abas, no celular quebram em duas linhas em vez de espremer. */
+.abas-p3:not(.subabas) {
+  flex-wrap: wrap;
+}
+
+.abas-p3:not(.subabas) a {
+  flex: 1 1 30%;
+}
+
+@media (min-width: 768px) {
+  .abas-p3:not(.subabas) a {
+    flex: 1 1 0;
+  }
+}
+
+.formulario-eap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formulario-eap .cartao {
+  margin: 0;
+}
+
+.grade-2,
+.grade-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .grade-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .grade-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.titulo-secao {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  color: var(--cor-secundaria);
+}
+
+.lista-simples {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 4px;
+}
+
+.tabela-vagas {
+  display: grid;
+  gap: 4px;
+}
+
+.linha-vagas {
+  display: grid;
+  grid-template-columns: minmax(3.6rem, 1.2fr) repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  align-items: center;
+}
+
+.cabecalho-vagas span {
+  font-size: 0.75rem;
+  color: var(--cor-suave);
+  text-align: center;
+}
+
+.linha-vagas [role='rowheader'] {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.linha-vagas input {
+  width: 100%;
+  min-height: 40px;
+  text-align: center;
+  font-size: 16px;
+  border: 1px solid #c8cdd6;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.tabela-eap td,
+.tabela-eap th {
+  overflow-wrap: anywhere;
+}
+
+/* Cia: turmas do EAP */
+.turma-eap {
+  display: grid;
+  gap: 8px;
+}
+
+.turma-eap h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.lista-policiais-eap {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.lista-policiais-eap li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  overflow-wrap: anywhere;
+}
+
+.marcar-sem-efetivo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}

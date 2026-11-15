@@ -29,7 +29,10 @@ var CONFIG_P3 = {
   HORA_EFETIVO: 5, // atualização diária do banco de efetivo
   // Página do CFP: eventos da agenda do CFP de X dias atrás até Y dias à frente
   AGENDA_CFP_DIAS_ANTES: 60,
-  AGENDA_CFP_DIAS_DEPOIS: 365
+  AGENDA_CFP_DIAS_DEPOIS: 365,
+  // Aperfeiçoamento: EAP (cada EAP nova vira uma cópia zerada do modelo, nesta pasta)
+  PLANILHA_EAP_MODELO: '12qEDEI1sdN_7FMZCLCs4gUWxfkokXdPGtT_rP4oxbdI',
+  PASTA_EAP: '13eaHfoeX8BvK8wZQ_0Gt1aN207x_FRTk'
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -190,6 +193,11 @@ function rodarMotor_(esperaMs) {
       sincronizarAgendaCfp_(false);
     } catch (e3) {
       console.error('Agenda do CFP: ' + e3.message);
+    }
+    try {
+      processarEap_();
+    } catch (e4) {
+      console.error('EAP: ' + e4.message);
     }
   } finally {
     trava.releaseLock();
@@ -668,7 +676,7 @@ function sincronizarEfetivo() {
       return {
         update: {
           name: caminhoDocs_() + '/efetivo/' + k,
-          fields: jsParaValor({ re: p.re, posto: p.posto, nomeGuerra: p.nomeGuerra, telefone: p.telefone }).mapValue.fields
+          fields: jsParaValor({ re: p.re, posto: p.posto, nomeGuerra: p.nomeGuerra, telefone: p.telefone, nomeCompleto: p.nomeCompleto, email: p.email }).mapValue.fields
         }
       };
     });
@@ -676,4 +684,232 @@ function sincronizarEfetivo() {
     if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
   }
   Logger.log('Banco de efetivo: ' + chaves.length + ' policiais. ' + resumo.join(' | '));
+}
+
+// ---------- Aperfeiçoamento: EAP ----------
+
+/** Cópia nova, cabeçalhos/vagas alterados, respostas das Cias e compilado pedidos no portal. */
+function processarEap_() {
+  consultar_('eap', 'planilha.status', 'pedida').forEach(function (e) {
+    try {
+      criarPlanilhaEap_(e);
+    } catch (err) {
+      gravarCampos_('eap/' + e.id, { planilha: { status: 'erro', erro: err.message } });
+    }
+  });
+  consultar_('eap', 'planilhaDesatualizada', true).forEach(function (e) {
+    try {
+      if (e.dados.planilha && e.dados.planilha.status === 'pronta') prepararAbasEap_(SpreadsheetApp.openById(e.dados.planilha.id), e.dados, false);
+      gravarCampos_('eap/' + e.id, { planilhaDesatualizada: false });
+    } catch (err) {
+      console.error('EAP ' + e.id + ': ' + err.message);
+    }
+  });
+  consultar_('eapRespostas', 'gravado', false).forEach(gravarRespostaEap_);
+  consultar_('eap', 'compilado.status', 'pedido').forEach(function (e) {
+    try {
+      var n = compilarEap_(SpreadsheetApp.openById(e.dados.planilha.id));
+      gravarCampos_('eap/' + e.id, { compilado: { status: 'pronto', registros: n, em: new Date().toISOString() } });
+    } catch (err) {
+      gravarCampos_('eap/' + e.id, { compilado: { status: 'erro', erro: err.message } });
+    }
+  });
+}
+
+function nomeArquivoEap_(eap) {
+  return 'EAP ' + eap.ano + ' - EAD ' + MESES_EXTENSO[eap.mesEad - 1] + ' - PRESENCIAL ' + MESES_EXTENSO[eap.mesPresencial - 1];
+}
+
+function criarPlanilhaEap_(e) {
+  var copia = DriveApp.getFileById(CONFIG_P3.PLANILHA_EAP_MODELO).makeCopy(nomeArquivoEap_(e.dados), DriveApp.getFolderById(CONFIG_P3.PASTA_EAP));
+  prepararAbasEap_(SpreadsheetApp.openById(copia.getId()), e.dados, true);
+  gravarCampos_('eap/' + e.id, { planilha: { status: 'pronta', id: copia.getId(), url: copia.getUrl() }, planilhaDesatualizada: false });
+}
+
+function abaEap_(ss, nome) {
+  var alvo = String(nome).toUpperCase().trim();
+  return ss.getSheets().filter(function (a) { return a.getName().toUpperCase().trim() === alvo; })[0] || null;
+}
+
+function lerBlocosEap_(aba) {
+  var n = aba.getMaxRows();
+  var colA = aba.getRange(1, 1, n, 1).getValues().map(function (r) { return r[0]; });
+  var fundos = aba.getRange(1, 2, n, 1).getBackgrounds().map(function (r) { return r[0]; });
+  return localizarBlocosEap(colA, fundos);
+}
+
+/** Como o "Zerar Planilhas" do script da planilha: limpa as células brancas da linha 9 para baixo, J1:J2 e H3. */
+function zerarAbaEap_(aba) {
+  var linhas = aba.getMaxRows();
+  var colunas = aba.getMaxColumns();
+  if (linhas > 8) {
+    var fundos = aba.getRange(9, 1, linhas - 8, colunas).getBackgrounds();
+    var limpar = [];
+    for (var i = 0; i < fundos.length; i++) {
+      for (var j = 0; j < fundos[i].length; j++) {
+        if (String(fundos[i][j]).toLowerCase() === '#ffffff') limpar.push(aba.getRange(i + 9, j + 1).getA1Notation());
+      }
+    }
+    if (limpar.length) aba.getRangeList(limpar).clearContent();
+  }
+  try {
+    aba.getRange('J1:J2').uncheck();
+  } catch (e) {
+    aba.getRange('J1:J2').clearContent();
+  }
+  aba.getRange('H3').clearContent();
+}
+
+/** Linhas 4, 5 e 6, títulos e apresentações das turmas (nas abas das Cias e do EM). */
+function escreverCabecalhoEap_(aba, eap) {
+  aba.getRange('A4').setValue(textoAnoEap(eap.ano));
+  aba.getRange('A5').setValue(textoMesesEap(eap.mesEad, eap.mesPresencial));
+  aba.getRange('A6').setValue(textoPeriodoEad(eap.eadInicio, eap.eadFim));
+  var turmas = {};
+  (eap.turmas || []).forEach(function (t) { turmas[t.id] = t; });
+  lerBlocosEap_(aba).forEach(function (b) {
+    var t = turmas[b.id];
+    if (!t) return;
+    aba.getRange(b.titulo, 1).setValue(tituloTurmaEap(t));
+    aba.getRange(b.apresentacao, 1).setValue(textoApresentacaoEap(t.inicio));
+  });
+}
+
+/** Quantas linhas de cada bloco já têm algo escrito (colunas B a K). */
+function preenchidasEap_(aba, blocos) {
+  var r = {};
+  blocos.forEach(function (b) {
+    if (!b.linhas) return;
+    var v = aba.getRange(b.primeira, 2, b.linhas, 10).getValues();
+    var ultima = 0;
+    v.forEach(function (l, i) { if (l.join('').trim()) ultima = i + 1; });
+    r[b.id] = ultima;
+  });
+  return r;
+}
+
+/** Deixa cada turma com o nº de linhas das vagas da Cia (de baixo para cima, para não bagunçar as linhas). */
+function ajustarLinhasEap_(aba, vagas, minimos) {
+  var blocos = lerBlocosEap_(aba);
+  var porId = {};
+  blocos.forEach(function (b) { porId[b.id] = b; });
+  var ajustes = ajustesDeLinhasEap(blocos, vagas, minimos || preenchidasEap_(aba, blocos));
+  ajustes
+    .sort(function (a, b) { return porId[b.id].primeira - porId[a.id].primeira; })
+    .forEach(function (a) {
+      var b = porId[a.id];
+      var colunas = aba.getMaxColumns();
+      if (a.para > a.de) {
+        var ultima = b.primeira + Math.max(a.de, 1) - 1;
+        aba.insertRowsAfter(ultima, a.para - a.de);
+        aba.getRange(ultima, 1, 1, colunas).copyTo(aba.getRange(ultima + 1, 1, a.para - a.de, colunas), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+      } else {
+        aba.deleteRows(b.primeira + a.para, a.de - a.para);
+      }
+    });
+  // Nº 1, 2, 3... em cada turma.
+  lerBlocosEap_(aba).forEach(function (b) {
+    if (!b.linhas) return;
+    aba.getRange(b.primeira, 1, b.linhas, 1).setValues(Array.apply(null, Array(b.linhas)).map(function (_, i) { return [i + 1]; }));
+  });
+}
+
+function prepararAbasEap_(ss, eap, zerar) {
+  Object.keys(ABAS_EAP)
+    .map(function (u) { return { u: u, nome: ABAS_EAP[u] }; })
+    .concat([{ u: '', nome: 'EM' }])
+    .forEach(function (x) {
+      var aba = abaEap_(ss, x.nome);
+      if (!aba) return;
+      if (zerar) zerarAbaEap_(aba);
+      escreverCabecalhoEap_(aba, eap);
+      if (x.u) ajustarLinhasEap_(aba, (eap.vagas || {})[x.u] || {});
+    });
+  if (zerar) {
+    var comp = abaEap_(ss, 'COMPILADO TURMAS');
+    if (comp) comp.clear();
+  }
+}
+
+/** Resposta da Cia no portal -> aba da Cia na planilha do EAP, com a assinatura em H3. */
+function gravarRespostaEap_(r) {
+  var res = r.dados;
+  try {
+    var eap = obterDoc_('eap/' + res.eapId);
+    if (!eap || !eap.planilha || eap.planilha.status !== 'pronta') throw new Error('a planilha do EAP ainda não foi criada');
+    var aba = abaEap_(SpreadsheetApp.openById(eap.planilha.id), ABAS_EAP[res.unidadeId]);
+    if (!aba) throw new Error('a aba "' + ABAS_EAP[res.unidadeId] + '" não está na planilha');
+    var dados = res.blocos || {};
+    // Limpa o que a Cia tinha mandado antes e deixa linhas para todos os policiais.
+    var antes = lerBlocosEap_(aba);
+    antes.forEach(function (b) { if (b.linhas) aba.getRange(b.primeira, 2, b.linhas, 10).clearContent(); });
+    var precisa = {};
+    antes.forEach(function (b) { precisa[b.id] = ((dados[b.id] || {}).policiais || []).length; });
+    ajustarLinhasEap_(aba, (eap.vagas || {})[res.unidadeId] || {}, precisa);
+    lerBlocosEap_(aba).forEach(function (b) {
+      if (!b.linhas) return;
+      var bloco = dados[b.id] || {};
+      var policiais = bloco.policiais || [];
+      var linhas = [];
+      for (var k = 0; k < b.linhas; k++) {
+        if (policiais[k]) linhas.push(linhaPolicialEap(policiais[k], k + 1, res.unidadeId).slice(1));
+        else if (k === 0 && bloco.semEfetivo) linhas.push(['', '', SEM_EFETIVO_EAP, '', '', '', '', '', '', '']);
+        else linhas.push(['', '', '', '', '', '', '', '', '', '']);
+      }
+      aba.getRange(b.primeira, 2, b.linhas, 10).setValues(linhas);
+    });
+    aba.getRange('H3').setValue('Validado por: ' + String(res.respondidoPor || '').toUpperCase() + ' em ' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm'));
+    try {
+      aba.getRange('J1').check();
+    } catch (e) {
+      // J1 sem caixa de seleção: a assinatura em H3 basta.
+    }
+    gravarCampos_('eapRespostas/' + r.id, { gravado: true, gravadoEm: new Date().toISOString(), erro: '' });
+  } catch (e) {
+    gravarCampos_('eapRespostas/' + r.id, { erro: e.message });
+  }
+}
+
+/** Igual ao "Gerar Compilado Geral por Turmas" do script da planilha: junta as Cias por turma. */
+function compilarEap_(ss) {
+  var comp = abaEap_(ss, 'COMPILADO TURMAS') || ss.insertSheet('COMPILADO TURMAS');
+  comp.clear();
+  var nomes = Object.keys(ABAS_EAP).map(function (u) { return ABAS_EAP[u]; }).concat(['EM']);
+  var blocos = [];
+  var total = 0;
+  nomes.forEach(function (nome) {
+    var aba = abaEap_(ss, nome);
+    if (!aba) return;
+    lerBlocosEap_(aba).forEach(function (b, i) {
+      if (!blocos[i]) {
+        var cab = aba.getRange(b.titulo, 1, 3, 11);
+        blocos[i] = { valores: cab.getValues(), fundos: cab.getBackgrounds(), fontes: cab.getFontColors(), pesos: cab.getFontWeights(), dados: [] };
+      }
+      if (!b.linhas) return;
+      aba.getRange(b.primeira, 1, b.linhas, 11).getValues().forEach(function (l) {
+        if (l.slice(1).join('').trim()) {
+          blocos[i].dados.push(l);
+          total++;
+        }
+      });
+    });
+  });
+  var linha = 1;
+  blocos.forEach(function (b) {
+    if (!b || !b.dados.length) return;
+    var cab = comp.getRange(linha, 1, 3, 11);
+    cab.setValues(b.valores).setBackgrounds(b.fundos).setFontColors(b.fontes).setFontWeights(b.pesos);
+    comp.getRange(linha, 1, 1, 11).mergeAcross().setHorizontalAlignment('center');
+    comp.getRange(linha + 1, 1, 1, 11).mergeAcross().setHorizontalAlignment('center');
+    comp.getRange(linha + 2, 1, 1, 11).setHorizontalAlignment('center');
+    linha += 3;
+    b.dados.forEach(function (l, i) { l[0] = i + 1; });
+    var dados = comp.getRange(linha, 1, b.dados.length, 11);
+    dados.setValues(b.dados).setBackground('#ffffff').setFontColor('#000000').setFontWeight('normal');
+    dados.setHorizontalAlignment('center').setBorder(true, true, true, true, true, true);
+    comp.getRange(linha, 1, b.dados.length, 1).setBackground('#e0e0e0');
+    linha += b.dados.length + 2;
+  });
+  if (total) comp.autoResizeColumns(1, 11);
+  return total;
 }

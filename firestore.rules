@@ -92,6 +92,28 @@ service cloud.firestore {
       allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaEfetivoValida());
     }
 
+    // Aperfeiçoamento → EAP: a P/3 abre; cada Cia responde a sua; o motor grava na planilha.
+    match /eap/{id} {
+      allow read, write: if ehP3();
+    }
+
+    function respostaEapValida() {
+      let novo = request.resource.data;
+      return resource.data.encerrada == false
+        && novo.diff(resource.data).affectedKeys()
+          .hasOnly(['blocos', 'status', 'respondidoPor', 'respondidoEm', 'gravado', 'atualizadoEm'])
+        && novo.status == 'enviada'
+        && novo.gravado == false
+        && novo.blocos is map
+        && novo.respondidoPor is string && novo.respondidoPor.size() > 0;
+    }
+
+    match /eapRespostas/{id} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create, delete: if ehP3();
+      allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaEapValida());
+    }
+
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
     match /efetivo/{re} {
       allow read: if logado();

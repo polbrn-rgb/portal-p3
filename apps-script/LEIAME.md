@@ -77,6 +77,14 @@ Depois de colar esta versão: rode **sincronizarAgendaCfp** uma vez (leva a agen
 Rode **limparExcluidas** uma vez pelo editor: apaga o que sobrou nas agendas (inclusive a do CFP) e manda a pasta do
 CFP para a lixeira do Drive, só das demandas excluídas no portal. O registro mostra o que foi feito em cada uma.
 
+## Aperfeiçoamento → EAP
+
+O motor cuida sozinho do EAP (a cada rodada): cria a cópia zerada de `PLANILHA_EAP_MODELO` na pasta `PASTA_EAP`,
+atualiza o cabeçalho quando a P/3 edita, grava o que cada Cia enviou e gera o COMPILADO TURMAS quando pedido.
+A conta da P/3 (8bpmmp3@gmail.com) precisa **ver** a planilha modelo e **editar** a pasta do EAP no Drive.
+O banco de efetivo agora também guarda **nome completo** e **e-mail** (colunas "NOME COMPLETO"/"NOME" e "E-MAIL"):
+rode **sincronizarEfetivo** uma vez depois de colar esta versão.
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

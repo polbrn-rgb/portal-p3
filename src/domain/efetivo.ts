@@ -25,7 +25,7 @@ export const CAMPOS_EXTRAS = [
 export type CampoExtra = (typeof CAMPOS_EXTRAS)[number]['id'];
 
 /** Como está no banco de efetivo (coleção "efetivo", id = RE sem dígito). */
-export type Policial = { re: string; posto: string; nomeGuerra: string; telefone: string };
+export type Policial = { re: string; posto: string; nomeGuerra: string; telefone: string; nomeCompleto?: string; email?: string };
 
 export type PolicialEscalado = Policial & { extras: Partial<Record<CampoExtra, string>> };
 
