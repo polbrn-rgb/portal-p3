@@ -191,7 +191,7 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
 
             {item.id === 'efetivoOk' &&
               (efetivoEnviado && c.efetivo ? (
-                <AndamentoEfetivo numero={d.id} pedido={c.efetivo} />
+                <AndamentoEfetivo demanda={d} pedido={c.efetivo} />
               ) : (
                 pedindoEfetivo && <FormPedidoEfetivo demanda={d} aoFechar={() => setPedindoEfetivo(false)} />
               ))}

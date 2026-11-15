@@ -11,6 +11,9 @@ import {
   validarPolicialEscalado,
   validarResposta,
   type PolicialEscalado,
+  planejarEdicao,
+  planilhaDoEfetivo,
+  type SolicitacaoEfetivo,
 } from '../../src/domain/efetivo';
 import { diasMudaram, gruposDeCampos, operacoesDoDia, valoresPreenchidos } from '../../src/domain/resultado';
 
@@ -106,5 +109,66 @@ describe('planilha de resultados', () => {
     expect(diasMudaram(lista[0].planilha, ['2026-11-20', '2026-11-21'])).toBe(false);
     expect(diasMudaram(lista[0].planilha, ['2026-11-20'])).toBe(true);
     expect(diasMudaram(lista[1].planilha, ['2026-11-20'])).toBe(false);
+  });
+});
+
+describe('editar a solicitação depois de enviada', () => {
+  const q = (cap = 0, ten = 0, subsgt = 0, cbsd = 0) => ({ cap, ten, subsgt, cbsd });
+  const sol = (unidadeId: SolicitacaoEfetivo['unidadeId'], extra: Partial<SolicitacaoEfetivo> = {}): SolicitacaoEfetivo => ({
+    id: `10_${unidadeId}`,
+    numero: '10',
+    unidadeId,
+    saida: 'Op',
+    inicio: '2099-12-20',
+    termino: '',
+    prazo: '2099-12-15',
+    quantidades: q(0, 0, 0, 2),
+    campos: ['cpf'],
+    status: 'enviada',
+    policiais: [],
+    ...extra,
+  });
+  const policial = { re: '123456-7', posto: 'Cb PM', nomeGuerra: 'SILVA', telefone: '', extras: { cpf: '1' } };
+
+  test('Cia nova é criada, Cia desmarcada é apagada (avisando se tinha efetivo)', () => {
+    const plano = planejarEdicao([sol('1cia'), sol('2cia', { status: 'respondida', policiais: [policial] })], {
+      prazo: '2099-12-16',
+      campos: ['cpf'],
+      quantidades: { '1cia': q(0, 0, 0, 2), ft: q(1) },
+    });
+    expect(plano.criar).toEqual(['ft']);
+    expect(plano.apagar).toEqual([{ id: '10_2cia', unidadeId: '2cia', tinhaEfetivo: true }]);
+    expect(plano.atualizar).toEqual([{ id: '10_1cia', unidadeId: '1cia', reabrir: false }]);
+  });
+
+  test('Cia que já respondeu só volta a ficar pendente se mudou o que ela precisa mandar', () => {
+    const respondida = [sol('3cia', { status: 'respondida', policiais: [policial] })];
+    const reabre = (pedido: Parameters<typeof planejarEdicao>[1]) => planejarEdicao(respondida, pedido).atualizar[0].reabrir;
+    expect(reabre({ prazo: '2099-12-30', campos: ['cpf'], quantidades: { '3cia': q(0, 0, 0, 2) } })).toBe(false);
+    expect(reabre({ prazo: '2099-12-15', campos: [], quantidades: { '3cia': q(0, 0, 0, 2) } })).toBe(false);
+    expect(reabre({ prazo: '2099-12-15', campos: ['cpf'], quantidades: { '3cia': q(0, 0, 1, 2) } })).toBe(true);
+    expect(reabre({ prazo: '2099-12-15', campos: ['cpf', 'vtr'], quantidades: { '3cia': q(0, 0, 0, 2) } })).toBe(true);
+  });
+
+  test('planilha: um policial por linha (Cias em ordem, hierarquia), extras pedidos e resumo por Cia', () => {
+    const abas = planilhaDoEfetivo(
+      [
+        sol('3cia', { status: 'respondida', respondidoPor: 'Sgt Teste', policiais: [policial, { ...policial, re: '2', posto: '1º Sgt PM', nomeGuerra: 'SOUZA' }] }),
+        sol('1cia', { prazo: '2000-01-01', quantidades: q(1) }),
+      ],
+      { campos: ['cpf'] },
+      '2026-11-15',
+    );
+    expect(abas.map((a) => a.nome)).toEqual(['Efetivo', 'Resumo']);
+    expect(abas[0].linhas).toEqual([
+      ['Cia', 'Posto/Graduação', 'RE', 'Nome de guerra', 'Telefone', 'CPF', 'Enviado por'],
+      ['3ª CIA', '1º Sgt PM', '2', 'SOUZA', '', '1', 'Sgt Teste'],
+      ['3ª CIA', 'Cb PM', '123456-7', 'SILVA', '', '1', 'Sgt Teste'],
+    ]);
+    expect(abas[1].linhas).toEqual([
+      ['Cia', 'Situação', 'Pedidos', 'Enviados', 'Faltam', 'Enviado por'],
+      ['1ª CIA', 'Atrasada', 1, 0, 1, ''],
+      ['3ª CIA', 'Respondida', 2, 2, 0, 'Sgt Teste'],
+    ]);
   });
 });

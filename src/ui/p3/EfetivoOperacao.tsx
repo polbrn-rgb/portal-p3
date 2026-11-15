@@ -1,10 +1,12 @@
 import { type FormEvent, useState } from 'react';
 import { enviarSolicitacao, observarSolicitacoesDaOperacao } from '../../data/efetivo';
 import { formatarData, hojeISO } from '../../domain/datas';
+import { baixarXlsx } from '../../lib/xlsx';
 import type { Demanda } from '../../domain/demanda';
 import {
   CAMPOS_EXTRAS,
   contarPorPosto,
+  planilhaDoEfetivo,
   POSTOS,
   quantidadesVazias,
   ROTULO_SITUACAO,
@@ -22,12 +24,16 @@ import { siglaDoDestino, UNIDADES, type UnidadeId } from '../../domain/unidades'
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
 
-/** P/3: quantos policiais de cada posto cada Cia manda, que dados pedir e até quando. */
-export function FormPedidoEfetivo({ demanda, aoFechar }: { demanda: Demanda; aoFechar: () => void }) {
-  const [prazo, setPrazo] = useState('');
-  const [campos, setCampos] = useState<CampoExtra[]>([]);
-  const [cias, setCias] = useState<UnidadeId[]>([]);
-  const [quantidades, setQuantidades] = useState<Partial<Record<UnidadeId, Quantidades>>>({});
+type PropsPedido = { demanda: Demanda; aoFechar: () => void; anterior?: PedidoEfetivo };
+
+/** P/3: quantos policiais de cada posto cada Cia manda, que dados pedir e até quando (enviar ou editar). */
+export function FormPedidoEfetivo({ demanda, aoFechar, anterior }: PropsPedido) {
+  const [prazo, setPrazo] = useState(anterior?.prazo ?? '');
+  const [campos, setCampos] = useState<CampoExtra[]>(anterior?.campos ?? []);
+  const [cias, setCias] = useState<UnidadeId[]>(() =>
+    UNIDADES.map((u) => u.id).filter((id) => totalDe(anterior?.quantidades[id]) > 0),
+  );
+  const [quantidades, setQuantidades] = useState<Partial<Record<UnidadeId, Quantidades>>>(anterior?.quantidades ?? {});
   const [erros, setErros] = useState<ErrosPedido>({});
   const [erroGeral, setErroGeral] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -55,7 +61,7 @@ export function FormPedidoEfetivo({ demanda, aoFechar }: { demanda: Demanda; aoF
     if (Object.keys(encontrados).length) return;
     setEnviando(true);
     try {
-      await enviarSolicitacao(db, demanda, pedido);
+      await enviarSolicitacao(db, demanda, pedido, anterior);
       aoFechar();
     } catch (e) {
       setErroGeral(
@@ -71,7 +77,7 @@ export function FormPedidoEfetivo({ demanda, aoFechar }: { demanda: Demanda; aoF
     <form className="detalhe-item pedido-efetivo" onSubmit={enviar} noValidate aria-label="Solicitação de efetivo">
       <label className="campo">
         Prazo para as Cias preencherem
-        <input type="date" value={prazo} min={hojeISO()} onChange={(e) => setPrazo(e.target.value)} />
+        <input type="date" value={prazo} min={anterior ? undefined : hojeISO()} onChange={(e) => setPrazo(e.target.value)} />
         {erros.prazo && <span className="erro-campo">{erros.prazo}</span>}
       </label>
 
@@ -128,6 +134,12 @@ export function FormPedidoEfetivo({ demanda, aoFechar }: { demanda: Demanda; aoF
         {erros.quantidades && <span className="erro-campo">{erros.quantidades}</span>}
       </fieldset>
 
+      {anterior && (
+        <p className="pendente-detalhe">
+          Cia desmarcada perde a solicitação (e o efetivo que já mandou). Se mudar as quantidades ou pedir um dado novo, a
+          Cia que já respondeu volta a ver como pendente, com os policiais que já tinha mandado.
+        </p>
+      )}
       {erroGeral && (
         <p className="mensagem erro" role="alert">
           {erroGeral}
@@ -138,15 +150,17 @@ export function FormPedidoEfetivo({ demanda, aoFechar }: { demanda: Demanda; aoF
           Cancelar
         </button>
         <button className="botao destaque" type="submit" disabled={enviando}>
-          {enviando ? 'Enviando…' : 'Enviar solicitação às Cias'}
+          {enviando ? 'Salvando…' : anterior ? 'Salvar alterações' : 'Enviar solicitação às Cias'}
         </button>
       </div>
     </form>
   );
 }
 
-/** P/3: depois de enviada, quem já respondeu e quem foi escalado. */
-export function AndamentoEfetivo({ numero, pedido }: { numero: string; pedido: PedidoEfetivo }) {
+/** P/3: depois de enviada, quem já respondeu e quem foi escalado; dá para editar e baixar em Excel. */
+export function AndamentoEfetivo({ demanda, pedido }: { demanda: Demanda; pedido: PedidoEfetivo }) {
+  const numero = demanda.id;
+  const [editando, setEditando] = useState(false);
   const solicitacoes = useAoVivo<SolicitacaoEfetivo[]>(
     (ok, erro) => observarSolicitacoesDaOperacao(db, numero, ok, erro),
     [numero],
@@ -156,10 +170,31 @@ export function AndamentoEfetivo({ numero, pedido }: { numero: string; pedido: P
     (a, b) => UNIDADES.findIndex((u) => u.id === a.unidadeId) - UNIDADES.findIndex((u) => u.id === b.unidadeId),
   );
   const extras = CAMPOS_EXTRAS.filter((c) => pedido.campos.includes(c.id));
+  const temEfetivo = lista.some((s) => s.policiais.length > 0);
+
+  if (editando) return <FormPedidoEfetivo demanda={demanda} anterior={pedido} aoFechar={() => setEditando(false)} />;
+
+  function baixar() {
+    baixarXlsx(`efetivo-op-${numero}.xlsx`, planilhaDoEfetivo(lista, pedido, hoje));
+  }
 
   return (
     <div className="detalhe-item">
       <span className="pendente-detalhe">Prazo para as Cias: {formatarData(pedido.prazo)}</span>
+      <div className="acoes-linha acoes-efetivo">
+        <button className="botao secundario" type="button" onClick={() => setEditando(true)}>
+          ✏️ Editar solicitação
+        </button>
+        <button
+          className="botao secundario"
+          type="button"
+          onClick={baixar}
+          disabled={!temEfetivo}
+          title={temEfetivo ? undefined : 'Nenhuma Cia mandou efetivo ainda'}
+        >
+          ⬇️ Baixar efetivo (Excel)
+        </button>
+      </div>
       {solicitacoes.erro && <p className="mensagem erro">{solicitacoes.erro}</p>}
       <ul className="lista-efetivo">
         {lista.map((s) => {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -99,4 +100,25 @@ test('solicitação de efetivo: P/3 pede, Cia preenche pelo RE, P/3 vê quem vai
   await depois.getByText('3ª CIA').click();
   await expect(depois).toContainText('Cb PM SILVA · RE 123456-7');
   await expect(depois).toContainText('CPF: 123.456.789-00');
+
+  // Baixar o efetivo em Excel.
+  const [arquivo] = await Promise.all([page.waitForEvent('download'), depois.getByRole('button', { name: '⬇️ Baixar efetivo (Excel)' }).click()]);
+  expect(arquivo.suggestedFilename()).toMatch(/^efetivo-op-\d+\.xlsx$/);
+  const bytes = readFileSync((await arquivo.path())!);
+  expect(bytes.subarray(0, 2).toString()).toBe('PK');
+  expect(bytes.toString('utf8')).toContain('SILVA');
+
+  // Editar depois de enviada: abre já preenchida; mudar a quantidade reabre para a Cia.
+  await depois.getByRole('button', { name: '✏️ Editar solicitação' }).click();
+  const edicao = depois.getByRole('form', { name: 'Solicitação de efetivo' });
+  await expect(edicao.getByLabel('Prazo para as Cias preencherem')).toHaveValue('2099-12-15');
+  await expect(edicao.getByLabel('CPF')).toBeChecked();
+  const qtd = edicao.getByRole('group', { name: 'Quantidades 3ª CIA' }).getByLabel('Cb/Sd PM');
+  await expect(qtd).toHaveValue('2');
+  await qtd.fill('3');
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+  await edicao.getByRole('button', { name: 'Salvar alterações' }).click();
+  await expect(depois).toContainText('1 de 3 policiais');
+  await expect(depois).toContainText('Aguardando');
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });
