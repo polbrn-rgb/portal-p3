@@ -9,6 +9,7 @@ import {
   protocolosPreenchidos,
   type ItemChecklist,
   type Operacao,
+  rotuloDoItem,
 } from '../../domain/operacao';
 import { diasMudaram } from '../../domain/resultado';
 import { db } from '../../lib/firebase';
@@ -186,7 +187,7 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
                 disabled={(item.id === 'efetivoOk' && efetivoEnviado) || (item.id === 'resultadoOk' && !!planilha && planilha.status !== 'erro')}
                 onChange={(e) => aoMarcar(item.id, e.target.checked)}
               />
-              {item.rotulo}
+              {rotuloDoItem(item, d.tipoSaida)}
             </label>
 
             {item.id === 'efetivoOk' &&

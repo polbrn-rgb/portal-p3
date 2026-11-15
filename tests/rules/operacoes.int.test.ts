@@ -52,11 +52,13 @@ const operacao = (saida: string): DadosDemanda => ({
 } as DadosDemanda);
 
 describe('Checklist Operações', () => {
-  test('demanda Ordem de Serviço + Operações Policiais entra sozinha; outras não', async () => {
+  test('Ordem de Serviço ou Ordem de Operações + Operações Policiais entra sozinha; outras não', async () => {
     await criarDemanda(db, operacao('Operação Natal'));
+    await criarDemanda(db, { ...operacao('Operação Réveillon'), tipoSaida: 'ORDEM DE OPERAÇÕES' } as DadosDemanda);
+    await criarDemanda(db, { ...operacao('Ordem de Operações de escolta'), tipoSaida: 'ORDEM DE OPERAÇÕES', categoria: 'Escoltas' } as DadosDemanda);
     await criarDemanda(db, { ...demandaVazia('2026-11-14'), saida: 'Ofício comum' });
-    const lista = await operacoesQuando((l) => l.length === 1);
-    expect(lista[0].demanda.saida).toBe('Operação Natal');
+    const lista = await operacoesQuando((l) => l.length === 2);
+    expect(lista.map((o) => o.demanda.saida).sort()).toEqual(['Operação Natal', 'Operação Réveillon']);
     expect(lista[0].checklist.osOk).toBe(false);
   });
 

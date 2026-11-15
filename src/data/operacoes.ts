@@ -2,7 +2,7 @@ import { collection, doc, onSnapshot, query, setDoc, serverTimestamp, where, typ
 import {
   CATEGORIA_OPERACAO,
   operacoesEmAndamento,
-  TIPO_SAIDA_OPERACAO,
+  TIPOS_SAIDA_OPERACAO,
   type Checklist,
   type ItemChecklist,
   type Operacao,
@@ -28,7 +28,7 @@ export function observarOperacoes(
   };
   const q = query(
     collection(db, 'demandas'),
-    where('tipoSaida', '==', TIPO_SAIDA_OPERACAO),
+    where('tipoSaida', 'in', [...TIPOS_SAIDA_OPERACAO]),
     where('categoria', '==', CATEGORIA_OPERACAO),
   );
   const pararDemandas = onSnapshot(

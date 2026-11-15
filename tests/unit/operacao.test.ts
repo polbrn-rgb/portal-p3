@@ -9,6 +9,7 @@ import {
   pastaCfpDa,
   progresso,
   protocolosPreenchidos,
+  rotuloDoItem,
 } from '../../src/domain/operacao';
 
 function demanda(numero: number, extra: Partial<Demanda> = {}): Demanda {
@@ -24,8 +25,13 @@ function demanda(numero: number, extra: Partial<Demanda> = {}): Demanda {
 }
 
 describe('Checklist Operações', () => {
-  test('só Ordem de Serviço + Operações Policiais vira operação', () => {
+  test('só Ordem de Serviço ou Ordem de Operações + Operações Policiais vira operação', () => {
     expect(ehOperacao({ tipoSaida: 'ORDEM DE SERVIÇO', categoria: 'Operações Policiais' })).toBe(true);
+    expect(ehOperacao({ tipoSaida: 'ORDEM DE OPERAÇÕES', categoria: 'Operações Policiais' })).toBe(true);
+    expect(ehOperacao({ tipoSaida: 'ORDEM DE OPERAÇÕES', categoria: 'Escoltas' })).toBe(false);
+    expect(rotuloDoItem({ id: 'osOk', rotulo: 'Ordem de Serviço ok' }, 'ORDEM DE OPERAÇÕES')).toBe('Ordem de Operações ok');
+    expect(rotuloDoItem({ id: 'osOk', rotulo: 'Ordem de Serviço ok' }, 'ORDEM DE SERVIÇO')).toBe('Ordem de Serviço ok');
+    expect(rotuloDoItem({ id: 'pastaOk', rotulo: 'Pasta' }, 'ORDEM DE OPERAÇÕES')).toBe('Pasta');
     expect(ehOperacao({ tipoSaida: 'OFÍCIO', categoria: 'Operações Policiais' })).toBe(false);
     expect(ehOperacao({ tipoSaida: 'ORDEM DE SERVIÇO', categoria: 'Escoltas' })).toBe(false);
   });
