@@ -140,7 +140,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     return (
       <ListaUnidade
         sigla={sigla}
-        aba={ativa && ativa !== 'documentos' ? ativa : 'pendentes'}
+        aba={ativa ?? 'pendentes'}
         lista={lista}
         carregando={encs.carregando}
         erro={encs.erro}
