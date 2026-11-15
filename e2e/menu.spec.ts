@@ -44,3 +44,37 @@ test('menu da P/3: lateral esquerda no computador, ☰ no canto superior esquerd
     expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   }
 });
+
+test('menu das Cias e Força Tática: Pendentes, Respondidas e Finalizadas na lateral (PC) e no ☰ (celular)', async ({ page }, info) => {
+  await entrar(page, 'ft', SENHA_TESTE);
+  await expect(page.getByRole('heading', { name: 'CIA FT' })).toBeVisible();
+  const menu = page.getByRole('navigation', { name: 'Seções da Cia' });
+  const botao = page.getByRole('button', { name: 'Abrir menu' });
+  const link = (nome: string) => menu.getByRole('link', { name: new RegExp(`^${nome}`) });
+  await expect(page.getByRole('tab')).toHaveCount(0);
+
+  if (info.project.name === 'celular') {
+    await expect(botao).toBeVisible();
+    const caixa = (await botao.boundingBox())!;
+    expect(caixa.x).toBeLessThan(40);
+    expect(caixa.y).toBeLessThan(80);
+    await expect(menu).toBeHidden();
+    await botao.click();
+    for (const i of ['Pendentes', 'Respondidas', 'Finalizadas']) await expect(link(i)).toBeVisible();
+    expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+    await link('Respondidas').click();
+    await expect(menu).toBeHidden();
+    await expect(page.getByRole('heading', { name: /^Respondidas/ })).toBeVisible();
+  } else {
+    await expect(botao).toBeHidden();
+    await expect(menu).toBeVisible();
+    const lateral = (await menu.boundingBox())!;
+    const conteudo = (await page.locator('.conteudo-p3').boundingBox())!;
+    expect(lateral.x + lateral.width).toBeLessThanOrEqual(conteudo.x);
+    await expect(link('Pendentes')).toHaveAttribute('aria-current', 'page');
+    await link('Finalizadas').click();
+    await expect(page.getByRole('heading', { name: /^Finalizadas/ })).toBeVisible();
+    await expect(link('Finalizadas')).toHaveAttribute('aria-current', 'page');
+    expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+  }
+});

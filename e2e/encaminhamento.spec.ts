@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, sair, sobraLateral } from './ajuda';
+import { entrar, irParaAbaCia, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Fluxo completo: P/3 cria para a 3ª Cia -> 3ª Cia responde -> P/3 devolve -> Cia corrige -> P/3 aceita.
@@ -35,7 +35,7 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await page.getByLabel('Respondido por').fill('Sd Teste');
   await page.getByRole('button', { name: 'Enviar resposta' }).click();
   await expect(page.getByRole('heading', { name: '3ª CIA' })).toBeVisible();
-  await page.getByRole('tab', { name: /Respondidas/ }).click();
+  await irParaAbaCia(page, 'Respondidas');
   await expect(linkDaDemanda()).toContainText('Respondido');
   await sair(page);
 

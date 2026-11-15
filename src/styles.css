@@ -1672,6 +1672,12 @@ fieldset:has(> .erro-campo) > legend {
   min-width: 0;
 }
 
+.titulo-aba-cia {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  color: var(--cor-secundaria);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu-p3 {
     transition: none;
