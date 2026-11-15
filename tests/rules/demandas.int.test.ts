@@ -177,3 +177,19 @@ describe('excluirDemanda', () => {
     expect(await criarDemanda(db, dados())).toBe(fica + 1);
   });
 });
+
+describe('Painel estatístico: demandas do ano', () => {
+  test('pega só as do ano pela data de entrada, sem as excluídas, e guarda por 10 minutos', async () => {
+    const { demandasDoAno } = await import('../../src/data/estatisticas');
+    await criarDemanda(db, { ...dados('Do ano'), dataEntrada: '2026-03-10' });
+    await criarDemanda(db, { ...dados('Fim do ano'), dataEntrada: '2026-12-31' });
+    await criarDemanda(db, { ...dados('Ano que vem'), dataEntrada: '2027-01-01' });
+    const excluida = await criarDemanda(db, { ...dados('Excluída'), dataEntrada: '2026-05-05' });
+    await excluirDemanda(db, String(excluida));
+
+    expect((await demandasDoAno(db, 2026, true)).map((d) => d.saida).sort()).toEqual(['Do ano', 'Fim do ano']);
+    await criarDemanda(db, { ...dados('Nova'), dataEntrada: '2026-04-01' });
+    expect(await demandasDoAno(db, 2026)).toHaveLength(2); // guardado
+    expect(await demandasDoAno(db, 2026, true)).toHaveLength(3); // Atualizar
+  });
+});
