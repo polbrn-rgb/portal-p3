@@ -67,6 +67,7 @@ test('solicitação de efetivo: P/3 pede, Cia preenche pelo RE, P/3 vê quem vai
   const pedido = cartao.getByRole('form', { name: 'Solicitação de efetivo' });
   await pedido.getByRole('button', { name: 'Enviar solicitação às Cias' }).click();
   await expect(pedido).toContainText('Informe o prazo');
+  await expect(pedido.getByLabel('Prazo para as Cias preencherem')).toBeFocused();
   await pedido.getByLabel('Prazo para as Cias preencherem').fill('2099-12-15');
   await pedido.getByLabel('CPF').check();
   await pedido.getByLabel('3ª CIA').check();
@@ -84,6 +85,7 @@ test('solicitação de efetivo: P/3 pede, Cia preenche pelo RE, P/3 vê quem vai
   await expect(page.getByRole('status')).toContainText('Cb PM SILVA');
   await page.getByRole('button', { name: '+ Adicionar policial' }).click();
   await expect(page.getByText('Preencha: CPF.')).toBeVisible();
+  await expect(page.getByLabel('CPF')).toBeFocused();
   await page.getByLabel('CPF').fill('123.456.789-00');
   await page.getByRole('button', { name: '+ Adicionar policial' }).click();
   await expect(page.getByText('RE 123456-7')).toBeVisible();

@@ -10,6 +10,7 @@ import {
 } from '../../domain/pendente';
 import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
+import { Campo } from '../Campo';
 
 /** Lançar uma pendente de SEI (texto colado) ou de Ordem Verbal. */
 export function FormPendente({ tipo }: { tipo: TipoManual }) {
@@ -51,29 +52,23 @@ export function FormPendente({ tipo }: { tipo: TipoManual }) {
       <fieldset className="cartao grupo">
         <legend>{ehSEI ? 'Demanda do SEI' : 'Ordem Verbal'}</legend>
         <div className="grade">
-          <label className="campo">
-            Data de entrada
+          <Campo rotulo="Data de entrada" erro={erros.dataEntrada} obrigatorio>
             <input type="date" value={dados.dataEntrada} onChange={(e) => mudar('dataEntrada', e.target.value)} />
-            {erros.dataEntrada && <span className="erro-campo">{erros.dataEntrada}</span>}
-          </label>
+          </Campo>
           {ehSEI ? (
             <label className="campo">
               Nº do processo SEI
               <input value={dados.numeroSei} inputMode="numeric" onChange={(e) => mudar('numeroSei', e.target.value)} />
             </label>
           ) : (
-            <label className="campo">
-              Quem deu a ordem
+            <Campo rotulo="Quem deu a ordem" erro={erros.quemOrdenou} obrigatorio>
               <input value={dados.quemOrdenou} onChange={(e) => mudar('quemOrdenou', e.target.value)} />
-              {erros.quemOrdenou && <span className="erro-campo">{erros.quemOrdenou}</span>}
-            </label>
+            </Campo>
           )}
         </div>
-        <label className="campo">
-          {ehSEI ? 'Texto da demanda (cole aqui)' : 'Qual é a ordem'}
+        <Campo rotulo={ehSEI ? 'Texto da demanda (cole aqui)' : 'Qual é a ordem'} erro={erros.texto} obrigatorio>
           <textarea rows={ehSEI ? 10 : 5} value={dados.texto} onChange={(e) => mudar('texto', e.target.value)} />
-          {erros.texto && <span className="erro-campo">{erros.texto}</span>}
-        </label>
+        </Campo>
         <p className="ajuda-pendentes">A primeira linha do texto vira o assunto na lista.</p>
       </fieldset>
 

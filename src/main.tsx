@@ -1,7 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { instalarLevarAoErro } from './lib/levarAoErro';
 import './styles.css';
+
+instalarLevarAoErro();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

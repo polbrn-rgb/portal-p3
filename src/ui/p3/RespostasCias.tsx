@@ -5,6 +5,7 @@ import { ROTULO_ENC, type Encaminhamento } from '../../domain/encaminhamento';
 import { siglaDoDestino, UNIDADES } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { Campo } from '../Campo';
 
 const ORDEM = UNIDADES.map((u) => u.id as string);
 
@@ -37,6 +38,7 @@ function RespostaCia({ enc }: { enc: Encaminhamento }) {
   const [motivo, setMotivo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
+  const [semMotivo, setSemMotivo] = useState(false);
 
   async function executar(acao: () => Promise<void>) {
     setOcupado(true);
@@ -88,10 +90,9 @@ function RespostaCia({ enc }: { enc: Encaminhamento }) {
 
       {devolvendo && (
         <div className="devolucao">
-          <label className="campo">
-            Motivo da devolução
+          <Campo rotulo="Motivo da devolução" erro={semMotivo && !motivo.trim() ? 'Escreva o motivo da devolução.' : undefined} obrigatorio>
             <textarea rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-          </label>
+          </Campo>
           <div className="acoes-linha">
             <button className="botao secundario" type="button" onClick={() => setDevolvendo(false)}>
               Cancelar
@@ -99,8 +100,11 @@ function RespostaCia({ enc }: { enc: Encaminhamento }) {
             <button
               className="botao destaque"
               type="button"
-              disabled={ocupado || !motivo.trim()}
-              onClick={() => executar(() => devolverResposta(db, enc, motivo))}
+              disabled={ocupado}
+              onClick={() => {
+                setSemMotivo(!motivo.trim());
+                if (motivo.trim()) void executar(() => devolverResposta(db, enc, motivo));
+              }}
             >
               Confirmar devolução
             </button>

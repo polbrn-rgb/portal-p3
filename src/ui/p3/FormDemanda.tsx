@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import {
   alterarStatus,
   atualizarDemanda,
@@ -37,6 +37,7 @@ import { cutucarMotor } from '../../lib/motor';
 import { irPara } from '../../lib/navegacao';
 import { RespostasCias } from './RespostasCias';
 import { StatusAutomacao } from './StatusAutomacao';
+import { Campo } from '../Campo';
 
 export function NovaDemanda() {
   return <FormDemanda />;
@@ -131,16 +132,6 @@ export function EditarDemanda({ id }: { id: string }) {
     );
   }
   return <FormDemanda key={demanda.id} existente={demanda} />;
-}
-
-function Campo({ rotulo, erro, children }: { rotulo: string; erro?: string; children: ReactNode }) {
-  return (
-    <label className="campo">
-      {rotulo}
-      {children}
-      {erro && <span className="erro-campo">{erro}</span>}
-    </label>
-  );
 }
 
 const CHAVE_RESPONSAVEL = 'portalp3.responsavel';
@@ -302,7 +293,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
       <fieldset className="cartao grupo grupo-entrada">
         <legend>Entrada</legend>
         <div className="grade">
-          <Campo rotulo="Data de entrada" erro={erros.dataEntrada}>
+          <Campo rotulo="Data de entrada" erro={erros.dataEntrada} obrigatorio>
             <input type="date" value={dados.dataEntrada} onChange={(e) => mudar('dataEntrada', e.target.value)} />
           </Campo>
           <Campo rotulo="Origem" erro={erros.origem}>
@@ -313,7 +304,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
               ))}
             </select>
           </Campo>
-          <Campo rotulo={ehSEI ? 'Nº do processo SEI' : 'Nº da origem'} erro={erros.numeroOrigem}>
+          <Campo rotulo={ehSEI ? 'Nº do processo SEI' : 'Nº da origem'} erro={erros.numeroOrigem} obrigatorio={ehSEI}>
             <input
               value={dados.numeroOrigem}
               inputMode={ehSEI ? 'numeric' : 'text'}
@@ -325,11 +316,11 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
 
       <fieldset className="cartao grupo">
         <legend>Saída</legend>
-        <Campo rotulo="Demanda (resumo)" erro={erros.saida}>
+        <Campo rotulo="Demanda (resumo)" erro={erros.saida} obrigatorio>
           <textarea rows={3} value={dados.saida} onChange={(e) => mudar('saida', e.target.value)} />
         </Campo>
         <div className="grade">
-          <Campo rotulo="Tipo de saída" erro={erros.tipoSaida}>
+          <Campo rotulo="Tipo de saída" erro={erros.tipoSaida} obrigatorio>
             <select value={dados.tipoSaida} onChange={(e) => mudar('tipoSaida', e.target.value as DadosDemanda['tipoSaida'])}>
               {TIPOS_SAIDA.map((t) => (
                 <option key={t}>{t}</option>
@@ -346,7 +337,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
           <Campo rotulo="Nº de saída SEI" erro={erros.numeroSaida}>
             <input value={dados.numeroSaida} onChange={(e) => mudar('numeroSaida', e.target.value)} />
           </Campo>
-          <Campo rotulo="Categoria" erro={erros.categoria}>
+          <Campo rotulo="Categoria" erro={erros.categoria} obrigatorio>
             <select value={dados.categoria} onChange={(e) => mudar('categoria', e.target.value as DadosDemanda['categoria'])}>
               {CATEGORIAS.map((c) => (
                 <option key={c}>{c}</option>
@@ -364,7 +355,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
               ))}
             </select>
           </Campo>
-          <Campo rotulo="Resposta?" erro={erros.resposta}>
+          <Campo rotulo="Resposta?" erro={erros.resposta} obrigatorio>
             <select value={dados.resposta} onChange={(e) => mudar('resposta', e.target.value as DadosDemanda['resposta'])}>
               {RESPOSTAS.map((r) => (
                 <option key={r}>{r}</option>
@@ -403,10 +394,10 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
           <Campo rotulo="Prazo Cia" erro={erros.prazoCia}>
             <input type="date" value={dados.prazoCia} onChange={(e) => mudar('prazoCia', e.target.value)} />
           </Campo>
-          <Campo rotulo="Início Btl" erro={erros.inicioBtl}>
+          <Campo rotulo="Início Btl" erro={erros.inicioBtl} obrigatorio={dados.adicionarCFP}>
             <input type="date" value={dados.inicioBtl} onChange={(e) => mudar('inicioBtl', e.target.value)} />
           </Campo>
-          <Campo rotulo="Término Btl" erro={erros.terminoBtl}>
+          <Campo rotulo="Término Btl" erro={erros.terminoBtl} obrigatorio={dados.adicionarCFP}>
             <input type="date" value={dados.terminoBtl} onChange={(e) => mudar('terminoBtl', e.target.value)} />
           </Campo>
         </div>

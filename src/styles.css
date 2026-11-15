@@ -934,9 +934,40 @@ a.botao {
 }
 
 .erro-campo {
-  color: #8a1c1c;
-  font-weight: 400;
+  color: #b52b27;
+  font-weight: 600;
   font-size: 0.85rem;
+}
+
+/* ---------- Campos obrigatórios e campos com erro (todas as páginas) ---------- */
+.obrigatorio {
+  color: #b52b27;
+  font-weight: 700;
+}
+
+.campo.com-erro,
+.campo:has(> .erro-campo) {
+  color: #b52b27;
+}
+
+.campo.com-erro :is(input, select, textarea),
+.campo:has(> .erro-campo) :is(input, select, textarea) {
+  border-color: #b52b27;
+  box-shadow: 0 0 0 1px #b52b27;
+  background: #fff6f6;
+}
+
+fieldset:has(> .erro-campo) {
+  border-color: #b52b27;
+  box-shadow: 0 0 0 1px #b52b27;
+}
+
+fieldset:has(> .erro-campo) > legend {
+  color: #b52b27;
+}
+
+.cartao:has(> .erro-campo) {
+  outline: 2px solid #b52b27;
 }
 
 .opcoes {
