@@ -72,6 +72,11 @@ de 60 dias atrás até 1 ano à frente (`AGENDA_CFP_DIAS_ANTES` / `AGENDA_CFP_DI
 Depois de colar esta versão: rode **sincronizarAgendaCfp** uma vez (leva a agenda na hora) e faça a
 **Nova versão** da implantação (passo acima). No projeto, rode `npm run deploy:regras` para liberar a leitura.
 
+## Demandas excluídas antes da limpeza da pasta do CFP
+
+Rode **limparExcluidas** uma vez pelo editor: apaga o que sobrou nas agendas (inclusive a do CFP) e manda a pasta do
+CFP para a lixeira do Drive, só das demandas excluídas no portal. O registro mostra o que foi feito em cada uma.
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

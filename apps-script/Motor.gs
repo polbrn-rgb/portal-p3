@@ -124,6 +124,28 @@ function verUltimasDemandas() {
   });
 }
 
+/**
+ * Rode pelo editor (uma vez): refaz a limpeza de TODAS as demandas já excluídas no portal —
+ * apaga o que sobrou nas agendas (inclusive a do CFP) e manda a pasta do CFP para a lixeira.
+ * Serve para as excluídas antes desta versão. Não mexe em nenhuma demanda que não foi excluída.
+ */
+function limparExcluidas() {
+  var excluidas = consultar_('demandas', 'status', 'excluido', 500);
+  var limpas = 0;
+  excluidas.forEach(function (doc) {
+    var d = doc.dados;
+    var auto = d.automacao || {};
+    var feito = { agendaCPA: auto.agendaCPA || null, agendaCia: auto.agendaCia || null, cfp: auto.cfp || null, cfpPasta: auto.cfpPasta || null };
+    var acoes = planejarAutomacao(d, feito).map(function (a) { return a.tipo + ' ' + a.chave; });
+    if (!acoes.length) return;
+    processarDemanda_(doc);
+    limpas++;
+    Logger.log('Nº ' + d.numero + ' — ' + d.saida + ': ' + acoes.join(', '));
+  });
+  sincronizarAgendaCfp_(true);
+  Logger.log(excluidas.length + ' demanda(s) excluída(s); ' + limpas + ' tinham algo para limpar. Página do CFP atualizada.');
+}
+
 /** Gatilho de reserva (a cada 5 min): se outra rodada estiver trabalhando, deixa para ela. */
 function processarPendentes() {
   rodarMotor_(1000);
