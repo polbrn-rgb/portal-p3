@@ -61,7 +61,8 @@ describe('Controle de Operações', () => {
 
   test('Cia, Sala e CFP não leem nem escrevem', async () => {
     await criarOperacaoControle(p3, { ...controleVazio(), nome: 'A', inicio: '2026-10-01' });
-    for (const claims of [{ perfil: 'unidade', unidade: '1cia' }, { perfil: 'sala' }, { perfil: 'cfp' }]) {
+    const perfis: Record<string, string>[] = [{ perfil: 'unidade', unidade: '1cia' }, { perfil: 'sala' }, { perfil: 'cfp' }];
+    for (const claims of perfis) {
       const outro = como('outro', claims);
       await assertFails(getDocs(collection(outro, 'controleOperacoes')));
       await assertFails(criarOperacaoControle(outro, { ...controleVazio(), nome: 'B', inicio: '2026-10-01' }));
