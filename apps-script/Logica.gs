@@ -564,3 +564,59 @@ function preencherXmlRelatorio(xml, dados) {
     return monta(txt);
   });
 }
+
+// ---------- Operações → Documentos Mensais ----------
+// A configuração (células de cada Cia) vem do portal (config/documentosMensais).
+
+var MESES_NOME_DOC = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+/** "2026-10" -> "2026-11" */
+function proximoMes(mesRef) {
+  var p = String(mesRef).split('-').map(Number);
+  return p[1] === 12 ? (p[0] + 1) + '-01' : p[0] + '-' + ('0' + (p[1] + 1)).slice(-2);
+}
+
+/** Troca {MES} (OUTUBRO), {Mes} (Outubro), {SIGLA} (OUT), {AA} (26), {ANO} (2026) e {QUEM}. */
+function textoDoMes(modelo, mesRef, quem) {
+  var p = String(mesRef).split('-');
+  var i = Number(p[1]) - 1;
+  return String(modelo)
+    .replace(/\{MES\}/g, MESES_NOME_DOC[i].toUpperCase())
+    .replace(/\{Mes\}/g, MESES_NOME_DOC[i])
+    .replace(/\{SIGLA\}/g, MESES_SIGLA[i])
+    .replace(/\{AA\}/g, p[0].slice(-2))
+    .replace(/\{ANO\}/g, p[0])
+    .replace(/\{QUEM\}/g, String(quem || '').trim());
+}
+
+/** '' = a planilha está no formato esperado; senão, o que mudou (o motor não grava). */
+function conferirAncoras(ancoras, lidos) {
+  var norm = function (s) { return semAcento_(s).replace(/\s+/g, ' ').toUpperCase(); };
+  var faltam = Object.keys(ancoras || {}).filter(function (c) {
+    return norm(lidos[c]).indexOf(norm(ancoras[c])) < 0;
+  });
+  return faltam.length ? 'A planilha mudou de formato (' + faltam.map(function (c) { return c + ' devia ter "' + ancoras[c] + '"'; }).join('; ') + ')' : '';
+}
+
+/**
+ * O que fazer com o envio de uma Cia, comparando o mês que está na planilha com o do envio:
+ * 'gravar' | 'arquivarAntes' (planilha ainda com o mês anterior: guarda cópia e zera) | 'antigo' (mês já arquivado).
+ */
+function acaoEnvioMensal(mesPlanilha, mesEnvio) {
+  if (!mesPlanilha || mesPlanilha === mesEnvio) return 'gravar';
+  return mesPlanilha < mesEnvio ? 'arquivarAntes' : 'antigo';
+}
+
+/** Todas as células que a Cia preenche (para zerar ao arquivar). */
+function celulasParaZerar(doc) {
+  var out = [];
+  Object.keys(doc.celulas || {}).forEach(function (u) {
+    Object.keys(doc.celulas[u]).forEach(function (campo) { out.push(doc.celulas[u][campo]); });
+  });
+  return out;
+}
+
+function nomeArquivoMensal(nome, mesRef) {
+  var p = String(mesRef).split('-');
+  return nome + ' - ' + MESES_SIGLA[Number(p[1]) - 1] + p[0];
+}

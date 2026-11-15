@@ -11,6 +11,7 @@ import { Recados } from '../setores/Recados';
 import { Aperfeicoamento } from './Aperfeicoamento';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { ControleOperacoes } from './ControleOperacoes';
+import { DocumentosMensais } from './DocumentosMensais';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
@@ -21,7 +22,7 @@ import { PainelPrazos } from './PainelPrazos';
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
 /** Dentro de Operações: o Checklist Operações e o Controle de Operações (com o Relatório de Indicadores). */
-function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle'; operacoes?: number }) {
+function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos'; operacoes?: number }) {
   return (
     <nav className="abas abas-p3 subabas" aria-label="Operações">
       <a href="#/operacoes" aria-current={ativa === 'checklist' ? 'page' : undefined}>
@@ -30,6 +31,9 @@ function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle
       </a>
       <a href="#/operacoes/controle" aria-current={ativa === 'controle' ? 'page' : undefined}>
         Controle de Operações
+      </a>
+      <a href="#/operacoes/documentos" aria-current={ativa === 'documentos' ? 'page' : undefined}>
+        Documentos Mensais
       </a>
     </nav>
   );
@@ -99,12 +103,12 @@ function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: A
     );
   }
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
-  if (hash === '#/operacoes' || hash === '#/operacoes/controle') {
-    const controle = hash === '#/operacoes/controle';
+  if (hash === '#/operacoes' || hash === '#/operacoes/controle' || hash === '#/operacoes/documentos') {
+    const ativa = hash === '#/operacoes/controle' ? 'controle' : hash === '#/operacoes/documentos' ? 'documentos' : 'checklist';
     return (
       <>
-        <SubAbasOperacoes ativa={controle ? 'controle' : 'checklist'} operacoes={operacoes.valor?.length} />
-        {controle ? <ControleOperacoes /> : <ChecklistOperacoes operacoes={operacoes} />}
+        <SubAbasOperacoes ativa={ativa} operacoes={operacoes.valor?.length} />
+        {ativa === 'controle' ? <ControleOperacoes /> : ativa === 'documentos' ? <DocumentosMensais /> : <ChecklistOperacoes operacoes={operacoes} />}
       </>
     );
   }

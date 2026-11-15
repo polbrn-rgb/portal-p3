@@ -19,6 +19,9 @@ import { irPara, useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
 import { MenuLateral } from '../MenuLateral';
+import { observarEnviosDaUnidade } from '../../data/documentosMensais';
+import { DOCUMENTOS, mesReferencia, type EnvioMensal } from '../../domain/documentosMensais';
+import { contarPendentesDocs, documentosDaUnidade, FormDocumentoCia, ListaDocumentosCia } from './DocumentosCia';
 import { EapsDaCia, ResponderEap } from './EapCia';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
@@ -28,7 +31,10 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-function abaDaRota(hash: string): AbaUnidade | undefined {
+type AbaCia = AbaUnidade | 'documentos';
+
+function abaDaRota(hash: string): AbaCia | undefined {
+  if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash === '#/respondidas') return 'respondidas';
   if (hash === '#/finalizadas') return 'finalizadas';
   if (/^#\/(enc|efetivo|eap)\//.test(hash)) return undefined;
@@ -57,13 +63,22 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   const efetivo = /^#\/efetivo\/(.+)$/.exec(hash)?.[1];
   const eapAberto = /^#\/eap\/(.+)$/.exec(hash)?.[1];
   const encAberto = aberto ? lista.find((e) => e.id === aberto) : undefined;
-  const ativa = encAberto ? (abaDoEncaminhamento(encAberto.status) ?? undefined) : abaDaRota(hash);
-  const itens = ABAS.map((a) => ({
-    id: a.id,
-    href: `#/${a.id}`,
-    rotulo: a.rotulo,
-    contador: lista.filter((e) => abaDoEncaminhamento(e.status) === a.id).length,
-  }));
+  const ativa: AbaCia | undefined = encAberto ? (abaDoEncaminhamento(encAberto.status) ?? undefined) : abaDaRota(hash);
+  const mesRef = mesReferencia();
+  const envios = useAoVivo<EnvioMensal[]>((ok, erro) => observarEnviosDaUnidade(db, unidade, mesRef, ok, erro), [unidade, mesRef]);
+  const temDocs = documentosDaUnidade(unidade, mesRef).length > 0;
+  const itens = [
+    ...ABAS.map((a) => ({
+      id: a.id as AbaCia,
+      href: `#/${a.id}`,
+      rotulo: a.rotulo,
+      contador: lista.filter((e) => abaDoEncaminhamento(e.status) === a.id).length,
+    })),
+    ...(temDocs
+      ? [{ id: 'documentos' as AbaCia, href: '#/documentos', rotulo: 'Documentos Mensais', contador: contarPendentesDocs(unidade, mesRef, envios.valor ?? []) }]
+      : []),
+  ];
+  const docAberto = /^#\/documentos\/([\w-]+)$/.exec(hash)?.[1];
 
   return (
     <div className="layout-p3">
@@ -73,6 +88,15 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   );
 
   function conteudo(): ReactNode {
+    if (docAberto) {
+      const d = DOCUMENTOS.find((x) => x.id === docAberto);
+      if (!d) return <p className="mensagem erro">Documento não encontrado.</p>;
+      if (envios.carregando) return <p className="carregando">Carregando…</p>;
+      return <FormDocumentoCia key={d.id} documento={d} unidade={unidade} mesRef={mesRef} envio={envios.valor?.find((e) => e.docId === d.id)} />;
+    }
+    if (ativa === 'documentos') {
+      return <ListaDocumentosCia unidade={unidade} mesRef={mesRef} envios={envios.valor ?? []} carregando={envios.carregando} />;
+    }
     if (eapAberto) {
       const r = eaps.valor?.find((x) => x.id === eapAberto);
       if (r) return <ResponderEap key={r.id} r={r} />;
@@ -116,7 +140,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     return (
       <ListaUnidade
         sigla={sigla}
-        aba={ativa ?? 'pendentes'}
+        aba={ativa && ativa !== 'documentos' ? ativa : 'pendentes'}
         lista={lista}
         carregando={encs.carregando}
         erro={encs.erro}

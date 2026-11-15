@@ -103,6 +103,24 @@ rode **sincronizarEfetivo** uma vez depois de colar esta versão.
 Depois de colar esta versão: rode **sincronizarControleOperacoes** uma vez, **diagnostico**, faça a **Nova versão** da
 implantação e, no projeto, `npm run deploy:regras` (libera as coleções novas).
 
+## Operações → Documentos Mensais
+
+- As Cias preenchem pelo portal (menu **Documentos Mensais** de cada Cia) até o Nº dia útil de cada documento.
+  O motor grava cada número na célula da Cia, escreve na legenda "Preenchimento do Mês de … - quem preencheu" e
+  atualiza o mês do cabeçalho.
+- **Segurança:** antes de gravar, o motor confere alguns textos da planilha (cabeçalhos das Cias e dos itens). Se a
+  planilha mudou de formato, ele **não grava** e o erro aparece para a P/3 e para a Cia.
+- **Arquivo do mês:** "Arquivar e zerar" (ou o primeiro envio do mês seguinte, se ninguém arquivou) guarda uma cópia
+  na pasta `PASTA_DOCS_MENSAIS_ARQUIVO`, numa subpasta do mês (ex.: `2026-10 OUT`), e só então zera as células das
+  Cias e a legenda. Os documentos que ainda são preenchidos direto na planilha só têm a cópia (não são zerados).
+- As células de cada Cia ficam no portal (`src/domain/documentosMensais.ts`); a P/3, ao abrir a aba, publica essa
+  configuração para o motor.
+- A conta **8bpmmp3@gmail.com** precisa **editar** as planilhas da pasta DOCUMENTOS MENSAIS e a pasta de arquivo.
+
+Depois de colar esta versão: no portal, abra **Operações → Documentos Mensais** uma vez (publica a configuração);
+rode **diagnostico** (linha *Documentos Mensais* deve mostrar ✅ em cada planilha); faça a **Nova versão** da
+implantação e `npm run deploy:regras`.
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

@@ -1,0 +1,181 @@
+import { useEffect, useState } from 'react';
+import { marcarFeito, observarEnviosDoMes, observarEstados, pedirArquivamento, publicarConfig } from '../../data/documentosMensais';
+import { rotuloMes } from '../../domain/controle';
+import { formatarData, hojeISO } from '../../domain/datas';
+import {
+  ciasDoDocumento,
+  documentosDoMes,
+  mesReferencia,
+  preenchidoPeloPortal,
+  prazoDoDocumento,
+  situacaoEnvio,
+  urlPlanilha,
+  type DocumentoMensal,
+  type EnvioMensal,
+  type EstadoDocumento,
+} from '../../domain/documentosMensais';
+import { UNIDADES } from '../../domain/unidades';
+import { db } from '../../lib/firebase';
+import { cutucarMotor } from '../../lib/motor';
+import { useAoVivo } from '../../lib/useAoVivo';
+import { Campo } from '../Campo';
+
+const SIGLA = Object.fromEntries(UNIDADES.map((u) => [u.id, u.id === 'ft' ? 'FT' : u.sigla.replace(' CIA', '')]));
+const ICONE = { gravado: '✅', enviado: '⏳', erro: '❌', pendente: '·', atrasado: '🔴' } as const;
+
+/** Operações → Documentos Mensais (P/3): prazos por dia útil, quem já enviou e o arquivo do mês. */
+export function DocumentosMensais() {
+  const [mesRef, setMesRef] = useState(mesReferencia());
+  const envios = useAoVivo<EnvioMensal[]>((ok, erro) => observarEnviosDoMes(db, mesRef, ok, erro), [mesRef], 'Não foi possível carregar os envios.');
+  const estados = useAoVivo<Record<string, EstadoDocumento>>((ok, erro) => observarEstados(db, ok, erro), []);
+  const [aviso, setAviso] = useState('');
+
+  // O motor lê daqui as células de cada Cia: publica de novo quando a configuração muda.
+  useEffect(() => {
+    publicarConfig(db).catch(() => setAviso('Não foi possível publicar a configuração para o motor. Abra a aba de novo.'));
+  }, []);
+
+  const docs = documentosDoMes(mesRef);
+  const dias = [...new Set(docs.map((d) => d.diaUtil))].sort((a, b) => a - b);
+
+  async function arquivar(d: DocumentoMensal) {
+    try {
+      await pedirArquivamento(db, d.id, mesRef);
+      cutucarMotor();
+      setAviso(`Pedido enviado: o motor guarda a cópia de ${rotuloMes(mesRef)}${preenchidoPeloPortal(d) ? ' e zera a planilha' : ''}.`);
+    } catch {
+      setAviso('Não foi possível pedir. Verifique a conexão e tente de novo.');
+    }
+  }
+
+  return (
+    <section className="painel">
+      <div className="painel-cabecalho">
+        <h2>Documentos Mensais</h2>
+      </div>
+      <p className="ajuda-pendentes">
+        As Cias preenchem pelo portal e o motor grava na planilha. Depois de enviar ao CPA, use “Arquivar e zerar”: a cópia
+        do mês vai para a pasta de arquivo e a planilha fica pronta para o próximo mês.
+      </p>
+      <div className="cartao grupo">
+        <Campo rotulo="Dados do mês" className="campo-mes-lista">
+          <input type="month" value={mesRef} onChange={(e) => e.target.value && setMesRef(e.target.value)} />
+        </Campo>
+      </div>
+      {aviso && (
+        <p className="mensagem aviso" role="status">
+          {aviso}
+        </p>
+      )}
+      {envios.erro && (
+        <p className="mensagem erro" role="alert">
+          {envios.erro}
+        </p>
+      )}
+
+      {dias.map((dia) => (
+        <section key={dia} className="grupo-mes-controle" aria-label={`${dia}º dia útil`}>
+          <h3 className="titulo-aba-cia">
+            {dia}º dia útil · {formatarData(prazoDoDocumento(docs.find((d) => d.diaUtil === dia)!, mesRef))}
+          </h3>
+          <ul className="lista lista-pendentes">
+            {docs
+              .filter((d) => d.diaUtil === dia)
+              .map((d) => (
+                <li key={d.id}>
+                  <CartaoDocumento
+                    documento={d}
+                    mesRef={mesRef}
+                    envios={(envios.valor ?? []).filter((e) => e.docId === d.id)}
+                    estado={estados.valor?.[d.id]}
+                    aoArquivar={() => arquivar(d)}
+                  />
+                </li>
+              ))}
+          </ul>
+        </section>
+      ))}
+    </section>
+  );
+}
+
+function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios: EnvioMensal[]; estado?: EstadoDocumento; aoArquivar: () => void }) {
+  const d = p.documento;
+  const prazo = prazoDoDocumento(d, p.mesRef);
+  const portal = preenchidoPeloPortal(d);
+  const cias = ciasDoDocumento(d);
+  const situacoes = cias.map((u) => ({ u, s: situacaoEnvio(p.envios.find((e) => e.unidadeId === u), prazo) }));
+  const prontas = situacoes.filter((x) => x.s === 'gravado').length;
+  const arquivo = p.estado?.arquivados?.[p.mesRef];
+  const pedido = p.estado?.pedidoArquivar === p.mesRef;
+  const feito = portal ? cias.length > 0 && prontas === cias.length : !!p.estado?.feitos?.[p.mesRef];
+  const atrasado = !feito && hojeISO() > prazo;
+  const erros = p.envios.filter((e) => e.erro && !e.gravado);
+  const [confirmando, setConfirmando] = useState(false);
+
+  return (
+    <article className={`item-pendente ${feito ? 'borda-doc-gravado' : atrasado ? 'borda-doc-atrasado' : ''}`} aria-label={d.nome}>
+      <span className="item-topo">
+        <strong className="pendente-assunto">{d.nome}</strong>
+        <span className="pendente-detalhe">{portal ? `${prontas}/${cias.length} Cias` : 'Direto na planilha'}</span>
+      </span>
+      {portal ? (
+        <ul className="chips-cias" aria-label={`Envios — ${d.nome}`}>
+          {situacoes.map(({ u, s }) => (
+            <li key={u} className={`chip-cia chip-${s}`} title={s}>
+              {ICONE[s]} {SIGLA[u]}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <label className="campo-check-linha">
+          <input type="checkbox" checked={feito} onChange={(e) => void marcarFeito(db, d.id, p.mesRef, e.target.checked)} /> Feito em{' '}
+          {rotuloMes(p.mesRef)}
+        </label>
+      )}
+      {erros.map((e) => (
+        <p key={e.id} className="mensagem erro" role="alert">
+          {SIGLA[e.unidadeId]}: {e.erro}
+        </p>
+      ))}
+      {p.estado?.erro && <p className="mensagem erro">{p.estado.erro}</p>}
+      <div className="acoes-linha acoes-quebra">
+        <a className="botao secundario" href={urlPlanilha(d)} target="_blank" rel="noreferrer">
+          Abrir planilha
+        </a>
+        {arquivo ? (
+          <a className="botao secundario" href={arquivo} target="_blank" rel="noreferrer">
+            📦 Cópia de {rotuloMes(p.mesRef)}
+          </a>
+        ) : (
+          <button className="botao secundario" type="button" disabled={pedido} onClick={() => setConfirmando(true)}>
+            {pedido ? '⏳ Arquivando…' : portal ? '📦 Arquivar e zerar' : '📦 Arquivar cópia'}
+          </button>
+        )}
+      </div>
+      {confirmando && (
+        <div className="confirmar-linha" role="alertdialog" aria-label={`Confirmar arquivo — ${d.nome}`}>
+          <p>
+            Guardar a cópia de {rotuloMes(p.mesRef)} na pasta de arquivo
+            {portal ? ' e zerar a planilha para o próximo mês' : ''}?
+          </p>
+          <div className="acoes-linha">
+            <button className="botao secundario" type="button" onClick={() => setConfirmando(false)}>
+              Cancelar
+            </button>
+            <button
+              className="botao perigo"
+              type="button"
+              onClick={() => {
+                setConfirmando(false);
+                p.aoArquivar();
+              }}
+            >
+              Sim, arquivar
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
