@@ -40,7 +40,9 @@ var CONFIG_P3 = {
   ABA_INDICADORES: 'BTL',
   FAIXA_CRIMES: 'C36:E44', // 9 linhas: Homicídio ... Roubo a Banco
   FAIXA_PRODUTIVIDADE: 'C50:E57', // 8 linhas: Flagrante de tráfico ... Veículos vistoriados
-  PREFIXO_RELATORIO: '8BPMM-'
+  PREFIXO_RELATORIO: '8BPMM-',
+  // Operações → Documentos Mensais: cópia de cada mês (uma subpasta por mês)
+  PASTA_DOCS_MENSAIS_ARQUIVO: '1mkm8R8dTpYF1jp1C2kStpONI1eN95EpN'
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -95,6 +97,14 @@ function diagnostico() {
   ok('Banco de efetivo', function () { return SpreadsheetApp.openById(CONFIG_P3.PLANILHA_EFETIVO).getName(); });
   ok('Modelo do relatório (Word)', function () { return DriveApp.getFileById(CONFIG_P3.RELATORIO_MODELO).getName(); });
   ok('Pasta dos relatórios', function () { return DriveApp.getFolderById(CONFIG_P3.RELATORIO_PASTA).getName(); });
+  ok('Pasta de arquivo dos Documentos Mensais', function () { return DriveApp.getFolderById(CONFIG_P3.PASTA_DOCS_MENSAIS_ARQUIVO).getName(); });
+  ok('Documentos Mensais (formato das planilhas)', function () {
+    var cfg = obterDoc_('config/documentosMensais');
+    if (!cfg) throw new Error('a P/3 ainda não abriu Operações → Documentos Mensais no portal');
+    return cfg.documentos.filter(function (d) { return d.celulas; }).map(function (d) {
+      try { abaDoDocMensal_(d); return '✅ ' + d.nome; } catch (e) { return '❌ ' + d.nome + ': ' + e.message; }
+    }).join(' | ');
+  });
   ok('Planilha de indicadores', function () {
     var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_INDICADORES);
     if (!ss.getSheetByName(CONFIG_P3.ABA_INDICADORES)) throw new Error('aba ' + CONFIG_P3.ABA_INDICADORES + ' não encontrada');
@@ -223,6 +233,11 @@ function rodarMotor_(esperaMs) {
       processarRelatorios_();
     } catch (e6) {
       console.error('Relatório: ' + e6.message);
+    }
+    try {
+      processarDocsMensais_();
+    } catch (e7) {
+      console.error('Documentos Mensais: ' + e7.message);
     }
   } finally {
     trava.releaseLock();
@@ -1035,4 +1050,100 @@ function gerarRelatorio_(pedido) {
   var zip = Utilities.zip(partes, nome).setContentType('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   var arquivo = DriveApp.getFolderById(CONFIG_P3.RELATORIO_PASTA).createFile(zip);
   return { url: arquivo.getUrl(), nome: nome, qtd: dados.OPERACOES.length };
+}
+
+// ---------- Operações → Documentos Mensais ----------
+
+/**
+ * Envios das Cias -> células da planilha (e a legenda). Antes de gravar o primeiro envio de um mês novo,
+ * guarda a cópia do mês anterior na pasta de arquivo e zera a planilha. Também atende os pedidos da P/3
+ * ("Arquivar e zerar" / "Arquivar cópia").
+ */
+function processarDocsMensais_() {
+  var cfg = obterDoc_('config/documentosMensais');
+  if (!cfg || !cfg.documentos) return;
+  var docs = {};
+  cfg.documentos.forEach(function (d) { docs[d.id] = d; });
+  var estados = {};
+  listarTodos_('estadoDocsMensais', ['mesRef', 'pedidoArquivar', 'arquivados']).forEach(function (e) { estados[e.id] = e.dados; });
+
+  Object.keys(estados).forEach(function (id) {
+    var e = estados[id];
+    if (!e.pedidoArquivar || !docs[id]) return;
+    try {
+      arquivarDocMensal_(docs[id], e.pedidoArquivar, e);
+      gravarCampos_('estadoDocsMensais/' + id, { pedidoArquivar: '', mesRef: proximoMes(e.pedidoArquivar), arquivados: e.arquivados || {}, erro: '' });
+      e.mesRef = proximoMes(e.pedidoArquivar);
+      e.pedidoArquivar = '';
+    } catch (err) {
+      gravarCampos_('estadoDocsMensais/' + id, { pedidoArquivar: '', erro: 'Arquivar: ' + err.message });
+    }
+  });
+
+  consultar_('docsMensais', 'gravado', false, 30).forEach(function (envio) {
+    var en = envio.dados;
+    if (en.erro && en.erroEm && Date.now() - new Date(en.erroEm).getTime() < 30 * 60 * 1000) return; // espera para tentar de novo
+    try {
+      var doc = docs[en.docId];
+      if (!doc || !doc.celulas) throw new Error('documento sem configuração no portal');
+      var e = estados[en.docId] || {};
+      var acao = acaoEnvioMensal(e.mesRef, en.mesRef);
+      if (acao === 'antigo') throw new Error('o mês ' + en.mesRef + ' já foi arquivado e a planilha está em outro mês');
+      if (acao === 'arquivarAntes') arquivarDocMensal_(doc, e.mesRef, e);
+      gravarEnvioMensal_(doc, en);
+      e.mesRef = en.mesRef;
+      estados[en.docId] = e;
+      gravarCampos_('estadoDocsMensais/' + en.docId, { mesRef: en.mesRef, arquivados: e.arquivados || {} });
+      gravarCampos_('docsMensais/' + envio.id, { gravado: true, gravadoEm: new Date().toISOString(), erro: '' });
+    } catch (err) {
+      gravarCampos_('docsMensais/' + envio.id, { erro: err.message, erroEm: new Date().toISOString() });
+    }
+  });
+}
+
+function abaDoDocMensal_(doc) {
+  var ss = SpreadsheetApp.openById(doc.planilhaId);
+  var aba = doc.aba ? ss.getSheetByName(doc.aba) : ss.getSheets()[0];
+  if (!aba) throw new Error('aba "' + doc.aba + '" não encontrada');
+  var lidos = {};
+  Object.keys(doc.ancoras || {}).forEach(function (c) { lidos[c] = aba.getRange(c).getDisplayValue(); });
+  var erro = conferirAncoras(doc.ancoras, lidos);
+  if (erro) throw new Error(erro);
+  return aba;
+}
+
+function gravarEnvioMensal_(doc, en) {
+  var aba = abaDoDocMensal_(doc);
+  var celulas = doc.celulas[en.unidadeId];
+  if (!celulas) throw new Error('a ' + en.unidadeId + ' não preenche este documento');
+  Object.keys(celulas).forEach(function (campo) {
+    var v = (en.valores || {})[campo];
+    aba.getRange(celulas[campo]).setValue(v === undefined || v === null ? '' : v);
+  });
+  if (doc.legenda && doc.legenda.celulas && doc.legenda.celulas[en.unidadeId]) {
+    aba.getRange(doc.legenda.celulas[en.unidadeId]).setValue(textoDoMes(doc.legenda.modelo, en.mesRef, en.respondidoPor));
+  }
+  if (doc.mes && doc.mes.celula) aba.getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, en.mesRef));
+}
+
+/** Pasta do mês dentro da pasta de arquivo (ex.: "2026-10 OUT"). */
+function pastaArquivoDoMes_(mesRef) {
+  var raiz = DriveApp.getFolderById(CONFIG_P3.PASTA_DOCS_MENSAIS_ARQUIVO);
+  var nome = mesRef + ' ' + MESES_SIGLA[Number(mesRef.slice(5)) - 1];
+  var it = raiz.getFoldersByName(nome);
+  return it.hasNext() ? it.next() : raiz.createFolder(nome);
+}
+
+/** Guarda a cópia do mês e, se o documento é preenchido pelo portal, zera as células das Cias e a legenda. */
+function arquivarDocMensal_(doc, mesRef, estado) {
+  var copia = DriveApp.getFileById(doc.planilhaId).makeCopy(nomeArquivoMensal(doc.nome, mesRef), pastaArquivoDoMes_(mesRef));
+  estado.arquivados = estado.arquivados || {};
+  estado.arquivados[mesRef] = copia.getUrl();
+  if (!doc.celulas) return;
+  var aba = abaDoDocMensal_(doc);
+  var valor = doc.zerarCom === 0 ? 0 : '';
+  aba.getRangeList(celulasParaZerar(doc)).setValue(valor);
+  var legenda = doc.legenda && doc.legenda.celulas ? Object.keys(doc.legenda.celulas).map(function (u) { return doc.legenda.celulas[u]; }) : [];
+  if (legenda.length) aba.getRangeList(legenda).clearContent();
+  if (doc.mes && doc.mes.celula) aba.getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, proximoMes(mesRef)));
 }

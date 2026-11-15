@@ -1779,3 +1779,74 @@ fieldset:has(> .erro-campo) > legend {
 .lista-relatorios a {
   font-weight: 600;
 }
+
+/* Operações → Documentos Mensais */
+.chips-cias {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-cia {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #f1f3f7;
+  color: var(--cor-secundaria);
+}
+
+.chip-gravado { background: #e3f4e8; color: #1e6b37; }
+.chip-enviado { background: #e7f1fb; color: #1d4f86; }
+.chip-erro,
+.chip-atrasado { background: #fbeaea; color: #b52b27; }
+
+.selo-doc-gravado { background: #e3f4e8; color: #1e6b37; }
+.selo-doc-enviado { background: #e7f1fb; color: #1d4f86; }
+.selo-doc-pendente { background: #f1f3f7; color: var(--cor-secundaria); }
+.selo-doc-erro,
+.selo-doc-atrasado { background: #fbeaea; color: #b52b27; }
+
+.item-pendente.borda-doc-gravado { border-left-color: #2e8b57; }
+.item-pendente.borda-doc-atrasado,
+.item-pendente.borda-doc-erro { border-left-color: #b52b27; }
+.item-pendente.borda-doc-enviado { border-left-color: #1d4f86; }
+
+.legenda-grupo {
+  font-weight: 700;
+  color: var(--cor-secundaria);
+  padding: 0 4px;
+}
+
+.campo-largo {
+  grid-column: 1 / -1;
+}
+
+.campo-check-linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.campo-check-linha input {
+  width: 20px;
+  height: 20px;
+}
+
+.acoes-quebra {
+  flex-wrap: wrap;
+}
+
+.confirmar-linha {
+  border-top: 1px solid #e3e7ee;
+  padding-top: 8px;
+}
+
+.confirmar-linha p {
+  margin: 0 0 8px;
+}

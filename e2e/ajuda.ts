@@ -31,7 +31,7 @@ export async function irPara(page: Page, secao: string | RegExp) {
 }
 
 /** Vai para uma aba da Cia/Força Tática pelo menu (no celular abre o ☰ antes). */
-export async function irParaAbaCia(page: Page, aba: 'Pendentes' | 'Respondidas' | 'Finalizadas') {
+export async function irParaAbaCia(page: Page, aba: 'Pendentes' | 'Respondidas' | 'Finalizadas' | 'Documentos Mensais') {
   await page.locator('#menu-unidade').waitFor({ state: 'attached' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });
   if (await botao.isVisible()) await botao.click();
