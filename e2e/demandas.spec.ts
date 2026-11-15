@@ -150,6 +150,20 @@ test('painel de prazos conta a demanda atrasada e leva para a lista filtrada', a
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await expect(page.getByRole('table')).toContainText('CIA FT');
 
+  // Descendo: o painel estatístico (o Dashboard do numerador antigo), depois dos prazos.
+  const estatistico = page.getByRole('region', { name: 'Painel estatístico' });
+  await expect(estatistico.getByRole('heading', { name: 'Painel estatístico' })).toBeVisible();
+  const prazos = await page.getByRole('heading', { name: 'Painel de prazos' }).boundingBox();
+  const estat = await estatistico.boundingBox();
+  expect(estat!.y).toBeGreaterThan(prazos!.y);
+  for (const g of ['Por status', 'Por mês de entrada', 'Por responsável', 'Por categoria', 'Por dia da semana (entrada)', 'Por tipo de saída']) {
+    await expect(estatistico.getByRole('figure', { name: g })).toBeVisible();
+  }
+  await expect(estatistico.getByRole('figure', { name: 'Por status' })).toContainText('Atrasado');
+  const total = Number(await estatistico.locator('.numero-painel', { hasText: 'Total de demandas' }).locator('strong').innerText());
+  expect(total).toBeGreaterThan(0);
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
   await page.getByRole('link', { name: /Atrasadas/ }).click();
   await expect(page.getByRole('button', { name: /^Atrasado/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('link', { name: new RegExp(assunto) })).toContainText('Atrasado');

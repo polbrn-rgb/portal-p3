@@ -6,6 +6,7 @@ import { montarPainel, type Prazo } from '../../domain/painel';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { useDemandasAbertas } from '../../lib/useDemandasAbertas';
+import { PainelEstatistico } from './PainelEstatistico';
 
 function Numero({ rotulo, valor, classe, href }: { rotulo: string; valor: number; classe: string; href?: string }) {
   const conteudo = (
@@ -49,6 +50,7 @@ export function PainelPrazos() {
   if (abertas.carregando || !painel) return <p className="carregando">Carregando…</p>;
 
   return (
+    <>
     <section className="painel">
       <div className="painel-cabecalho">
         <h2>Painel de prazos</h2>
@@ -109,5 +111,7 @@ export function PainelPrazos() {
         </div>
       </div>
     </section>
+    <PainelEstatistico encs={encs.valor ?? []} />
+    </>
   );
 }
