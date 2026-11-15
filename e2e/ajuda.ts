@@ -20,9 +20,12 @@ export async function sair(page: Page) {
 
 /** Vai para uma seção da P/3 pelo menu (no celular abre o ☰ antes). */
 export async function irPara(page: Page, secao: string | RegExp) {
-  const menu = page.getByRole('navigation', { name: 'Seções da P/3' });
-  await menu.waitFor({ state: 'attached' }); // espera a tela da P/3 aparecer depois do login
+  // Espera a tela da P/3 aparecer depois do login (fechada no celular, a gaveta fica fora da árvore de acessibilidade).
+  await page.locator('#menu-p3').waitFor({ state: 'attached' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });
   if (await botao.isVisible()) await botao.click();
-  await menu.getByRole('link', typeof secao === 'string' ? { name: secao, exact: true } : { name: secao }).click();
+  await page
+    .getByRole('navigation', { name: 'Seções da P/3' })
+    .getByRole('link', typeof secao === 'string' ? { name: secao, exact: true } : { name: secao })
+    .click();
 }
