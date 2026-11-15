@@ -409,3 +409,158 @@ function ajustesDeLinhasEap(blocos, vagas, preenchidas) {
     })
     .filter(function (a) { return a.de !== a.para; });
 }
+
+// ---------- Controle de Operações e Relatório de Indicadores ----------
+// Mesmo texto e mesmo modelo do script "Relatório P/3" do numerador antigo.
+
+var MESES_EXT_REL = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+/** Id do registro: data de início + nome sem acento (o mesmo no portal e no motor, para não duplicar). */
+function idControleOperacao(nome, inicio) {
+  var slug = String(nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+  return (inicio || 'sem-data') + '_' + (slug || 'operacao');
+}
+
+/** Célula de data (Date da planilha ou "dd/mm/aaaa") -> "aaaa-mm-dd" ('' se não for data). */
+function isoDaCelula(v) {
+  var dois = function (n) { return ('0' + n).slice(-2); };
+  if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v)) {
+    return v.getFullYear() + '-' + dois(v.getMonth() + 1) + '-' + dois(v.getDate());
+  }
+  var m = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(v || ''));
+  if (!m) return '';
+  var ano = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+  return ano + '-' + dois(m[2]) + '-' + dois(m[1]);
+}
+
+function semAcento_(s) {
+  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+/**
+ * Linhas da aba Operações da planilha antiga -> registros do Controle de Operações.
+ * Colunas: A Seq, B Operação, C OPM, D Ordem, E Origem, F Início, G Término, H (observação), I Objetivo
+ * (o Objetivo é achado pelo cabeçalho, como no script do relatório).
+ */
+function linhasControleDaPlanilha(cabecalho, linhas) {
+  var colObjetivo = (cabecalho || []).map(semAcento_).indexOf('objetivo');
+  if (colObjetivo < 0) colObjetivo = 8;
+  var texto = function (v) { return String(v === null || v === undefined ? '' : v).trim(); };
+  var saida = [];
+  (linhas || []).forEach(function (l) {
+    var nome = texto(l[1]);
+    var inicio = isoDaCelula(l[5]);
+    if (!nome || !inicio) return;
+    saida.push({
+      id: idControleOperacao(nome, inicio),
+      nome: nome,
+      opm: texto(l[2]),
+      ordem: texto(l[3]),
+      origem: texto(l[4]),
+      inicio: inicio,
+      termino: isoDaCelula(l[6]),
+      observacao: colObjetivo === 7 ? '' : texto(l[7]),
+      objetivo: texto(l[colObjetivo])
+    });
+  });
+  return saida;
+}
+
+/** "2026-09-01" -> "01SET26" */
+function dataMilitar(iso) {
+  var p = String(iso).split('-');
+  return p[2] + MESES_SIGLA[Number(p[1]) - 1] + p[0].slice(-2);
+}
+
+/** "2026-10-10" -> "10 de outubro de 2026" */
+function dataExtenso(iso) {
+  var p = String(iso).split('-');
+  return p[2] + ' de ' + MESES_EXT_REL[Number(p[1]) - 1] + ' de ' + p[0];
+}
+
+/** Item da lista de operações do relatório (igual ao relTextoOperacao do script antigo). */
+function textoOperacaoRelatorio(nome, inicio, termino, objetivo) {
+  var per;
+  if (!termino) per = 'a partir de ' + dataMilitar(inicio);
+  else if (inicio === termino) per = 'em ' + dataMilitar(inicio);
+  else if (inicio.slice(0, 7) === termino.slice(0, 7)) per = 'de ' + inicio.slice(8, 10) + ' a ' + dataMilitar(termino);
+  else per = 'de ' + dataMilitar(inicio) + ' a ' + dataMilitar(termino);
+  var obj = String(objetivo || '').trim();
+  return String(nome).trim() + ' – ' + per + (obj ? ', ' + obj.replace(/[;.]\s*$/, '') : '') + ';';
+}
+
+function ultimoDiaDoMes_(ano, mes) {
+  return ano + '-' + ('0' + mes).slice(-2) + '-' + ('0' + new Date(ano, mes, 0).getDate()).slice(-2);
+}
+
+/** Operações (não excluídas) que cruzam o mês, em ordem de início, já no texto do relatório. */
+function operacoesDoMes(lista, ano, mes) {
+  var ini = ano + '-' + ('0' + mes).slice(-2) + '-01';
+  var fim = ultimoDiaDoMes_(ano, mes);
+  return (lista || [])
+    .filter(function (o) { return !o.excluida && o.nome && o.inicio && o.inicio <= fim && !(o.termino && o.termino < ini); })
+    .sort(function (a, b) { return a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0; })
+    .map(function (o) { return textoOperacaoRelatorio(o.nome, o.inicio, o.termino, o.objetivo); });
+}
+
+/** Campos {{...}} do modelo em Word. tabelas = { CRI_1_ANT: '...', ... } (lidas da planilha de indicadores). */
+function dadosRelatorio(pedido, operacoes, tabelas, hojeIso, prefixo) {
+  var p = String(pedido.mes).split('-');
+  var ano = Number(p[0]);
+  var mes = Number(p[1]);
+  var dados = {
+    DATA_EXTENSO: dataExtenso(hojeIso),
+    NUMERO: (prefixo || '') + String(pedido.numero || '').trim(),
+    INICIO: dataMilitar(p[0] + '-' + p[1] + '-01'),
+    FIM: dataMilitar(ultimoDiaDoMes_(ano, mes)),
+    ANO_ANT: String(ano - 1),
+    ANO: String(ano),
+    OPERACOES: operacoesDoMes(operacoes, ano, mes)
+  };
+  Object.keys(tabelas || {}).forEach(function (k) { dados[k] = tabelas[k]; });
+  return dados;
+}
+
+/** Valores das faixas da planilha de indicadores -> CRI_1_ANT, CRI_1_ATU, CRI_1_EVO, PRO_1_ANT... */
+function tabelasIndicadores(crimes, produtividade) {
+  var out = {};
+  [['CRI', crimes], ['PRO', produtividade]].forEach(function (par) {
+    (par[1] || []).forEach(function (linha, i) {
+      out[par[0] + '_' + (i + 1) + '_ANT'] = linha[0];
+      out[par[0] + '_' + (i + 1) + '_ATU'] = linha[1];
+      out[par[0] + '_' + (i + 1) + '_EVO'] = linha[2];
+    });
+  });
+  return out;
+}
+
+function nomeArquivoRelatorio(numero, mesIso) {
+  var p = String(mesIso).split('-');
+  return 'Relatório ' + String(numero || '').trim().replace(/\//g, '_') + ' - Avaliação Periódica de Indicadores (' +
+    MESES_SIGLA[Number(p[1]) - 1] + p[0] + ').docx';
+}
+
+/** Preenche o document.xml do modelo (mesma regra do relPreencherXml do script antigo). */
+function preencherXmlRelatorio(xml, dados) {
+  var textoDe = function (p) {
+    return (p.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(function (t) { return t.replace(/<[^>]+>/g, ''); }).join('');
+  };
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  return xml.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, function (p) {
+    var txt = textoDe(p);
+    if (txt.indexOf('{{') < 0) return p;
+    // junta os pedaços (runs) do parágrafo mantendo a formatação do primeiro
+    var abre = p.match(/^<w:p[^>]*>/)[0];
+    var ppr = (p.match(/<w:pPr>[\s\S]*?<\/w:pPr>/) || [''])[0];
+    var run = (p.match(/<w:r[ >][\s\S]*?<\/w:r>/) || [''])[0];
+    var rpr = (run.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
+    var monta = function (t) { return abre + ppr + '<w:r>' + rpr + '<w:t xml:space="preserve">' + t + '</w:t></w:r></w:p>'; };
+    if (txt.indexOf('{{OPERACAO}}') >= 0) {
+      var lista = dados.OPERACOES && dados.OPERACOES.length ? dados.OPERACOES : ['Não houve operações no período.'];
+      return lista.map(function (o) { return monta(txt.replace('{{OPERACAO}}', esc(o))); }).join('');
+    }
+    txt = txt.replace(/\{\{([A-Z0-9_]+)\}\}/g, function (m, k) { return k in dados ? esc(dados[k]) : m; });
+    return monta(txt);
+  });
+}

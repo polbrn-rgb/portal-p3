@@ -1724,3 +1724,69 @@ fieldset:has(> .erro-campo) > legend {
     z-index: auto;
   }
 }
+
+/* Operações → Controle de Operações */
+.barra-filtro-controle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.campo-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 600;
+  color: var(--cor-secundaria);
+}
+
+.campo-check input {
+  width: 20px;
+  height: 20px;
+}
+
+.objetivo-controle {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.sem-objetivo,
+.texto-alerta {
+  color: #b52b27;
+}
+
+.item-pendente.borda-sem-objetivo {
+  border-left-color: #d9822b;
+}
+
+.form-controle h3,
+.cartao > h3 {
+  margin: 0 0 8px;
+}
+
+.lista-relatorios {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lista-relatorios li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px 0;
+  border-top: 1px solid #e3e7ee;
+  overflow-wrap: anywhere;
+}
+
+.lista-relatorios a {
+  font-weight: 600;
+}
