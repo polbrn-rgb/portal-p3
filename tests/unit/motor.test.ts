@@ -238,10 +238,71 @@ describe('Checklist Operações (Apps Script)', () => {
       [3, '1º Sgt PM', 234567, 'BELTRANO', 'BELTRANO', ''],
     ];
     expect(motor.linhasDoEfetivo(aba)).toEqual([
-      { chave: '123456', re: '123456-7', posto: 'Cb PM', nomeGuerra: 'FULANO', telefone: '(11) 90000-0000' },
-      { chave: '234567', re: '234567', posto: '1º Sgt PM', nomeGuerra: 'BELTRANO', telefone: '' },
+      { chave: '123456', re: '123456-7', posto: 'Cb PM', nomeGuerra: 'FULANO', telefone: '(11) 90000-0000', nomeCompleto: 'FULANO DE TAL', email: '' },
+      { chave: '234567', re: '234567', posto: '1º Sgt PM', nomeGuerra: 'BELTRANO', telefone: '', nomeCompleto: 'BELTRANO', email: '' },
     ]);
     expect(motor.linhasDoEfetivo([['sem', 'cabeçalho']])).toEqual([]);
+  });
+});
+
+describe('EAP: textos e turmas da planilha', () => {
+  const m = motor as unknown as Record<string, (...a: unknown[]) => unknown>;
+  test('cabeçalho igual ao da planilha (linhas 4, 5, 6, títulos e apresentação)', () => {
+    expect(m.textoAnoEap(2026)).toBe('ESTÁGIO DE ATUALIZAÇÃO PROFISSIONAL - 2026');
+    expect(m.textoMesesEap(11, 12)).toBe('EAD EM NOVEMBRO - PRESENCIAL EM DEZEMBRO');
+    expect(m.textoPeriodoEad('2026-11-09', '2026-11-25')).toBe('PERÍODO EAD 09 A 25NOV');
+    expect(m.textoPeriodoEad('2026-10-28', '2026-11-15')).toBe('PERÍODO EAD 28OUT A 15NOV');
+    expect(m.tituloTurmaEap({ tipo: 'cbsd', numero: '34', inicio: '2026-12-01', fim: '2026-12-03' })).toBe('CB/SD - TURMA 34 de 01 á 03DEZ');
+    expect(m.tituloTurmaEap({ tipo: 'sgt', numero: '9', inicio: '2026-11-30', fim: '2026-12-02' })).toBe('SUBTEN SGT PM TURMA 9 de 30NOV á 02DEZ');
+    expect(m.textoApresentacaoEap('2026-12-01')).toBe('APRESENTAÇÃO 010745DEZ26 CPA/M-11');
+  });
+
+  // Aba "1 Cia" como está hoje: título, apresentação, "Nº" e as linhas brancas de cada turma.
+  const colA: unknown[] = ['SECRETARIA', 'POLÍCIA', 'CPA', 'ESTÁGIO', 'EAD EM', 'PERÍODO', '', '1ª Cia'];
+  const fundos: string[] = colA.map(() => '#cccccc');
+  const bloco = (titulo: string, linhas: number) => {
+    colA.push(titulo, 'APRESENTAÇÃO', 'Nº');
+    fundos.push('#cccccc', '#cccccc', '#cccccc');
+    for (let i = 1; i <= linhas; i++) {
+      colA.push(i);
+      fundos.push('#FFFFFF');
+    }
+  };
+  bloco('CB/SD - TURMA 34 de 01 á 03DEZ', 3);
+  bloco('CB/SD - TURMA 35 de 07 á 09DEZ', 2);
+  bloco('CB/SD - TURMA 36 de 14 á 16DEZ', 3);
+  bloco('SUBTEN SGT PM TURMA 9 de 09 á 11DEZ', 2);
+  bloco('SUBTEN SGT PM TURMA 10 de 16 á 18DEZ', 2);
+  bloco('SOMENTE TAF OU TAT', 4);
+  colA.push('RESTRIÇÃO - TURMA X', 'SOMENTE FASE EAD', 'Nº', 1, 2, 3, '');
+  fundos.push('#cccccc', '#cccccc', '#cccccc', '#ffffff', '#ffffff', '#ffffff', '#cccccc');
+
+  test('acha as turmas onde elas estiverem (linhas 9, 15, 20, 26 e 31)', () => {
+    const blocos = m.localizarBlocosEap(colA, fundos) as { id: string; titulo: number; primeira: number; linhas: number }[];
+    expect(blocos.map((b) => [b.id, b.titulo, b.primeira, b.linhas])).toEqual([
+      ['cbsd1', 9, 12, 3],
+      ['cbsd2', 15, 18, 2],
+      ['cbsd3', 20, 23, 3],
+      ['sgt1', 26, 29, 2],
+      ['sgt2', 31, 34, 2],
+      ['taf', 36, 39, 4],
+      ['restricao', 43, 46, 3],
+    ]);
+  });
+
+  test('linhas de cada turma = vagas da Cia (mínimo 1 e nunca menos do que já foi preenchido)', () => {
+    const blocos = m.localizarBlocosEap(colA, fundos);
+    expect(m.ajustesDeLinhasEap(blocos, { cbsd1: 3, cbsd2: 4, cbsd3: 0, sgt1: 2, sgt2: 1 }, { sgt2: 2, taf: 6 })).toEqual([
+      { id: 'cbsd2', de: 2, para: 4 },
+      { id: 'cbsd3', de: 3, para: 1 },
+      { id: 'taf', de: 4, para: 6 },
+    ]);
+  });
+
+  test('linha do policial (A a K), validade da IAS em dd/mm/aaaa', () => {
+    const p = { grad: 'CB PM', re: '111660-6', nomeCompleto: 'FULANO DE TAL', email: 'f@pm', celular: '(11) 9', ias: 'IAS1', validadeIas: '2027-04-15', observacao: '' };
+    expect(m.linhaPolicialEap(p, 1, '1cia')).toEqual([1, 'CB PM', '111660-6', 'FULANO DE TAL', '1ª CIA PM', '8º BPM/M', 'f@pm', '(11) 9', 'IAS1', '15/04/2027', '']);
+    expect((m.linhaPolicialEap({ ...p, validadeIas: '' }, 2, 'ft') as unknown[]).slice(4, 6)).toEqual(['FT', '8º BPM/M']);
   });
 });
 

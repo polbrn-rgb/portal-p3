@@ -75,6 +75,11 @@ histórico das demandas.
   quantidades) e **⬇️ Baixar efetivo (Excel)** com o que as Cias mandaram (abas Efetivo e Resumo).
 - **Tela das Cias se limpa sozinha**: a demanda respondida/finalizada sai da tela da Cia um dia depois do prazo (sem
   prazo: no dia seguinte ao aceite). O que a Cia ainda não respondeu fica, mesmo atrasado. Nada some do Numerador.
+- **Aperfeiçoamento → EAP**: a P/3 abre o EAP (mês do EAD e do presencial, período EAD, 3 turmas de Cb/Sd e 2 de
+  Subten/Sgt, prazo e vagas por Cia). O motor faz uma cópia zerada da planilha modelo na pasta do EAP, escreve o
+  cabeçalho (linhas 4 a 6, títulos e apresentações) e deixa cada turma com as linhas das vagas da Cia. Cada Cia indica o
+  efetivo pelo portal (RE puxa graduação, nome completo, e-mail e celular do banco) ou marca "Sem efetivo pendente de
+  EAP"; o motor grava na aba da Cia com "Validado por" em H3. A P/3 acompanha, gera o compilado e encerra.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **Sala Op.**: o botão **Recado para a Sala**, que funciona igual: aparece no alto da página da Sala de Operações.

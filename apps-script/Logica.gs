@@ -229,6 +229,8 @@ function linhasDoEfetivo(valores) {
       linha.forEach(function (v, j) {
         if (col.posto === undefined && /POST|GRAD/.test(v)) col.posto = j;
         if (col.tel === undefined && /TELEFONE|CELULAR/.test(v)) col.tel = j;
+        if (col.nome === undefined && (/NOME COMPLETO/.test(v) || v === 'NOME')) col.nome = j;
+        if (col.email === undefined && /E-?MAIL/.test(v)) col.email = j;
       });
     }
   }
@@ -243,7 +245,9 @@ function linhasDoEfetivo(valores) {
       re: String(l[col.re]).trim(),
       posto: col.posto === undefined ? '' : String(l[col.posto]).trim(),
       nomeGuerra: String(l[col.guerra]).trim(),
-      telefone: col.tel === undefined ? '' : String(l[col.tel]).trim()
+      telefone: col.tel === undefined ? '' : String(l[col.tel]).trim(),
+      nomeCompleto: col.nome === undefined ? '' : String(l[col.nome]).trim(),
+      email: col.email === undefined ? '' : String(l[col.email]).trim()
     });
   }
   return lista;
@@ -291,4 +295,117 @@ function ordenarMissoes(lista) {
     if (a.titulo !== b.titulo) return a.titulo < b.titulo ? -1 : 1;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
+}
+
+// ---------- Aperfeiçoamento: EAP (planilha das turmas) ----------
+
+var MESES_EXTENSO = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+var MESES_SIGLA = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+/** Abas das Cias na planilha do EAP (o EM é preenchido pela P/1, fora do portal). */
+var ABAS_EAP = { '1cia': '1 Cia', '2cia': '2 Cia', '3cia': '3 Cia', '4cia': '4 Cia', '5cia': '5 Cia', '6cia': '6 Cia', ft: 'FT' };
+var UNIDADE_EAP = { '1cia': '1ª CIA PM', '2cia': '2ª CIA PM', '3cia': '3ª CIA PM', '4cia': '4ª CIA PM', '5cia': '5ª CIA PM', '6cia': '6ª CIA PM', ft: 'FT' };
+var OPM_EAP = '8º BPM/M';
+var SEM_EFETIVO_EAP = 'SEM EFETIVO PENDENTE DE EAP';
+
+function partesData_(iso) {
+  var p = String(iso || '').split('-');
+  return { ano: p[0] || '', mes: Number(p[1]) || 0, dia: p[2] || '' };
+}
+
+/** Linha 4: "ESTÁGIO DE ATUALIZAÇÃO PROFISSIONAL - 2026" */
+function textoAnoEap(ano) {
+  return 'ESTÁGIO DE ATUALIZAÇÃO PROFISSIONAL - ' + ano;
+}
+
+/** Linha 5: "EAD EM NOVEMBRO - PRESENCIAL EM DEZEMBRO" */
+function textoMesesEap(mesEad, mesPresencial) {
+  return 'EAD EM ' + MESES_EXTENSO[mesEad - 1] + ' - PRESENCIAL EM ' + MESES_EXTENSO[mesPresencial - 1];
+}
+
+/** "09 A 25NOV" (mesmo mês) ou "28OUT A 15NOV"; sep = " A " ou " á ". */
+function intervaloEap_(inicio, fim, sep) {
+  var a = partesData_(inicio);
+  var b = partesData_(fim);
+  var primeiro = a.mes === b.mes ? a.dia : a.dia + MESES_SIGLA[a.mes - 1];
+  return primeiro + sep + b.dia + MESES_SIGLA[b.mes - 1];
+}
+
+/** Linha 6: "PERÍODO EAD 09 A 25NOV" */
+function textoPeriodoEad(inicio, fim) {
+  return 'PERÍODO EAD ' + intervaloEap_(inicio, fim, ' A ');
+}
+
+/** Título da turma: "CB/SD - TURMA 34 de 01 á 03DEZ" ou "SUBTEN SGT PM TURMA 9 de 09 á 11DEZ". */
+function tituloTurmaEap(t) {
+  var periodo = intervaloEap_(t.inicio, t.fim, ' á ');
+  return (t.tipo === 'cbsd' ? 'CB/SD - TURMA ' : 'SUBTEN SGT PM TURMA ') + t.numero + ' de ' + periodo;
+}
+
+/** "APRESENTAÇÃO 010745DEZ26 CPA/M-11" (sempre 07h45 no CPA/M-11; muda a data). */
+function textoApresentacaoEap(inicio) {
+  var d = partesData_(inicio);
+  return 'APRESENTAÇÃO ' + d.dia + '0745' + MESES_SIGLA[d.mes - 1] + String(d.ano).slice(-2) + ' CPA/M-11';
+}
+
+function tipoDoBlocoEap_(titulo) {
+  var t = String(titulo || '').toUpperCase().trim();
+  if (/^CB\s*\/\s*SD/.test(t)) return 'cbsd';
+  if (/^SUBTEN|^SGT/.test(t)) return 'sgt';
+  if (/TAF|TAT/.test(t)) return 'taf';
+  if (/RESTRI/.test(t)) return 'restricao';
+  return '';
+}
+
+/**
+ * Acha as turmas na aba da Cia: cada bloco é título, apresentação, cabeçalho "Nº" e as linhas brancas (coluna B).
+ * colA = valores da coluna A; fundosB = cores da coluna B (mesmo tamanho). Linhas devolvidas contam a partir de 1.
+ * Ids: cbsd1..3, sgt1..2 na ordem em que aparecem; "taf" e "restricao".
+ */
+function localizarBlocosEap(colA, fundosB) {
+  var blocos = [];
+  var cont = { cbsd: 0, sgt: 0 };
+  for (var i = 2; i < colA.length; i++) {
+    if (String(colA[i]).trim().toUpperCase() !== 'Nº') continue;
+    var tipo = tipoDoBlocoEap_(colA[i - 2]);
+    if (!tipo) continue;
+    var id = tipo === 'cbsd' || tipo === 'sgt' ? tipo + ++cont[tipo] : tipo;
+    var primeira = i + 1;
+    var qtd = 0;
+    while (primeira + qtd < colA.length && String(fundosB[primeira + qtd] || '').toLowerCase() === '#ffffff') qtd++;
+    blocos.push({ id: id, tipo: tipo, titulo: i - 1, apresentacao: i, cabecalho: i + 1, primeira: primeira + 1, linhas: qtd });
+  }
+  return blocos;
+}
+
+/** Linha do policial na planilha (colunas A a K). */
+function linhaPolicialEap(p, ordem, unidadeId) {
+  var v = partesData_(p.validadeIas);
+  return [
+    ordem,
+    p.grad || '',
+    p.re || '',
+    p.nomeCompleto || '',
+    UNIDADE_EAP[unidadeId] || '',
+    OPM_EAP,
+    p.email || '',
+    p.celular || '',
+    p.ias || '',
+    v.dia ? v.dia + '/' + ('0' + v.mes).slice(-2) + '/' + v.ano : '',
+    p.observacao || ''
+  ];
+}
+
+/**
+ * Linhas que cada bloco deve ter nesta aba: turma = vagas da Cia (mínimo 1, para caber "SEM EFETIVO");
+ * nunca menos do que já foi preenchido. Devolve [{id, de, para}] só dos que mudam.
+ */
+function ajustesDeLinhasEap(blocos, vagas, preenchidas) {
+  return blocos
+    .map(function (b) {
+      var minimo = Math.max(1, (preenchidas && preenchidas[b.id]) || 0);
+      var alvo = b.tipo === 'cbsd' || b.tipo === 'sgt' ? Math.max(minimo, Number((vagas || {})[b.id]) || 0) : Math.max(minimo, b.linhas);
+      return { id: b.id, de: b.linhas, para: alvo };
+    })
+    .filter(function (a) { return a.de !== a.para; });
 }

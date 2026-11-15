@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { observarEapDaUnidade } from '../../data/eap';
 import { observarSolicitacoesDaUnidade } from '../../data/efetivo';
 import { marcarEmAndamento, marcarVisualizado, observarDaUnidade, responder } from '../../data/encaminhamentos';
 import { formatarData, hojeISO } from '../../domain/datas';
+import type { RespostaEap } from '../../domain/eap';
 import type { SolicitacaoEfetivo } from '../../domain/efetivo';
 import {
   abaDoEncaminhamento,
@@ -16,6 +18,7 @@ import { db } from '../../lib/firebase';
 import { irPara, useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
+import { EapsDaCia, ResponderEap } from './EapCia';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
@@ -40,8 +43,24 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   // Respondidas/finalizadas com o prazo vencido há um dia saem da tela (continuam no Numerador da P/3).
   const hoje = hojeISO();
   const lista = (encs.valor ?? []).filter((e) => !saiDaTelaDaCia(e, hoje));
+  const eaps = useAoVivo<RespostaEap[]>((ok, erro) => observarEapDaUnidade(db, unidade, ok, erro), [unidade]);
   const aberto = /^#\/enc\/(.+)$/.exec(hash)?.[1];
   const efetivo = /^#\/efetivo\/(.+)$/.exec(hash)?.[1];
+  const eapAberto = /^#\/eap\/(.+)$/.exec(hash)?.[1];
+
+  if (eapAberto) {
+    const r = eaps.valor?.find((x) => x.id === eapAberto);
+    if (r) return <ResponderEap key={r.id} r={r} />;
+    if (eaps.carregando) return <p className="carregando">Carregando…</p>;
+    return (
+      <section className="painel">
+        <p className="mensagem erro" role="alert">
+          EAP não encontrado.
+        </p>
+        <a href="#/">Voltar</a>
+      </section>
+    );
+  }
 
   if (efetivo) {
     const s = solicitacoes.valor?.find((x) => x.id === efetivo);
@@ -77,6 +96,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       carregando={encs.carregando}
       erro={encs.erro}
       solicitacoes={solicitacoes.valor ?? []}
+      eaps={eaps.valor ?? []}
     />
   );
 }
@@ -87,6 +107,7 @@ function ListaUnidade(p: {
   carregando: boolean;
   erro: string;
   solicitacoes: SolicitacaoEfetivo[];
+  eaps: RespostaEap[];
 }) {
   const hoje = hojeISO();
   const [aba, setAba] = useState<AbaUnidade>('pendentes');
@@ -98,6 +119,7 @@ function ListaUnidade(p: {
       <div className="painel-cabecalho">
         <h2>{p.sigla}</h2>
       </div>
+      <EapsDaCia lista={p.eaps} />
       <SolicitacoesEfetivo lista={p.solicitacoes} />
       <div className="abas" role="tablist">
         {ABAS.map((a) => (
