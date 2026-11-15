@@ -3,13 +3,20 @@ import type { Demanda } from './demanda';
 import type { PedidoEfetivo } from './efetivo';
 import type { PlanilhaResultado } from './resultado';
 
-// Checklist Operações: toda demanda "ORDEM DE SERVIÇO" + "Operações Policiais" vira uma operação a acompanhar.
+// Checklist Operações: toda demanda "ORDEM DE SERVIÇO" ou "ORDEM DE OPERAÇÕES" + "Operações Policiais"
+// vira uma operação a acompanhar.
 
-export const TIPO_SAIDA_OPERACAO = 'ORDEM DE SERVIÇO';
+export const TIPOS_SAIDA_OPERACAO = ['ORDEM DE SERVIÇO', 'ORDEM DE OPERAÇÕES'] as const;
 export const CATEGORIA_OPERACAO = 'Operações Policiais';
 
 export function ehOperacao(d: { tipoSaida: string; categoria: string }): boolean {
-  return d.tipoSaida === TIPO_SAIDA_OPERACAO && d.categoria === CATEGORIA_OPERACAO;
+  return (TIPOS_SAIDA_OPERACAO as readonly string[]).includes(d.tipoSaida) && d.categoria === CATEGORIA_OPERACAO;
+}
+
+/** O primeiro item do checklist leva o nome do documento: "Ordem de Serviço ok" ou "Ordem de Operações ok". */
+export function rotuloDoItem(item: { id: string; rotulo: string }, tipoSaida: string): string {
+  if (item.id === 'osOk' && tipoSaida === 'ORDEM DE OPERAÇÕES') return 'Ordem de Operações ok';
+  return item.rotulo;
 }
 
 export const ITENS_CHECKLIST = [
