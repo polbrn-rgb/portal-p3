@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -15,6 +16,7 @@ import {
   ciasDoPedido,
   idSolicitacao,
   normalizarRE,
+  planejarEdicao,
   quantidadesVazias,
   type PedidoEfetivo,
   type Policial,
@@ -33,16 +35,43 @@ export async function buscarPolicial(db: Firestore, re: string): Promise<Policia
   return s.exists() ? (s.data() as Policial) : null;
 }
 
-/** Grava o pedido no checklist e cria uma solicitação para cada Cia com policial pedido, tudo junto. */
-export async function enviarSolicitacao(db: Firestore, d: Demanda, pedido: PedidoEfetivo): Promise<void> {
-  const lote = writeBatch(db);
+/**
+ * Grava o pedido no checklist e as solicitações das Cias, tudo junto. Serve para enviar e para editar:
+ * Cia nova recebe a solicitação; Cia desmarcada perde a dela; a que já respondeu mantém os policiais
+ * e volta a ficar pendente só se mudou o que ela precisa mandar (quantidades ou dados novos).
+ */
+export async function enviarSolicitacao(
+  db: Firestore,
+  d: Demanda,
+  pedido: PedidoEfetivo,
+  anterior?: PedidoEfetivo,
+): Promise<void> {
   const campos = [...pedido.campos];
-  lote.set(
-    doc(db, 'operacoes', d.id),
-    { efetivo: { ...pedido, campos, enviadaEm: serverTimestamp() }, efetivoOk: true, atualizadoEm: serverTimestamp() },
-    { merge: true },
+  const quantidades = Object.fromEntries(ciasDoPedido(pedido).map((c) => [c, { ...quantidadesVazias(), ...pedido.quantidades[c] }]));
+  const existentes = (await getDocs(query(collection(db, 'solicitacoesEfetivo'), where('numero', '==', d.id)))).docs.map((x) =>
+    paraSolicitacao(x.id, x.data()),
   );
-  for (const cia of ciasDoPedido(pedido)) {
+  const plano = planejarEdicao(existentes, pedido);
+  const agora = serverTimestamp();
+  const lote = writeBatch(db);
+  const efetivo: Record<string, unknown> = { prazo: pedido.prazo, campos, quantidades, enviadaEm: anterior?.enviadaEm ?? agora };
+  if (anterior) efetivo.editadaEm = agora;
+  // mergeFields: o pedido inteiro é trocado (uma Cia desmarcada não fica para trás); o resto do checklist fica.
+  lote.set(doc(db, 'operacoes', d.id), { efetivo, efetivoOk: true, atualizadoEm: agora }, { mergeFields: ['efetivo', 'efetivoOk', 'atualizadoEm'] });
+  for (const a of plano.apagar) lote.delete(doc(db, 'solicitacoesEfetivo', a.id));
+  for (const a of plano.atualizar) {
+    lote.update(doc(db, 'solicitacoesEfetivo', a.id), {
+      saida: d.saida,
+      inicio: d.inicioBtl,
+      termino: d.terminoBtl,
+      prazo: pedido.prazo,
+      quantidades: quantidades[a.unidadeId],
+      campos,
+      ...(a.reabrir ? { status: 'enviada' } : {}),
+      atualizadoEm: agora,
+    });
+  }
+  for (const cia of plano.criar) {
     lote.set(doc(db, 'solicitacoesEfetivo', idSolicitacao(d.id, cia)), {
       numero: d.id,
       unidadeId: cia,

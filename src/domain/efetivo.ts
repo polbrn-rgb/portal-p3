@@ -132,3 +132,82 @@ export const ROTULO_SITUACAO: Record<SituacaoSolicitacao, string> = {
   atrasada: 'Atrasada',
   aguardando: 'Aguardando',
 };
+
+// ---------- P/3 edita a solicitação depois de enviada ----------
+
+export type PlanoEdicao = {
+  criar: UnidadeId[];
+  /** reabrir: a Cia já tinha respondido, mas mudou o que ela precisa mandar (volta a ficar pendente para ela). */
+  atualizar: { id: string; unidadeId: UnidadeId; reabrir: boolean }[];
+  apagar: { id: string; unidadeId: UnidadeId; tinhaEfetivo: boolean }[];
+};
+
+function mesmasQuantidades(a: Partial<Quantidades> | undefined, b: Partial<Quantidades> | undefined): boolean {
+  return POSTOS.every((p) => (Number(a?.[p.id]) || 0) === (Number(b?.[p.id]) || 0));
+}
+
+/** O que muda nas solicitações já enviadas quando a P/3 salva o pedido editado. */
+export function planejarEdicao(existentes: SolicitacaoEfetivo[], pedido: PedidoEfetivo): PlanoEdicao {
+  const novas = ciasDoPedido(pedido);
+  const plano: PlanoEdicao = { criar: [], atualizar: [], apagar: [] };
+  for (const s of existentes) {
+    if (!novas.includes(s.unidadeId)) {
+      plano.apagar.push({ id: s.id, unidadeId: s.unidadeId, tinhaEfetivo: s.policiais.length > 0 });
+      continue;
+    }
+    const campoNovo = pedido.campos.some((c) => !s.campos.includes(c));
+    const mudouQtd = !mesmasQuantidades(s.quantidades, pedido.quantidades[s.unidadeId]);
+    plano.atualizar.push({ id: s.id, unidadeId: s.unidadeId, reabrir: s.status === 'respondida' && (campoNovo || mudouQtd) });
+  }
+  for (const cia of novas) if (!existentes.some((s) => s.unidadeId === cia)) plano.criar.push(cia);
+  return plano;
+}
+
+// ---------- Planilha (Excel) do efetivo que as Cias mandaram ----------
+
+function ordemCia(id: UnidadeId): number {
+  return UNIDADES.findIndex((u) => u.id === id);
+}
+
+function ordemPosto(posto: string): number {
+  const c = categoriaDoPosto(posto);
+  return c === 'outro' ? -1 : POSTOS.findIndex((p) => p.id === c);
+}
+
+/** Abas "Efetivo" (um policial por linha) e "Resumo" (por Cia), na ordem das Cias e da hierarquia. */
+export function planilhaDoEfetivo(
+  solicitacoes: SolicitacaoEfetivo[],
+  pedido: Pick<PedidoEfetivo, 'campos'>,
+  hoje: string,
+): { nome: string; linhas: (string | number)[][] }[] {
+  const lista = [...solicitacoes].sort((a, b) => ordemCia(a.unidadeId) - ordemCia(b.unidadeId));
+  const extras = CAMPOS_EXTRAS.filter((c) => pedido.campos.includes(c.id));
+  const sigla = (id: UnidadeId) => UNIDADES.find((u) => u.id === id)?.sigla ?? id;
+
+  const efetivo: (string | number)[][] = [
+    ['Cia', 'Posto/Graduação', 'RE', 'Nome de guerra', 'Telefone', ...extras.map((c) => c.rotulo), 'Enviado por'],
+  ];
+  for (const s of lista) {
+    const policiais = [...s.policiais].sort((a, b) => ordemPosto(a.posto) - ordemPosto(b.posto));
+    for (const p of policiais) {
+      efetivo.push([sigla(s.unidadeId), p.posto, p.re, p.nomeGuerra, p.telefone, ...extras.map((c) => p.extras[c.id] ?? ''), s.respondidoPor ?? '']);
+    }
+  }
+
+  const resumo: (string | number)[][] = [['Cia', 'Situação', 'Pedidos', 'Enviados', 'Faltam', 'Enviado por']];
+  for (const s of lista) {
+    const pedidos = totalDe(s.quantidades);
+    resumo.push([
+      sigla(s.unidadeId),
+      ROTULO_SITUACAO[situacaoSolicitacao(s, hoje)],
+      pedidos,
+      s.policiais.length,
+      Math.max(0, pedidos - s.policiais.length),
+      s.respondidoPor ?? '',
+    ]);
+  }
+  return [
+    { nome: 'Efetivo', linhas: efetivo },
+    { nome: 'Resumo', linhas: resumo },
+  ];
+}

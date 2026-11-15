@@ -1255,3 +1255,9 @@ a.botao {
     margin-right: 52px;
   }
 }
+
+/* Checklist Operações: editar / baixar efetivo */
+.acoes-efetivo {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}

@@ -90,6 +90,34 @@ describe('Solicitação de efetivo', () => {
   });
 });
 
+describe('Editar a solicitação de efetivo', () => {
+  test('troca o pedido inteiro, cria/apaga Cias e reabre só a que precisa mandar mais', async () => {
+    const d = await operacao();
+    const q = (cbsd: number) => ({ ...quantidadesVazias(), cbsd });
+    await enviarSolicitacao(p3, d, { prazo: '2026-11-18', campos: [], quantidades: { '1cia': q(1), '2cia': q(1) } });
+    const cia1 = como('conta-1cia', { perfil: 'unidade', unidade: '1cia' });
+    await responderSolicitacao(cia1, `${d.id}_1cia`, [{ re: '123456-7', posto: 'Cb PM', nomeGuerra: 'SILVA', telefone: '', extras: {} }], 'Sgt Teste');
+    const antes = (await getDoc(doc(p3, 'operacoes', d.id))).data()?.efetivo;
+
+    await enviarSolicitacao(p3, d, { prazo: '2026-11-20', campos: [], quantidades: { '1cia': q(2), '3cia': q(1) } }, antes);
+
+    const op = (await getDoc(doc(p3, 'operacoes', d.id))).data();
+    expect(Object.keys(op?.efetivo.quantidades).sort()).toEqual(['1cia', '3cia']);
+    expect(op?.efetivo.prazo).toBe('2026-11-20');
+    expect(op?.efetivo.enviadaEm).toEqual(antes.enviadaEm);
+    expect(op?.efetivo.editadaEm).toBeTruthy();
+    const s1 = (await getDoc(doc(p3, 'solicitacoesEfetivo', `${d.id}_1cia`))).data();
+    expect(s1).toMatchObject({ status: 'enviada', prazo: '2026-11-20', quantidades: q(2), respondidoPor: 'Sgt Teste' });
+    expect(s1?.policiais).toHaveLength(1);
+    expect((await getDoc(doc(p3, 'solicitacoesEfetivo', `${d.id}_2cia`))).exists()).toBe(false);
+    expect((await getDoc(doc(p3, 'solicitacoesEfetivo', `${d.id}_3cia`))).data()).toMatchObject({ status: 'enviada', quantidades: q(1) });
+    // A Cia reenviada continua podendo responder.
+    await assertSucceeds(
+      responderSolicitacao(cia1, `${d.id}_1cia`, [{ re: '123456-7', posto: 'Cb PM', nomeGuerra: 'SILVA', telefone: '', extras: {} }], 'Sgt Teste'),
+    );
+  });
+});
+
 describe('Resultados da Sala de Operações', () => {
   test('Sala lê a operação e lança; Cia e CFP não', async () => {
     const d = await operacao();

@@ -67,6 +67,8 @@ histórico das demandas.
   para a lixeira do Drive (recuperável por 30 dias). O número não é
   reaproveitado e aparece como "Excluída" no backup.
 - **Painel**: prazos.
+- **Checklist Operações / Solicitação de efetivo**: depois de enviada, **✏️ Editar solicitação** (prazo, dados, Cias e
+  quantidades) e **⬇️ Baixar efetivo (Excel)** com o que as Cias mandaram (abas Efetivo e Resumo).
 - **Tela das Cias se limpa sozinha**: a demanda respondida/finalizada sai da tela da Cia um dia depois do prazo (sem
   prazo: no dia seguinte ao aceite). O que a Cia ainda não respondeu fica, mesmo atrasado. Nada some do Numerador.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
