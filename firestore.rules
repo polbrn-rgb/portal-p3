@@ -114,6 +114,27 @@ service cloud.firestore {
       allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaEapValida());
     }
 
+    // Operações → Controle de Operações (o motor também traz as linhas da aba Operações da planilha antiga).
+    // Não se apaga: a exclusão só marca "excluida".
+    match /controleOperacoes/{id} {
+      allow read, create, update: if ehP3();
+    }
+
+    // Pedido do Relatório de Indicadores: a P/3 pede; o motor gera o Word e grava o link.
+    function pedidoRelatorioValido() {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['mes', 'numero', 'status', 'pedidoEm'])
+        && r.mes is string && r.mes.matches('^[0-9]{4}-[0-9]{2}$')
+        && r.numero is string && r.numero.size() > 0 && r.numero.size() <= 40
+        && r.status == 'pedido'
+        && r.pedidoEm == request.time;
+    }
+
+    match /relatorios/{id} {
+      allow read: if ehP3();
+      allow create: if ehP3() && pedidoRelatorioValido();
+    }
+
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
     match /efetivo/{re} {
       allow read: if logado();

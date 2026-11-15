@@ -10,6 +10,7 @@ import { MissoesCfp } from '../setores/PainelCfp';
 import { Recados } from '../setores/Recados';
 import { Aperfeicoamento } from './Aperfeicoamento';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
+import { ControleOperacoes } from './ControleOperacoes';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
@@ -19,13 +20,16 @@ import { PainelPrazos } from './PainelPrazos';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-/** Dentro de Operações: o Checklist Operações (outras sub-abas entram aqui quando precisar). */
-function SubAbasOperacoes({ operacoes }: { operacoes?: number }) {
+/** Dentro de Operações: o Checklist Operações e o Controle de Operações (com o Relatório de Indicadores). */
+function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle'; operacoes?: number }) {
   return (
     <nav className="abas abas-p3 subabas" aria-label="Operações">
-      <a href="#/operacoes" aria-current="page">
+      <a href="#/operacoes" aria-current={ativa === 'checklist' ? 'page' : undefined}>
         Checklist Operações
         {operacoes ? <span className="contador-aba">{operacoes}</span> : null}
+      </a>
+      <a href="#/operacoes/controle" aria-current={ativa === 'controle' ? 'page' : undefined}>
+        Controle de Operações
       </a>
     </nav>
   );
@@ -95,11 +99,12 @@ function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: A
     );
   }
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
-  if (hash === '#/operacoes') {
+  if (hash === '#/operacoes' || hash === '#/operacoes/controle') {
+    const controle = hash === '#/operacoes/controle';
     return (
       <>
-        <SubAbasOperacoes operacoes={operacoes.valor?.length} />
-        <ChecklistOperacoes operacoes={operacoes} />
+        <SubAbasOperacoes ativa={controle ? 'controle' : 'checklist'} operacoes={operacoes.valor?.length} />
+        {controle ? <ControleOperacoes /> : <ChecklistOperacoes operacoes={operacoes} />}
       </>
     );
   }

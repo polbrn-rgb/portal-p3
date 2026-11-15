@@ -32,7 +32,15 @@ var CONFIG_P3 = {
   AGENDA_CFP_DIAS_DEPOIS: 365,
   // Aperfeiçoamento: EAP (cada EAP nova vira uma cópia zerada do modelo, nesta pasta)
   PLANILHA_EAP_MODELO: '12qEDEI1sdN_7FMZCLCs4gUWxfkokXdPGtT_rP4oxbdI',
-  PASTA_EAP: '13eaHfoeX8BvK8wZQ_0Gt1aN207x_FRTk'
+  PASTA_EAP: '13eaHfoeX8BvK8wZQ_0Gt1aN207x_FRTk',
+  // Operações → Controle de Operações: Relatório de Indicadores (mesmos IDs do script "Relatório P/3" do numerador)
+  RELATORIO_MODELO: '1jt9sR10f2JsPQ57wmj0TrE3WeXyjsS89', // Modelo_Relatorio_Indicadores.docx
+  RELATORIO_PASTA: '1cMxp1KcboYj_1VSib3DJPgFiTE_jnU0j', // onde os relatórios são salvos
+  PLANILHA_INDICADORES: '1kLHkeia6NozgBm8nCvDal4xLC6M2CtWdkXmeNVsOZXM',
+  ABA_INDICADORES: 'BTL',
+  FAIXA_CRIMES: 'C36:E44', // 9 linhas: Homicídio ... Roubo a Banco
+  FAIXA_PRODUTIVIDADE: 'C50:E57', // 8 linhas: Flagrante de tráfico ... Veículos vistoriados
+  PREFIXO_RELATORIO: '8BPMM-'
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -85,6 +93,13 @@ function diagnostico() {
   });
   ok('Modelo de resultados', function () { return DriveApp.getFileById(CONFIG_P3.PLANILHA_RESULTADO_MODELO).getName(); });
   ok('Banco de efetivo', function () { return SpreadsheetApp.openById(CONFIG_P3.PLANILHA_EFETIVO).getName(); });
+  ok('Modelo do relatório (Word)', function () { return DriveApp.getFileById(CONFIG_P3.RELATORIO_MODELO).getName(); });
+  ok('Pasta dos relatórios', function () { return DriveApp.getFolderById(CONFIG_P3.RELATORIO_PASTA).getName(); });
+  ok('Planilha de indicadores', function () {
+    var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_INDICADORES);
+    if (!ss.getSheetByName(CONFIG_P3.ABA_INDICADORES)) throw new Error('aba ' + CONFIG_P3.ABA_INDICADORES + ' não encontrada');
+    return ss.getName();
+  });
   ok('Firestore (chave)', function () {
     var p = consultarPendentes_();
     return p.length + ' demanda(s) esperando' + (p.length ? ': nº ' + p.map(function (d) { return d.dados.numero; }).join(', ') : '');
@@ -198,6 +213,16 @@ function rodarMotor_(esperaMs) {
       processarEap_();
     } catch (e4) {
       console.error('EAP: ' + e4.message);
+    }
+    try {
+      sincronizarControleOperacoes_(false);
+    } catch (e5) {
+      console.error('Controle de Operações: ' + e5.message);
+    }
+    try {
+      processarRelatorios_();
+    } catch (e6) {
+      console.error('Relatório: ' + e6.message);
     }
   } finally {
     trava.releaseLock();
@@ -912,4 +937,102 @@ function compilarEap_(ss) {
   });
   if (total) comp.autoResizeColumns(1, 11);
   return total;
+}
+
+// ---------- Operações → Controle de Operações e Relatório de Indicadores ----------
+
+/** Todos os documentos de uma coleção (só os campos pedidos). */
+function listarTodos_(colecao, campos) {
+  var r = firestore_('post', caminhoDocs_() + ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: colecao }],
+      select: { fields: campos.map(function (c) { return { fieldPath: c }; }) }
+    }
+  });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  return r.json
+    .filter(function (x) { return x.document; })
+    .map(function (x) { return { id: x.document.name.split('/').pop(), dados: camposParaJs(x.document.fields || {}) }; });
+}
+
+/**
+ * Traz para o portal as linhas novas da aba Operações da planilha antiga (inclusive as que o motor
+ * coloca lá ao gerar a pasta do CFP). Nunca apaga nem sobrescreve o que a P/3 editou no portal:
+ * só cria o que falta e preenche o Objetivo quando ele ainda está vazio no portal.
+ * Só trabalha quando a aba mudou (ou quando "forcar").
+ */
+function sincronizarControleOperacoes_(forcar) {
+  var aba = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_OPERACOES).getSheetByName(CONFIG_P3.ABA_OPERACOES);
+  if (!aba) throw new Error('Aba Operações não encontrada');
+  var valores = aba.getDataRange().getValues();
+  var props = PropertiesService.getScriptProperties();
+  var resumo = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(valores), Utilities.Charset.UTF_8));
+  if (!forcar && resumo === props.getProperty('CONTROLE_OPERACOES_RESUMO')) return 0;
+
+  var existentes = {};
+  listarTodos_('controleOperacoes', ['objetivo']).forEach(function (d) { existentes[d.id] = d.dados.objetivo || ''; });
+  var novos = 0;
+  linhasControleDaPlanilha(valores[0], valores.slice(1)).forEach(function (l) {
+    if (!(l.id in existentes)) {
+      var id = l.id;
+      delete l.id;
+      l.fonte = 'planilha';
+      l.excluida = false;
+      l.criadoEm = new Date().toISOString();
+      gravarCampos_('controleOperacoes/' + id, l);
+      existentes[id] = l.objetivo;
+      novos++;
+    } else if (!existentes[l.id] && l.objetivo) {
+      gravarCampos_('controleOperacoes/' + l.id, { objetivo: l.objetivo });
+      existentes[l.id] = l.objetivo;
+    }
+  });
+  props.setProperty('CONTROLE_OPERACOES_RESUMO', resumo);
+  return novos;
+}
+
+/** Rode pelo editor: traz agora todas as operações da aba Operações para o portal. */
+function sincronizarControleOperacoes() {
+  Logger.log(sincronizarControleOperacoes_(true) + ' operação(ões) nova(s) no Controle de Operações.');
+}
+
+/** Pedidos de relatório feitos no portal -> Word na pasta dos relatórios, com o link de volta no portal. */
+function processarRelatorios_() {
+  var pedidos = consultar_('relatorios', 'status', 'pedido', 5);
+  if (!pedidos.length) return;
+  sincronizarControleOperacoes_(false); // a planilha antiga pode ter linha nova
+  pedidos.forEach(function (r) {
+    try {
+      var res = gerarRelatorio_(r.dados);
+      gravarCampos_('relatorios/' + r.id, {
+        status: 'pronto', url: res.url, nomeArquivo: res.nome, qtdOperacoes: res.qtd, prontoEm: new Date().toISOString(), erro: ''
+      });
+    } catch (e) {
+      gravarCampos_('relatorios/' + r.id, { status: 'erro', erro: e.message });
+    }
+  });
+}
+
+function lerTabelasIndicadores_() {
+  var aba = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_INDICADORES).getSheetByName(CONFIG_P3.ABA_INDICADORES);
+  if (!aba) throw new Error('Aba "' + CONFIG_P3.ABA_INDICADORES + '" não encontrada na planilha de indicadores.');
+  // texto exatamente como aparece na planilha
+  return tabelasIndicadores(aba.getRange(CONFIG_P3.FAIXA_CRIMES).getDisplayValues(), aba.getRange(CONFIG_P3.FAIXA_PRODUTIVIDADE).getDisplayValues());
+}
+
+function gerarRelatorio_(pedido) {
+  if (!/^\d{4}-\d{2}$/.test(pedido.mes || '')) throw new Error('Mês inválido');
+  var operacoes = listarTodos_('controleOperacoes', ['nome', 'inicio', 'termino', 'objetivo', 'excluida']).map(function (d) { return d.dados; });
+  var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var dados = dadosRelatorio(pedido, operacoes, lerTabelasIndicadores_(), hoje, CONFIG_P3.PREFIXO_RELATORIO);
+  // abre o .docx (zip), edita só o document.xml e fecha de novo: cabeçalho, brasões e formatação ficam intactos
+  var modelo = DriveApp.getFileById(CONFIG_P3.RELATORIO_MODELO).getBlob().setContentType('application/zip');
+  var partes = Utilities.unzip(modelo).map(function (b) {
+    if (b.getName() !== 'word/document.xml') return b;
+    return Utilities.newBlob(preencherXmlRelatorio(b.getDataAsString('UTF-8'), dados), 'application/xml', 'word/document.xml');
+  });
+  var nome = nomeArquivoRelatorio(pedido.numero, pedido.mes);
+  var zip = Utilities.zip(partes, nome).setContentType('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  var arquivo = DriveApp.getFolderById(CONFIG_P3.RELATORIO_PASTA).createFile(zip);
+  return { url: arquivo.getUrl(), nome: nome, qtd: dados.OPERACOES.length };
 }

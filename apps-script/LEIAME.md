@@ -85,6 +85,24 @@ A conta da P/3 (8bpmmp3@gmail.com) precisa **ver** a planilha modelo e **editar*
 O banco de efetivo agora também guarda **nome completo** e **e-mail** (colunas "NOME COMPLETO"/"NOME" e "E-MAIL"):
 rode **sincronizarEfetivo** uma vez depois de colar esta versão.
 
+## Operações → Controle de Operações e Relatório de Indicadores
+
+- **Controle de Operações:** a cada rodada o motor confere a aba **Operações** da planilha do numerador
+  (`PLANILHA_OPERACOES`). Quando ela muda, as linhas novas (Operação, OPM, Ordem, Origem, Início, Término,
+  coluna H e **Objetivo**) entram no portal. Ele nunca apaga nem muda o que a P/3 editou no portal: só cria o que
+  falta e preenche o Objetivo quando ele ainda está vazio no portal. Para trazer tudo na hora, rode
+  **sincronizarControleOperacoes**.
+- **Relatório:** o botão **Gerar relatório** do portal faz um pedido; o motor gera o Word a partir do modelo
+  (`RELATORIO_MODELO`), com as operações do mês (e o Objetivo de cada uma) e as tabelas da planilha de indicadores
+  (`PLANILHA_INDICADORES`, aba `ABA_INDICADORES`, faixas `FAIXA_CRIMES` e `FAIXA_PRODUTIVIDADE`), salva na pasta
+  `RELATORIO_PASTA` e o link aparece no portal. O texto e o modelo são os mesmos do script "Relatório P/3" do numerador.
+- A conta **8bpmmp3@gmail.com** precisa **ver** o modelo do Word e a planilha de indicadores e **editar** a pasta dos
+  relatórios. Rode **diagnostico** para conferir (linhas *Modelo do relatório*, *Pasta dos relatórios* e
+  *Planilha de indicadores*).
+
+Depois de colar esta versão: rode **sincronizarControleOperacoes** uma vez, **diagnostico**, faça a **Nova versão** da
+implantação e, no projeto, `npm run deploy:regras` (libera as coleções novas).
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.
@@ -92,5 +110,7 @@ rode **sincronizarEfetivo** uma vez depois de colar esta versão.
 - `Firestore 403`: a chave colada não é do projeto `portal-p3`.
 - Página do CFP diz que a agenda ainda não foi lida: rode **sincronizarAgendaCfp** e veja o registro. Erros da
   leitura aparecem em **Execuções** começando com `Agenda do CFP:`.
+- Relatório com ❌ no portal: a mensagem diz o que faltou (modelo, pasta ou planilha de indicadores sem acesso).
+  Erros aparecem em **Execuções** começando com `Relatório:` ou `Controle de Operações:`.
 - E-mail encaminhado não apareceu: rode **diagnostico** e veja a linha *E-mails do funcional*. Erros do Gmail
   aparecem em **Execuções** começando com `E-mails:`.
