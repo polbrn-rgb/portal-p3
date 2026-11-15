@@ -1431,20 +1431,6 @@ fieldset:has(> .erro-campo) > legend {
 }
 
 /* ---------- Aperfeiçoamento / EAP ---------- */
-/* Abas da P/3: com 6 abas, no celular quebram em duas linhas em vez de espremer. */
-.abas-p3:not(.subabas) {
-  flex-wrap: wrap;
-}
-
-.abas-p3:not(.subabas) a {
-  flex: 1 1 30%;
-}
-
-@media (min-width: 768px) {
-  .abas-p3:not(.subabas) a {
-    flex: 1 1 0;
-  }
-}
 
 .formulario-eap {
   display: flex;
@@ -1558,4 +1544,177 @@ fieldset:has(> .erro-campo) > legend {
   align-items: center;
   gap: 8px;
   min-height: 40px;
+}
+
+/* ---------- Menu da P/3: gaveta com botão ☰ no celular, lateral fixa no computador ---------- */
+.tela {
+  position: relative;
+}
+
+.botao-menu {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: 12px;
+  z-index: 40;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background: rgb(255 255 255 / 0.16);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.icone-menu,
+.icone-menu::before,
+.icone-menu::after {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: #fff;
+  position: relative;
+}
+
+.icone-menu::before,
+.icone-menu::after {
+  content: '';
+  position: absolute;
+  left: 0;
+}
+
+.icone-menu::before {
+  top: -6px;
+}
+
+.icone-menu::after {
+  top: 6px;
+}
+
+/* O título do topo abre espaço para o botão. */
+.tela:has(.botao-menu) .topo {
+  padding-left: 72px;
+}
+
+.fundo-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgb(0 0 0 / 0.4);
+}
+
+.menu-p3 {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 60;
+  width: min(300px, 85vw);
+  background: #fff;
+  box-shadow: 4px 0 24px rgb(0 0 0 / 0.2);
+  padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform 0.2s ease, visibility 0.2s;
+}
+
+.menu-p3.aberto {
+  transform: none;
+  visibility: visible;
+}
+
+.menu-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e3e7ee;
+  color: var(--cor-secundaria);
+}
+
+.botao-fechar-menu {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f3f7;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.menu-p3 a {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  color: var(--cor-secundaria);
+  text-decoration: none;
+}
+
+.menu-p3 a:hover {
+  background: #eef2f8;
+}
+
+.menu-p3 a[aria-current='page'] {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
+.conteudo-p3 {
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-p3 {
+    transition: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .botao-menu,
+  .fundo-menu,
+  .menu-cabecalho {
+    display: none;
+  }
+
+  .tela:has(.botao-menu) .topo {
+    padding-left: var(--margem);
+  }
+
+  .layout-p3 {
+    display: grid;
+    grid-template-columns: 252px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    max-width: 1640px;
+    margin: 0 auto;
+    padding: 16px 16px 0;
+  }
+
+  .conteudo-p3 {
+    --margem: 16px;
+  }
+
+  .menu-p3 {
+    position: sticky;
+    top: 16px;
+    inset: auto;
+    width: auto;
+    transform: none;
+    visibility: visible;
+    transition: none;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+    padding: 8px;
+    max-height: calc(100vh - 32px);
+    z-index: auto;
+  }
 }

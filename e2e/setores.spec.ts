@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { entrar, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Os dados que o motor (Apps Script) gravaria são criados direto no emulador.
@@ -92,7 +92,7 @@ test('P/3 tem a aba CFP com as missões e manda recado que o CFP vê como do Cmt
   // Garante que o motor "já leu" a agenda (sem isso a página mostra o aviso de agenda não lida).
   await admin().doc('agendaCfp/eventos').set({ conferidoEm: new Date().toISOString() }, { merge: true });
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: 'CFP', exact: true }).click();
+  await irPara(page, 'CFP');
   await expect(page.getByRole('heading', { name: 'Missões do CFP' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Missões de hoje' })).toBeVisible();
 
@@ -116,7 +116,7 @@ test('P/3 tem a aba CFP com as missões e manda recado que o CFP vê como do Cmt
 test('P/3 manda recado para a Sala de Operações, que vê como do Cmt do P3 (e o CFP não)', async ({ page }, info) => {
   const recado = `Atenção ao lançamento dos resultados (${info.project.name} ${info.retry})`;
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: 'Sala Op.', exact: true }).click();
+  await irPara(page, 'Sala Op.');
   await expect(page.getByRole('heading', { name: 'Recados para a Sala de Operações' })).toBeVisible();
   await page.getByRole('button', { name: '✉️ Recado para a Sala' }).click();
   await page.getByRole('textbox', { name: /^Recado \(aparece/ }).fill(recado);

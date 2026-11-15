@@ -5,7 +5,7 @@ import type { Pendente } from '../../domain/pendente';
 import type { Situacao } from '../../domain/situacao';
 import { db } from '../../lib/firebase';
 import { useHash } from '../../lib/navegacao';
-import { useAoVivo } from '../../lib/useAoVivo';
+import { useAoVivo, type AoVivo } from '../../lib/useAoVivo';
 import { MissoesCfp } from '../setores/PainelCfp';
 import { Recados } from '../setores/Recados';
 import { Aperfeicoamento } from './Aperfeicoamento';
@@ -14,38 +14,10 @@ import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
 import { ListaPendentes } from './ListaPendentes';
+import { MenuP3, type AbaP3 } from './MenuP3';
 import { PainelPrazos } from './PainelPrazos';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
-
-type AbaP3 = 'pendentes' | 'numerador' | 'painel' | 'cfp' | 'sala' | 'aperfeicoamento';
-
-function Abas({ ativa, pendentes }: { ativa: AbaP3; pendentes?: number }) {
-  const atual = (aba: AbaP3) => (ativa === aba ? 'page' : undefined);
-  return (
-    <nav className="abas abas-p3" aria-label="Seções da P/3">
-      <a href="#/pendentes" aria-current={atual('pendentes')}>
-        Demandas Pendentes
-        {pendentes ? <span className="contador-aba">{pendentes}</span> : null}
-      </a>
-      <a href="#/demandas" aria-current={atual('numerador')}>
-        Numerador
-      </a>
-      <a href="#/painel" aria-current={atual('painel')}>
-        Painel
-      </a>
-      <a href="#/cfp" aria-current={atual('cfp')}>
-        CFP
-      </a>
-      <a href="#/sala" aria-current={atual('sala')}>
-        Sala Op.
-      </a>
-      <a href="#/aperfeicoamento" aria-current={atual('aperfeicoamento')}>
-        Aperfeiçoamento
-      </a>
-    </nav>
-  );
-}
 
 /** Dentro de Demandas Pendentes: a lista de pendentes e o Checklist Operações. */
 function SubAbas({ ativa, pendentes, operacoes }: { ativa: 'pendentes' | 'operacoes'; pendentes?: number; operacoes?: number }) {
@@ -63,11 +35,31 @@ function SubAbas({ ativa, pendentes, operacoes }: { ativa: 'pendentes' | 'operac
   );
 }
 
+/** Toda tela da P/3: menu (lateral no computador, ☰ no celular) e o conteúdo ao lado. */
 export function PainelP3() {
   const hash = useHash();
-  // Fica ligado em todas as telas da P/3: o número na aba avisa quando chega pendente nova.
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
+  return (
+    <div className="layout-p3">
+      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} />
+      <div className="conteudo-p3">
+        <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} />
+      </div>
+    </div>
+  );
+}
+
+function abaDaRota(hash: string): AbaP3 {
+  if (/^#\/(pendentes|operacoes|destinar)/.test(hash)) return 'pendentes';
+  if (hash === '#/painel') return 'painel';
+  if (hash === '#/cfp') return 'cfp';
+  if (hash === '#/sala') return 'sala';
+  if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
+  return 'numerador';
+}
+
+function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: AoVivo<Pendente[]>; operacoes: AoVivo<Operacao[]> }) {
   const total = pendentes.valor?.length;
   const totalOperacoes = operacoes.valor?.length;
 
@@ -81,7 +73,6 @@ export function PainelP3() {
   if (hash === '#/painel') {
     return (
       <>
-        <Abas ativa="painel" pendentes={total} />
         <PainelPrazos />
       </>
     );
@@ -89,7 +80,6 @@ export function PainelP3() {
   if (hash === '#/cfp') {
     return (
       <>
-        <Abas ativa="cfp" pendentes={total} />
         <Recados setor="cfp" podeEnviar />
         <MissoesCfp />
       </>
@@ -98,7 +88,6 @@ export function PainelP3() {
   if (hash.startsWith('#/aperfeicoamento')) {
     return (
       <>
-        <Abas ativa="aperfeicoamento" pendentes={total} />
         <Aperfeicoamento rota={hash} />
       </>
     );
@@ -106,7 +95,6 @@ export function PainelP3() {
   if (hash === '#/sala') {
     return (
       <>
-        <Abas ativa="sala" pendentes={total} />
         <Recados setor="sala" podeEnviar />
       </>
     );
@@ -115,7 +103,6 @@ export function PainelP3() {
     const ativa = hash === '#/pendentes' ? 'pendentes' : 'operacoes';
     return (
       <>
-        <Abas ativa="pendentes" pendentes={total} />
         <SubAbas ativa={ativa} pendentes={total} operacoes={totalOperacoes} />
         {ativa === 'pendentes' ? <ListaPendentes pendentes={pendentes} /> : <ChecklistOperacoes operacoes={operacoes} />}
       </>
@@ -124,7 +111,6 @@ export function PainelP3() {
   const filtro = /^#\/demandas\/(\w+)$/.exec(hash)?.[1];
   return (
     <>
-      <Abas ativa="numerador" pendentes={total} />
       <ListaDemandas
         key={filtro ?? 'todas'}
         filtroInicial={filtro && FILTROS_VALIDOS.includes(filtro) ? (filtro as Situacao) : 'todas'}
