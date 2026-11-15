@@ -6,7 +6,7 @@ test('menu da P/3: lateral esquerda no computador, ☰ no canto superior esquerd
   await entrar(page, 'p3', SENHA_TESTE);
   const menu = page.getByRole('navigation', { name: 'Seções da P/3' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });
-  const itens = ['Demandas Pendentes', 'Numerador', 'Painel', 'CFP', 'Sala Op.', 'Aperfeiçoamento'];
+  const itens = ['Numerador', 'Demandas Pendentes', 'Operações', 'Aperfeiçoamento', 'CFP', 'Sala de Operações', 'Painel'];
 
   if (info.project.name === 'celular') {
     await expect(botao).toBeVisible();
@@ -17,7 +17,8 @@ test('menu da P/3: lateral esquerda no computador, ☰ no canto superior esquerd
 
     await botao.click();
     await expect(menu).toBeVisible();
-    for (const i of itens) await expect(menu.getByRole('link', { name: new RegExp(`^${i.replace('.', '\\.')}`) })).toBeVisible();
+    for (const i of itens) await expect(menu.getByRole('link', { name: new RegExp(`^${i}`) })).toBeVisible();
+    await expect(menu.getByRole('link')).toHaveText(itens.map((i) => new RegExp(`^${i}`)));
     expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
     // Esc fecha; escolher uma opção navega e fecha.
     await page.keyboard.press('Escape');
@@ -33,6 +34,7 @@ test('menu da P/3: lateral esquerda no computador, ☰ no canto superior esquerd
   } else {
     await expect(botao).toBeHidden();
     await expect(menu).toBeVisible();
+    await expect(menu.getByRole('link')).toHaveText(itens.map((i) => new RegExp(`^${i}`)));
     const lateral = (await menu.boundingBox())!;
     const conteudo = (await page.locator('.conteudo-p3').boundingBox())!;
     expect(lateral.x).toBeLessThan(conteudo.x);

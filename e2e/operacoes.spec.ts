@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { entrar, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('Ordem de Serviço + Operações Policiais entra no Checklist Operações', async ({ page }, info) => {
@@ -17,8 +17,8 @@ test('Ordem de Serviço + Operações Policiais entra no Checklist Operações',
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByRole('status')).toContainText('Demanda registrada');
 
-  await page.goto('/#/pendentes');
-  await page.getByRole('link', { name: /Checklist Operações/ }).click();
+  await irPara(page, /^Operações/);
+  await expect(page.getByRole('navigation', { name: 'Operações' }).getByRole('link', { name: /Checklist Operações/ })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Checklist Operações', level: 2 })).toBeVisible();
   const cartao = page.getByRole('article').filter({ hasText: saida });
   await expect(cartao).toContainText('20/12/2099 a 21/12/2099');
