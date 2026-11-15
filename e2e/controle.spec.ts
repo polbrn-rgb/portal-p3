@@ -27,8 +27,22 @@ test('Controle de Operações: registra com objetivo, edita, exclui e pede o Rel
   // Vai para o mês da operação e avisa que falta o objetivo.
   const cartao = page.getByRole('article', { name: nome });
   await expect(cartao).toContainText('Sem objetivo');
-  await expect(page.getByRole('group', { name: 'Relatório de Indicadores' })).toContainText('sem objetivo');
+  const relatorio = page.getByRole('group', { name: 'Relatório de Indicadores' });
+  await relatorio.getByLabel('Mês de referência').fill(iso.slice(0, 7));
+  await expect(relatorio).toContainText('sem objetivo');
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
+  // Visualizar: por mês (outro mês não mostra) ou todas (agrupadas por mês).
+  const visualizar = page.getByRole('group', { name: 'Visualizar operações' });
+  await visualizar.getByLabel('Mês', { exact: true }).fill('2000-01');
+  await expect(cartao).toHaveCount(0);
+  await visualizar.getByRole('tab', { name: 'Todas' }).click();
+  await expect(visualizar.getByLabel('Mês', { exact: true })).toHaveCount(0);
+  const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+  await expect(page.getByRole('region', { name: `${meses[hoje.getMonth()]}/${hoje.getFullYear()}` }).getByRole('article', { name: nome })).toBeVisible();
+  await visualizar.getByRole('tab', { name: 'Por mês' }).click();
+  await visualizar.getByLabel('Mês', { exact: true }).fill(iso.slice(0, 7));
+  await expect(cartao).toBeVisible();
 
   await cartao.getByRole('button', { name: '✏️ Editar' }).click();
   const edicao = page.getByRole('form', { name: 'Editar operação' });
@@ -37,7 +51,6 @@ test('Controle de Operações: registra com objetivo, edita, exclui e pede o Rel
   await expect(cartao).toContainText('Objetivo: Prevenir roubos no evento');
 
   // Pede o relatório: fica "Gerando…" até o motor (Apps Script) devolver o Word.
-  const relatorio = page.getByRole('group', { name: 'Relatório de Indicadores' });
   await relatorio.getByRole('button', { name: 'Gerar relatório' }).click();
   await expect(relatorio.getByText(/Informe o número do relatório/)).toBeVisible();
   const numero = `${Date.now() % 10000}/${info.project.name === 'celular' ? '01' : '02'}/26`;

@@ -27,25 +27,27 @@ import {
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { hojeISO } from '../../domain/datas';
 import { Campo } from '../Campo';
 
 /** Operações → Controle de Operações: registro das operações (com o Objetivo) e o Relatório de Indicadores. */
 export function ControleOperacoes() {
   const ops = useAoVivo<OperacaoControle[]>((ok, erro) => observarControle(db, ok, erro), [], 'Não foi possível carregar as operações.');
-  const [mes, setMes] = useState(mesAnterior());
-  const [todas, setTodas] = useState(false);
+  const [mes, setMes] = useState(mesAnterior()); // do relatório
+  const [visao, setVisao] = useState<'mes' | 'todas'>('mes');
+  const [mesLista, setMesLista] = useState(mesDe(hojeISO()));
   const [editando, setEditando] = useState<string | null>(null); // 'nova' ou o id
   const [aExcluir, setAExcluir] = useState<OperacaoControle | null>(null);
   const [aviso, setAviso] = useState('');
 
-  const lista = filtrarControle(ops.valor ?? [], todas ? null : mes);
+  const lista = filtrarControle(ops.valor ?? [], visao === 'todas' ? null : mesLista);
   const doMes = filtrarControle(ops.valor ?? [], mes);
   const semObjetivo = doMes.filter((o) => !o.objetivo.trim());
 
   function salvo(d: DadosControle, nova: boolean) {
     setEditando(null);
     setAviso(nova ? `Operação registrada (${rotuloMes(mesDe(d.inicio))}).` : 'Operação atualizada.');
-    if (!todas) setMes(mesDe(d.inicio)); // mostra a operação que acabou de salvar
+    if (visao === 'mes') setMesLista(mesDe(d.inicio)); // mostra a operação que acabou de salvar
   }
 
   async function confirmarExclusao() {
@@ -84,13 +86,24 @@ export function ControleOperacoes() {
         </p>
       )}
 
-      <div className="barra-filtro-controle">
-        <h3 className="titulo-aba-cia">
-          {todas ? 'Todas as operações' : `Operações de ${rotuloMes(mes)}`} ({lista.length})
-        </h3>
-        <label className="campo-check">
-          <input type="checkbox" checked={todas} onChange={(e) => setTodas(e.target.checked)} /> Mostrar todos os meses
-        </label>
+      <div className="cartao grupo" role="group" aria-label="Visualizar operações">
+        <h3>👁️ Visualizar operações</h3>
+        <div className="abas" role="tablist" aria-label="Período">
+          <button type="button" role="tab" aria-selected={visao === 'mes'} onClick={() => setVisao('mes')}>
+            Por mês
+          </button>
+          <button type="button" role="tab" aria-selected={visao === 'todas'} onClick={() => setVisao('todas')}>
+            Todas
+          </button>
+        </div>
+        {visao === 'mes' && (
+          <Campo rotulo="Mês" className="campo-mes-lista">
+            <input type="month" value={mesLista} onChange={(e) => e.target.value && setMesLista(e.target.value)} />
+          </Campo>
+        )}
+        <p className="pendente-detalhe">
+          {visao === 'todas' ? 'Todas as operações' : `Operações de ${rotuloMes(mesLista)}`}: {lista.length}
+        </p>
       </div>
 
       {ops.erro && (
@@ -101,21 +114,42 @@ export function ControleOperacoes() {
       {ops.carregando && <p className="carregando">Carregando…</p>}
       {!ops.carregando && !ops.erro && lista.length === 0 && <p className="vazio">Nenhuma operação neste período.</p>}
 
-      <ul className="lista lista-pendentes">
-        {lista.map((o) => (
-          <li key={o.id}>
-            {editando === o.id ? (
-              <FormControle operacao={o} aoCancelar={() => setEditando(null)} aoSalvar={(d) => salvo(d, false)} />
-            ) : (
-              <CartaoControle operacao={o} aoEditar={() => setEditando(o.id)} aoExcluir={() => setAExcluir(o)} />
-            )}
-          </li>
-        ))}
-      </ul>
+      {agruparPorMes(lista, visao === 'todas').map((g) => (
+        <section key={g.mes} className="grupo-mes-controle" aria-label={g.rotulo || undefined}>
+          {g.rotulo && (
+            <h3 className="titulo-aba-cia">
+              {g.rotulo} ({g.itens.length})
+            </h3>
+          )}
+          <ul className="lista lista-pendentes">
+            {g.itens.map((o) => (
+              <li key={o.id}>
+                {editando === o.id ? (
+                  <FormControle operacao={o} aoCancelar={() => setEditando(null)} aoSalvar={(d) => salvo(d, false)} />
+                ) : (
+                  <CartaoControle operacao={o} aoEditar={() => setEditando(o.id)} aoExcluir={() => setAExcluir(o)} />
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
 
       {aExcluir && <ConfirmarExclusao operacao={aExcluir} aoConfirmar={confirmarExclusao} aoCancelar={() => setAExcluir(null)} />}
     </section>
   );
+}
+
+/** Em "Todas": um título por mês (pelo mês de início), do mais recente ao mais antigo. */
+function agruparPorMes(lista: OperacaoControle[], agrupar: boolean) {
+  if (!agrupar) return [{ mes: 'mes', rotulo: '', itens: lista }];
+  const grupos: { mes: string; rotulo: string; itens: OperacaoControle[] }[] = [];
+  for (const o of lista) {
+    const m = mesDe(o.inicio);
+    if (grupos.at(-1)?.mes !== m) grupos.push({ mes: m, rotulo: rotuloMes(m), itens: [] });
+    grupos.at(-1)!.itens.push(o);
+  }
+  return grupos;
 }
 
 function CartaoControle(p: { operacao: OperacaoControle; aoEditar: () => void; aoExcluir: () => void }) {
