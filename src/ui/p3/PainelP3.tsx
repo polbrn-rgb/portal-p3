@@ -19,15 +19,11 @@ import { PainelPrazos } from './PainelPrazos';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-/** Dentro de Demandas Pendentes: a lista de pendentes e o Checklist Operações. */
-function SubAbas({ ativa, pendentes, operacoes }: { ativa: 'pendentes' | 'operacoes'; pendentes?: number; operacoes?: number }) {
+/** Dentro de Operações: o Checklist Operações (outras sub-abas entram aqui quando precisar). */
+function SubAbasOperacoes({ operacoes }: { operacoes?: number }) {
   return (
-    <nav className="abas abas-p3 subabas" aria-label="Demandas Pendentes">
-      <a href="#/pendentes" aria-current={ativa === 'pendentes' ? 'page' : undefined}>
-        Pendentes
-        {pendentes ? <span className="contador-aba">{pendentes}</span> : null}
-      </a>
-      <a href="#/operacoes" aria-current={ativa === 'operacoes' ? 'page' : undefined}>
+    <nav className="abas abas-p3 subabas" aria-label="Operações">
+      <a href="#/operacoes" aria-current="page">
         Checklist Operações
         {operacoes ? <span className="contador-aba">{operacoes}</span> : null}
       </a>
@@ -42,7 +38,7 @@ export function PainelP3() {
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
   return (
     <div className="layout-p3">
-      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} />
+      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} />
       <div className="conteudo-p3">
         <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} />
       </div>
@@ -51,7 +47,8 @@ export function PainelP3() {
 }
 
 function abaDaRota(hash: string): AbaP3 {
-  if (/^#\/(pendentes|operacoes|destinar)/.test(hash)) return 'pendentes';
+  if (/^#\/(pendentes|destinar)/.test(hash)) return 'pendentes';
+  if (hash.startsWith('#/operacoes')) return 'operacoes';
   if (hash === '#/painel') return 'painel';
   if (hash === '#/cfp') return 'cfp';
   if (hash === '#/sala') return 'sala';
@@ -60,8 +57,6 @@ function abaDaRota(hash: string): AbaP3 {
 }
 
 function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: AoVivo<Pendente[]>; operacoes: AoVivo<Operacao[]> }) {
-  const total = pendentes.valor?.length;
-  const totalOperacoes = operacoes.valor?.length;
 
   if (hash === '#/nova') return <NovaDemanda />;
   if (hash === '#/pendentes/sei') return <FormPendente key="sei" tipo="sei" />;
@@ -99,12 +94,12 @@ function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: A
       </>
     );
   }
-  if (hash === '#/pendentes' || hash === '#/operacoes') {
-    const ativa = hash === '#/pendentes' ? 'pendentes' : 'operacoes';
+  if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
+  if (hash === '#/operacoes') {
     return (
       <>
-        <SubAbas ativa={ativa} pendentes={total} operacoes={totalOperacoes} />
-        {ativa === 'pendentes' ? <ListaPendentes pendentes={pendentes} /> : <ChecklistOperacoes operacoes={operacoes} />}
+        <SubAbasOperacoes operacoes={operacoes.valor?.length} />
+        <ChecklistOperacoes operacoes={operacoes} />
       </>
     );
   }

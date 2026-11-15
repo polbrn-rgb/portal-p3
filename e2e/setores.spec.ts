@@ -116,7 +116,7 @@ test('P/3 tem a aba CFP com as missões e manda recado que o CFP vê como do Cmt
 test('P/3 manda recado para a Sala de Operações, que vê como do Cmt do P3 (e o CFP não)', async ({ page }, info) => {
   const recado = `Atenção ao lançamento dos resultados (${info.project.name} ${info.retry})`;
   await entrar(page, 'p3', SENHA_TESTE);
-  await irPara(page, 'Sala Op.');
+  await irPara(page, 'Sala de Operações');
   await expect(page.getByRole('heading', { name: 'Recados para a Sala de Operações' })).toBeVisible();
   await page.getByRole('button', { name: '✉️ Recado para a Sala' }).click();
   await page.getByRole('textbox', { name: /^Recado \(aparece/ }).fill(recado);
