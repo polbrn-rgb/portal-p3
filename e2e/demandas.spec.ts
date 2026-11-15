@@ -46,6 +46,24 @@ test('formulário não salva sem os campos obrigatórios', async ({ page }) => {
   await expect(page.getByRole('alert')).toHaveText('Confira os campos destacados.');
   await expect(page.getByText('Informe a demanda (resumo).')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Nova demanda' })).toBeVisible();
+
+  // A página leva até o primeiro dado que falta, com o campo em vermelho; obrigatórios têm *.
+  const resumo = page.getByLabel('Demanda (resumo)');
+  await expect(resumo).toBeFocused();
+  await expect(resumo).toBeInViewport();
+  await expect(resumo).toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
+  await expect(page.locator('label.campo', { hasText: 'Demanda (resumo)' }).locator('.obrigatorio')).toHaveText('*');
+  await expect(page.locator('label.campo', { hasText: 'Observação' }).locator('.obrigatorio')).toHaveCount(0);
+
+  // Corrigiu esse e faltou outro, mais acima: a página sobe até ele; o corrigido deixa de ficar vermelho.
+  await resumo.fill('Teste de obrigatórios');
+  await page.getByLabel('Data de entrada').fill('');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  const data = page.getByLabel('Data de entrada');
+  await expect(data).toBeFocused();
+  await expect(data).toBeInViewport();
+  await expect(page.getByText('Informe a data de entrada.')).toBeVisible();
+  await expect(resumo).not.toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
 });
 
 test('marcar TODAS cobre as 7 Cias', async ({ page }) => {

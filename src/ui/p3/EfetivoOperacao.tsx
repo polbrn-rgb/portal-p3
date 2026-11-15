@@ -23,6 +23,7 @@ import {
 import { siglaDoDestino, UNIDADES, type UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { Campo, Obrigatorio } from '../Campo';
 
 type PropsPedido = { demanda: Demanda; aoFechar: () => void; anterior?: PedidoEfetivo };
 
@@ -75,11 +76,9 @@ export function FormPedidoEfetivo({ demanda, aoFechar, anterior }: PropsPedido) 
 
   return (
     <form className="detalhe-item pedido-efetivo" onSubmit={enviar} noValidate aria-label="Solicitação de efetivo">
-      <label className="campo">
-        Prazo para as Cias preencherem
+      <Campo rotulo="Prazo para as Cias preencherem" erro={erros.prazo} obrigatorio>
         <input type="date" value={prazo} min={anterior ? undefined : hojeISO()} onChange={(e) => setPrazo(e.target.value)} />
-        {erros.prazo && <span className="erro-campo">{erros.prazo}</span>}
-      </label>
+      </Campo>
 
       <fieldset className="grupo-simples">
         <legend>Dados que as Cias devem informar</legend>
@@ -99,7 +98,10 @@ export function FormPedidoEfetivo({ demanda, aoFechar, anterior }: PropsPedido) 
       </fieldset>
 
       <fieldset className="grupo-simples">
-        <legend>Cias e quantidade de policiais</legend>
+        <legend>
+          Cias e quantidade de policiais
+          <Obrigatorio />
+        </legend>
         <div className="opcoes">
           {UNIDADES.map((u) => (
             <label key={u.id} className="opcao">

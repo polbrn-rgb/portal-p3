@@ -11,8 +11,11 @@ import {
   validarPolicialEscalado,
   validarResposta,
   type PolicialEscalado,
+  errosPolicialEscalado,
+  errosResposta,
   planejarEdicao,
   planilhaDoEfetivo,
+  temErroPolicial,
   type SolicitacaoEfetivo,
 } from '../../src/domain/efetivo';
 import { diasMudaram, gruposDeCampos, operacoesDoDia, valoresPreenchidos } from '../../src/domain/resultado';
@@ -70,6 +73,20 @@ describe('efetivo', () => {
     expect(validarPolicialEscalado({ ...p, extras: { cpf: '1', vtr: 'M-08' } }, ['cpf', 'vtr'])).toBe('');
     expect(validarPolicialEscalado({ ...p, re: '12' }, [])).toBe('Informe o RE.');
     expect(validarResposta([], 'Sgt X')).toBe('Adicione pelo menos um policial.');
+    // Campo a campo, para a tela marcar cada um de vermelho.
+    expect(errosPolicialEscalado(p, ['cpf', 'vtr'])).toEqual({ extras: { cpf: 'Preencha: CPF.', vtr: 'Preencha: VTR (prefixo).' } });
+    expect(errosPolicialEscalado({ ...p, posto: ' ', nomeGuerra: '' }, [])).toEqual({
+      extras: {},
+      posto: 'Informe o posto/graduação.',
+      nomeGuerra: 'Informe o nome de guerra.',
+    });
+    expect(errosPolicialEscalado({ ...p, re: '12', posto: '' }, [])).toEqual({ extras: {}, re: 'Informe o RE.' });
+    expect(temErroPolicial(errosPolicialEscalado(p, []))).toBe(false);
+    expect(errosResposta([], ' ')).toEqual({
+      policiais: 'Adicione pelo menos um policial.',
+      nome: 'Informe quem está enviando (posto/graduação e nome).',
+    });
+    expect(errosResposta([p], 'Sgt X')).toEqual({});
     expect(validarResposta([p], ' ')).toBe('Informe quem está enviando (posto/graduação e nome).');
   });
 

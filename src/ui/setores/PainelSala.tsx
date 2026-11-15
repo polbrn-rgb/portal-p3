@@ -5,6 +5,7 @@ import { gruposDeCampos, operacoesDoDia, valoresPreenchidos, type Resultado } fr
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.sala.nome';
 
@@ -68,6 +69,7 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
   const [valores, setValores] = useState<Record<string, string>>({});
   const [nome, setNome] = useState(lerNome);
   const [erro, setErro] = useState('');
+  const [faltando, setFaltando] = useState<{ protocolo?: string; nome?: string }>({});
   const [salvando, setSalvando] = useState(false);
   const [carregou, setCarregou] = useState(false);
 
@@ -84,9 +86,13 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
   async function salvar(e: FormEvent) {
     e.preventDefault();
     const { valores: numeros, erro: erroValores } = valoresPreenchidos(valores);
-    const msg = erroValores || (!protocolo.trim() ? 'Informe o protocolo do resultado (Sicoordop).' : '') || (!nome.trim() ? 'Informe quem está lançando.' : '');
-    setErro(msg);
-    if (msg) return;
+    const f = {
+      ...(!protocolo.trim() ? { protocolo: 'Informe o protocolo do resultado (Sicoordop).' } : {}),
+      ...(!nome.trim() ? { nome: 'Informe quem está lançando.' } : {}),
+    };
+    setFaltando(f);
+    setErro(erroValores);
+    if (erroValores || f.protocolo || f.nome) return;
     setSalvando(true);
     try {
       try {
@@ -113,10 +119,9 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
             Nº protocolo - Mapa Força
             <input value={operacao.protocolos[dia] || 'Sem protocolo informado pela P/3'} readOnly />
           </label>
-          <label className="campo">
-            Nº protocolo - Resultado
+          <Campo rotulo="Nº protocolo - Resultado" erro={faltando.protocolo && !protocolo.trim() ? faltando.protocolo : undefined} obrigatorio>
             <input value={protocolo} placeholder="Nº do Sicoordop" onChange={(e) => setProtocolo(e.target.value)} />
-          </label>
+          </Campo>
         </div>
       </div>
 
@@ -142,10 +147,9 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
       ))}
 
       <div className="cartao grupo">
-        <label className="campo">
-          Lançado por
+        <Campo rotulo="Lançado por" erro={faltando.nome && !nome.trim() ? faltando.nome : undefined} obrigatorio>
           <input value={nome} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
-        </label>
+        </Campo>
       </div>
 
       {erro && (

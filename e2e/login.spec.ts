@@ -26,3 +26,12 @@ test('o aparelho lembra a última unidade escolhida', async ({ page }) => {
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByLabel('Unidade')).toHaveValue('4cia');
 });
+
+test('sem senha: avisa no próprio campo, em vermelho, e não entra', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page.getByText('Digite a senha.')).toBeVisible();
+  await expect(page.getByLabel('Senha')).toBeFocused();
+  await expect(page.getByLabel('Senha')).toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
+  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+});

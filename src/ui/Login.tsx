@@ -4,6 +4,7 @@ import { CONTAS, emailDaConta, type ContaId } from '../domain/contas';
 import { mensagemErroLogin } from '../domain/mensagens';
 import { auth } from '../lib/firebase';
 import { Topo } from './Topo';
+import { Campo } from './Campo';
 
 const CHAVE_ULTIMA = 'portalp3.ultimaConta';
 
@@ -29,11 +30,14 @@ export function Login() {
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [semSenha, setSemSenha] = useState(false);
 
   async function entrar(evento: FormEvent) {
     evento.preventDefault();
     setErro('');
     setAviso('');
+    setSemSenha(!senha);
+    if (!senha) return;
     setEnviando(true);
     try {
       try {
@@ -62,7 +66,7 @@ export function Login() {
   return (
     <main className="tela">
       <Topo />
-      <form className="cartao formulario" onSubmit={entrar}>
+      <form className="cartao formulario" onSubmit={entrar} noValidate>
         <h2>Entrar</h2>
         <label className="campo">
           Unidade
@@ -74,8 +78,7 @@ export function Login() {
             ))}
           </select>
         </label>
-        <label className="campo">
-          Senha
+        <Campo rotulo="Senha" erro={semSenha && !senha ? 'Digite a senha.' : undefined} obrigatorio>
           <input
             type="password"
             autoComplete="current-password"
@@ -83,7 +86,7 @@ export function Login() {
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
           />
-        </label>
+        </Campo>
         {erro && (
           <p className="mensagem erro" role="alert">
             {erro}

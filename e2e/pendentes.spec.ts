@@ -45,6 +45,7 @@ test('Ordem Verbal pede quem deu a ordem e leva isso para a demanda', async ({ p
   await page.getByLabel('Qual é a ordem').fill(ordem);
   await page.getByRole('button', { name: 'Salvar pendente' }).click();
   await expect(page.getByText('Informe quem deu a ordem.')).toBeVisible();
+  await expect(page.getByLabel('Quem deu a ordem')).toBeFocused();
 
   await page.getByLabel('Quem deu a ordem').fill('Cmt Btl');
   await page.getByRole('button', { name: 'Salvar pendente' }).click();

@@ -3,6 +3,7 @@ import { apagarRecado, enviarRecado, observarRecados, type Recado, type SetorRec
 import { LIMITE_RECADO, quandoFoi, validarRecado } from '../../domain/recado';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { Campo } from '../Campo';
 
 const NOMES: Record<SetorRecado, { titulo: string; botao: string }> = {
   cfp: { titulo: 'Recados para o CFP', botao: '✉️ Recado para o CFP' },
@@ -66,11 +67,9 @@ export function Recados({ setor, podeEnviar = false }: { setor: SetorRecado; pod
       )}
       {podeEnviar && escrevendo && (
         <form className="cartao-recado" onSubmit={enviar} noValidate>
-          <label className="campo">
-            Recado (aparece como "Recado do Cmt do P3")
+          <Campo rotulo='Recado (aparece como "Recado do Cmt do P3")' erro={erro} obrigatorio>
             <textarea rows={4} maxLength={LIMITE_RECADO} value={texto} autoFocus onChange={(e) => setTexto(e.target.value)} />
-            {erro && <span className="erro-campo">{erro}</span>}
-          </label>
+          </Campo>
           <div className="acoes-linha">
             <button className="botao secundario" type="button" onClick={() => { setEscrevendo(false); setErro(''); }}>
               Cancelar

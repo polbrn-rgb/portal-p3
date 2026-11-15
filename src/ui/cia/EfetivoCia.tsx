@@ -9,15 +9,19 @@ import {
   POSTOS,
   ROTULO_SITUACAO,
   situacaoSolicitacao,
+  errosPolicialEscalado,
+  errosResposta,
+  temErroPolicial,
   totalDe,
-  validarPolicialEscalado,
-  validarResposta,
   type CampoExtra,
+  type ErrosPolicial,
+  type ErrosResposta,
   type PolicialEscalado,
   type SolicitacaoEfetivo,
 } from '../../domain/efetivo';
 import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
+import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.respondidoPor';
 
@@ -73,7 +77,9 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
   const [policiais, setPoliciais] = useState<PolicialEscalado[]>(s.policiais);
   const [novo, setNovo] = useState<PolicialEscalado>(policialVazio);
   const [busca, setBusca] = useState<'nada' | 'buscando' | 'achou' | 'nao-achou'>('nada');
-  const [erroNovo, setErroNovo] = useState('');
+  const [errosNovo, setErrosNovo] = useState<ErrosPolicial>({ extras: {} });
+  const setErroNovo = (re: string) => setErrosNovo({ extras: {}, ...(re ? { re } : {}) });
+  const [errosEnvio, setErrosEnvio] = useState<ErrosResposta>({});
   const [nome, setNome] = useState(lerNome);
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -105,8 +111,14 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
 
   function adicionar(e: FormEvent) {
     e.preventDefault();
-    const msg = validarPolicialEscalado(novo, s.campos);
-    if (msg) return setErroNovo(msg);
+    const encontrados = errosPolicialEscalado(novo, s.campos);
+    // Sem buscar o RE, posto e nome ainda não aparecem na tela: o aviso vai no RE.
+    if (busca !== 'nao-achou' && !encontrados.re && (encontrados.posto || encontrados.nomeGuerra)) {
+      encontrados.re = 'Clique em Buscar para trazer os dados do RE.';
+      delete encontrados.posto;
+      delete encontrados.nomeGuerra;
+    }
+    if (temErroPolicial(encontrados)) return setErrosNovo(encontrados);
     if (policiais.some((p) => normalizarRE(p.re) === normalizarRE(novo.re))) return setErroNovo('Este RE já está na lista.');
     const extrasPedidos = Object.fromEntries(extras.map((c) => [c.id, (novo.extras[c.id] ?? '').trim()]));
     setPoliciais((l) => [...l, { ...novo, re: novo.re.trim(), extras: extrasPedidos }]);
@@ -117,9 +129,10 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
   }
 
   async function enviar() {
-    const msg = validarResposta(policiais, nome);
-    setErro(msg);
-    if (msg) return;
+    const encontrados = errosResposta(policiais, nome);
+    setErrosEnvio(encontrados);
+    setErro('');
+    if (encontrados.policiais || encontrados.nome) return;
     setEnviando(true);
     try {
       try {
@@ -162,8 +175,7 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
 
       <form className="cartao grupo" onSubmit={adicionar} noValidate aria-label="Adicionar policial">
         <div className="linha-busca">
-          <label className="campo">
-            RE do policial
+          <Campo rotulo="RE do policial" erro={errosNovo.re} obrigatorio>
             <input
               value={novo.re}
               inputMode="numeric"
@@ -174,7 +186,7 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
               }}
               onBlur={() => busca === 'nada' && novo.re.trim() && void buscar()}
             />
-          </label>
+          </Campo>
           <button className="botao secundario" type="button" onClick={() => void buscar()} disabled={busca === 'buscando'}>
             {busca === 'buscando' ? 'Buscando…' : 'Buscar'}
           </button>
@@ -192,14 +204,12 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
               RE não encontrado no banco de efetivo. Preencha os dados:
             </p>
             <div className="grade">
-              <label className="campo">
-                Posto/graduação
+              <Campo rotulo="Posto/graduação" erro={errosNovo.posto} obrigatorio>
                 <input value={novo.posto} placeholder="Ex.: Cb PM" onChange={(e) => setNovo({ ...novo, posto: e.target.value })} />
-              </label>
-              <label className="campo">
-                Nome de guerra
+              </Campo>
+              <Campo rotulo="Nome de guerra" erro={errosNovo.nomeGuerra} obrigatorio>
                 <input value={novo.nomeGuerra} onChange={(e) => setNovo({ ...novo, nomeGuerra: e.target.value })} />
-              </label>
+              </Campo>
               <label className="campo">
                 Telefone
                 <input value={novo.telefone} inputMode="tel" onChange={(e) => setNovo({ ...novo, telefone: e.target.value })} />
@@ -211,26 +221,30 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
         {extras.length > 0 && (
           <div className="grade">
             {extras.map((c) => (
-              <label key={c.id} className="campo">
-                {c.rotulo}
+              <Campo key={c.id} rotulo={c.rotulo} erro={errosNovo.extras[c.id]} obrigatorio>
                 <input
                   value={novo.extras[c.id] ?? ''}
                   inputMode={c.id === 'cpf' ? 'numeric' : undefined}
                   onChange={(e) => setNovo({ ...novo, extras: { ...novo.extras, [c.id as CampoExtra]: e.target.value } })}
                 />
-              </label>
+              </Campo>
             ))}
           </div>
         )}
-        {erroNovo && <span className="erro-campo">{erroNovo}</span>}
         <button className="botao secundario" type="submit">
           + Adicionar policial
         </button>
       </form>
 
       <div className="cartao grupo">
-        <strong>Policiais ({policiais.length})</strong>
+        <strong>
+          Policiais ({policiais.length})
+          <span className="obrigatorio" aria-hidden="true">
+            {' '}*
+          </span>
+        </strong>
         {policiais.length === 0 && <p className="vazio">Nenhum policial adicionado.</p>}
+        {errosEnvio.policiais && policiais.length === 0 && <span className="erro-campo">{errosEnvio.policiais}</span>}
         <ul className="escalados">
           {policiais.map((p) => (
             <li key={p.re}>
@@ -254,10 +268,9 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
             </li>
           ))}
         </ul>
-        <label className="campo">
-          Enviado por
+        <Campo rotulo="Enviado por" erro={errosEnvio.nome && !nome.trim() ? errosEnvio.nome : undefined} obrigatorio>
           <input value={nome} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
-        </label>
+        </Campo>
       </div>
 
       {erro && (

@@ -15,6 +15,7 @@ import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { irPara, useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { Campo } from '../Campo';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
@@ -153,6 +154,7 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
   const [nome, setNome] = useState(enc.respondidoPor || lerNome());
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
+  const [faltando, setFaltando] = useState<{ resposta?: string; nome?: string }>({});
   const finalizado = enc.status === 'aceito' || enc.status === 'cancelado';
 
   // Abrir a demanda já avisa a P/3 que a Cia viu.
@@ -175,10 +177,12 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
   }
 
   function enviar() {
-    if (!resposta.trim() || !nome.trim()) {
-      setErro('Preencha a resposta e o nome de quem respondeu.');
-      return;
-    }
+    const f = {
+      ...(!resposta.trim() ? { resposta: 'Escreva a resposta.' } : {}),
+      ...(!nome.trim() ? { nome: 'Informe quem respondeu (posto/graduação e nome).' } : {}),
+    };
+    setFaltando(f);
+    if (f.resposta || f.nome) return;
     try {
       localStorage.setItem(CHAVE_NOME, nome.trim());
     } catch {
@@ -229,12 +233,10 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
       )}
 
       <div className="cartao grupo">
-        <label className="campo">
-          Resposta
+        <Campo rotulo="Resposta" erro={faltando.resposta && !resposta.trim() ? faltando.resposta : undefined} obrigatorio={!finalizado}>
           <textarea rows={5} value={resposta} disabled={finalizado} onChange={(e) => setResposta(e.target.value)} />
-        </label>
-        <label className="campo">
-          Respondido por
+        </Campo>
+        <Campo rotulo="Respondido por" erro={faltando.nome && !nome.trim() ? faltando.nome : undefined} obrigatorio={!finalizado}>
           <input
             value={nome}
             disabled={finalizado}
@@ -242,7 +244,7 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
             autoComplete="name"
             onChange={(e) => setNome(e.target.value)}
           />
-        </label>
+        </Campo>
       </div>
 
       {erro && (

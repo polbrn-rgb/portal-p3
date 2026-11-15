@@ -211,3 +211,33 @@ export function planilhaDoEfetivo(
     { nome: 'Resumo', linhas: resumo },
   ];
 }
+
+// ---------- Erros campo a campo (a tela marca de vermelho e rola até o primeiro) ----------
+
+export type ErrosPolicial = { re?: string; posto?: string; nomeGuerra?: string; extras: Partial<Record<CampoExtra, string>> };
+
+export function errosPolicialEscalado(p: PolicialEscalado, campos: CampoExtra[]): ErrosPolicial {
+  const e: ErrosPolicial = { extras: {} };
+  if (normalizarRE(p.re).length < 5) e.re = 'Informe o RE.';
+  else {
+    if (!p.posto.trim()) e.posto = 'Informe o posto/graduação.';
+    if (!p.nomeGuerra.trim()) e.nomeGuerra = 'Informe o nome de guerra.';
+  }
+  for (const c of CAMPOS_EXTRAS) {
+    if (campos.includes(c.id) && !(p.extras[c.id] ?? '').trim()) e.extras[c.id] = `Preencha: ${c.rotulo}.`;
+  }
+  return e;
+}
+
+export function temErroPolicial(e: ErrosPolicial): boolean {
+  return Boolean(e.re || e.posto || e.nomeGuerra || Object.keys(e.extras).length);
+}
+
+export type ErrosResposta = { policiais?: string; nome?: string };
+
+export function errosResposta(policiais: PolicialEscalado[], respondidoPor: string): ErrosResposta {
+  const e: ErrosResposta = {};
+  if (!policiais.length) e.policiais = 'Adicione pelo menos um policial.';
+  if (!respondidoPor.trim()) e.nome = 'Informe quem está enviando (posto/graduação e nome).';
+  return e;
+}
