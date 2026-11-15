@@ -55,10 +55,14 @@ test('formulário não salva sem os campos obrigatórios', async ({ page }) => {
   await expect(page.locator('label.campo', { hasText: 'Demanda (resumo)' }).locator('.obrigatorio')).toHaveText('*');
   await expect(page.locator('label.campo', { hasText: 'Observação' }).locator('.obrigatorio')).toHaveCount(0);
 
-  // Corrigiu e tentou de novo: vai para o próximo que falta.
+  // Corrigiu esse e faltou outro, mais acima: a página sobe até ele; o corrigido deixa de ficar vermelho.
   await resumo.fill('Teste de obrigatórios');
+  await page.getByLabel('Data de entrada').fill('');
   await page.getByRole('button', { name: 'Salvar' }).click();
-  await expect(page.getByLabel('Tipo de saída')).toBeFocused();
+  const data = page.getByLabel('Data de entrada');
+  await expect(data).toBeFocused();
+  await expect(data).toBeInViewport();
+  await expect(page.getByText('Informe a data de entrada.')).toBeVisible();
   await expect(resumo).not.toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
 });
 
