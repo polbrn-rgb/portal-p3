@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { entrar, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ page }, info) => {
@@ -145,7 +145,7 @@ test('painel de prazos conta a demanda atrasada e leva para a lista filtrada', a
   await page.getByRole('button', { name: 'Salvar' }).click();
   await page.getByRole('link', { name: 'Ver lista' }).click();
 
-  await page.getByRole('link', { name: 'Painel', exact: true }).click();
+  await irPara(page, 'Painel');
   await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await expect(page.getByRole('table')).toContainText('CIA FT');

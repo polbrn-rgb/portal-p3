@@ -66,6 +66,8 @@ histórico das demandas.
   Cias e do Checklist Operações; o motor apaga os eventos dela nas agendas (inclusive a do CFP) e manda a pasta do CFP
   para a lixeira do Drive (recuperável por 30 dias). O número não é
   reaproveitado e aparece como "Excluída" no backup.
+- **Menu da P/3**: no computador fica fixo na lateral esquerda; no celular é o botão ☰ no canto superior esquerdo,
+  que abre a gaveta com as seções (fecha ao escolher, ao tocar fora ou no Esc).
 - **Painel**: prazos no topo e, descendo, o **Painel estatístico** (o Dashboard do numerador antigo): total, entraram no
   mês, em aberto, vencem hoje, atrasadas e gráficos por status, mês, responsável, categoria, dia da semana e tipo de saída
   (filtro por ano; lê as demandas do ano uma vez e guarda 10 minutos no aparelho).

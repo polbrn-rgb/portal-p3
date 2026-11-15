@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { entrar, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 const admin = () => getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-portal-p3' }));
@@ -14,7 +14,7 @@ test('P/3 abre o EAP no Aperfeiçoamento e a Cia indica o efetivo da turma', asy
     .set({ re: '987654-3', posto: 'SD PM', nomeGuerra: 'TESTE', telefone: '(11) 98888-0000', nomeCompleto: 'TESTE DA SILVA', email: 'teste@policiamilitar.sp.gov.br' });
 
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: 'Aperfeiçoamento', exact: true }).click();
+  await irPara(page, 'Aperfeiçoamento');
   await expect(page.getByRole('heading', { name: 'Aperfeiçoamento' })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await page.getByRole('link', { name: '+ Novo EAP' }).click();
@@ -75,7 +75,7 @@ test('P/3 abre o EAP no Aperfeiçoamento e a Cia indica o efetivo da turma', asy
   // P/3 vê que a Cia enviou (o motor ainda vai gravar na planilha).
   await sair(page);
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: 'Aperfeiçoamento', exact: true }).click();
+  await irPara(page, 'Aperfeiçoamento');
   await page.getByRole('link', { name: new RegExp(titulo) }).click();
   const linha = page.getByRole('row', { name: /1ª CIA/ });
   await expect(linha).toContainText('Gravando…');

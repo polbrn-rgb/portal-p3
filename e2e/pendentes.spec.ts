@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { entrar, sobraLateral } from './ajuda';
+import { entrar, irPara, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('SEI lançado nas pendentes ganha destino e vai para o Numerador', async ({ page }, info) => {
   const assunto = `Escolta SEI ${info.project.name} ${Date.now()}`;
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: /Demandas Pendentes/ }).click();
+  await irPara(page, /Demandas Pendentes/);
   await expect(page.getByRole('heading', { name: 'Demandas Pendentes', level: 2 })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 
@@ -33,14 +33,14 @@ test('SEI lançado nas pendentes ganha destino e vai para o Numerador', async ({
   await expect(page.getByRole('heading', { name: 'Demandas Pendentes', level: 2 })).toBeVisible();
   await expect(page.getByRole('article', { name: assunto })).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Numerador', exact: true }).click();
+  await irPara(page, 'Numerador');
   await expect(page.getByRole('link', { name: new RegExp(assunto) })).toContainText('Escoltas');
 });
 
 test('Ordem Verbal pede quem deu a ordem e leva isso para a demanda', async ({ page }, info) => {
   const ordem = `Reforço no centro ${info.project.name} ${Date.now()}`;
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: /Demandas Pendentes/ }).click();
+  await irPara(page, /Demandas Pendentes/);
   await page.getByRole('link', { name: '+ Ordem Verbal' }).click();
   await page.getByLabel('Qual é a ordem').fill(ordem);
   await page.getByRole('button', { name: 'Salvar pendente' }).click();
@@ -60,7 +60,7 @@ test('Ordem Verbal pede quem deu a ordem e leva isso para a demanda', async ({ p
 test('descartar pede confirmação e pode ser desfeito', async ({ page }, info) => {
   const assunto = `Descartar ${info.project.name} ${Date.now()}`;
   await entrar(page, 'p3', SENHA_TESTE);
-  await page.getByRole('link', { name: /Demandas Pendentes/ }).click();
+  await irPara(page, /Demandas Pendentes/);
   await page.getByRole('link', { name: '+ SEI' }).click();
   await page.getByLabel('Texto da demanda (cole aqui)').fill(assunto);
   await page.getByRole('button', { name: 'Salvar pendente' }).click();
