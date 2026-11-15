@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { observarEapDaUnidade } from '../../data/eap';
 import { observarSolicitacoesDaUnidade } from '../../data/efetivo';
 import { marcarEmAndamento, marcarVisualizado, observarDaUnidade, responder } from '../../data/encaminhamentos';
@@ -18,6 +18,7 @@ import { db } from '../../lib/firebase';
 import { irPara, useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
+import { MenuLateral } from '../MenuLateral';
 import { EapsDaCia, ResponderEap } from './EapCia';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
@@ -27,8 +28,16 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
+function abaDaRota(hash: string): AbaUnidade | undefined {
+  if (hash === '#/respondidas') return 'respondidas';
+  if (hash === '#/finalizadas') return 'finalizadas';
+  if (/^#\/(enc|efetivo|eap)\//.test(hash)) return undefined;
+  return 'pendentes';
+}
+
 const CHAVE_NOME = 'portalp3.respondidoPor';
 
+/** Tela das Cias e da Força Tática: menu (lateral no computador, ☰ no celular) e o conteúdo ao lado. */
 export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) {
   const hash = useHash();
   const encs = useAoVivo<Encaminhamento[]>(
@@ -47,62 +56,80 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   const aberto = /^#\/enc\/(.+)$/.exec(hash)?.[1];
   const efetivo = /^#\/efetivo\/(.+)$/.exec(hash)?.[1];
   const eapAberto = /^#\/eap\/(.+)$/.exec(hash)?.[1];
+  const encAberto = aberto ? lista.find((e) => e.id === aberto) : undefined;
+  const ativa = encAberto ? (abaDoEncaminhamento(encAberto.status) ?? undefined) : abaDaRota(hash);
+  const itens = ABAS.map((a) => ({
+    id: a.id,
+    href: `#/${a.id}`,
+    rotulo: a.rotulo,
+    contador: lista.filter((e) => abaDoEncaminhamento(e.status) === a.id).length,
+  }));
 
-  if (eapAberto) {
-    const r = eaps.valor?.find((x) => x.id === eapAberto);
-    if (r) return <ResponderEap key={r.id} r={r} />;
-    if (eaps.carregando) return <p className="carregando">Carregando…</p>;
-    return (
-      <section className="painel">
-        <p className="mensagem erro" role="alert">
-          EAP não encontrado.
-        </p>
-        <a href="#/">Voltar</a>
-      </section>
-    );
-  }
-
-  if (efetivo) {
-    const s = solicitacoes.valor?.find((x) => x.id === efetivo);
-    if (s) return <PreencherEfetivo key={s.id} s={s} />;
-    if (solicitacoes.carregando) return <p className="carregando">Carregando…</p>;
-    return (
-      <section className="painel">
-        <p className="mensagem erro" role="alert">
-          Solicitação não encontrada.
-        </p>
-        <a href="#/">Voltar</a>
-      </section>
-    );
-  }
-
-  if (aberto) {
-    const enc = lista.find((e) => e.id === aberto);
-    if (enc) return <DetalheEncaminhamento key={enc.id} enc={enc} />;
-    if (encs.carregando) return <p className="carregando">Carregando…</p>;
-    return (
-      <section className="painel">
-        <p className="mensagem erro" role="alert">
-          Demanda não encontrada.
-        </p>
-        <a href="#/">Voltar</a>
-      </section>
-    );
-  }
   return (
-    <ListaUnidade
-      sigla={sigla}
-      lista={lista}
-      carregando={encs.carregando}
-      erro={encs.erro}
-      solicitacoes={solicitacoes.valor ?? []}
-      eaps={eaps.valor ?? []}
-    />
+    <div className="layout-p3">
+      <MenuLateral id="menu-unidade" rotulo="Seções da Cia" titulo={sigla} itens={itens} ativa={ativa} />
+      <div className="conteudo-p3">{conteudo()}</div>
+    </div>
   );
+
+  function conteudo(): ReactNode {
+    if (eapAberto) {
+      const r = eaps.valor?.find((x) => x.id === eapAberto);
+      if (r) return <ResponderEap key={r.id} r={r} />;
+      if (eaps.carregando) return <p className="carregando">Carregando…</p>;
+      return (
+        <section className="painel">
+          <p className="mensagem erro" role="alert">
+            EAP não encontrado.
+          </p>
+          <a href="#/">Voltar</a>
+        </section>
+      );
+    }
+
+    if (efetivo) {
+      const s = solicitacoes.valor?.find((x) => x.id === efetivo);
+      if (s) return <PreencherEfetivo key={s.id} s={s} />;
+      if (solicitacoes.carregando) return <p className="carregando">Carregando…</p>;
+      return (
+        <section className="painel">
+          <p className="mensagem erro" role="alert">
+            Solicitação não encontrada.
+          </p>
+          <a href="#/">Voltar</a>
+        </section>
+      );
+    }
+
+    if (aberto) {
+      if (encAberto) return <DetalheEncaminhamento key={encAberto.id} enc={encAberto} />;
+      if (encs.carregando) return <p className="carregando">Carregando…</p>;
+      return (
+        <section className="painel">
+          <p className="mensagem erro" role="alert">
+            Demanda não encontrada.
+          </p>
+          <a href="#/">Voltar</a>
+        </section>
+      );
+    }
+    return (
+      <ListaUnidade
+        sigla={sigla}
+        aba={ativa ?? 'pendentes'}
+        lista={lista}
+        carregando={encs.carregando}
+        erro={encs.erro}
+        solicitacoes={solicitacoes.valor ?? []}
+        eaps={eaps.valor ?? []}
+      />
+    );
+  }
 }
 
 function ListaUnidade(p: {
   sigla: string;
+  aba: AbaUnidade;
   lista: Encaminhamento[];
   carregando: boolean;
   erro: string;
@@ -110,9 +137,8 @@ function ListaUnidade(p: {
   eaps: RespostaEap[];
 }) {
   const hoje = hojeISO();
-  const [aba, setAba] = useState<AbaUnidade>('pendentes');
-  const porAba = (a: AbaUnidade) => p.lista.filter((e) => abaDoEncaminhamento(e.status) === a);
-  const visiveis = porAba(aba);
+  const visiveis = p.lista.filter((e) => abaDoEncaminhamento(e.status) === p.aba);
+  const rotulo = ABAS.find((a) => a.id === p.aba)?.rotulo;
 
   return (
     <section className="painel">
@@ -121,13 +147,9 @@ function ListaUnidade(p: {
       </div>
       <EapsDaCia lista={p.eaps} />
       <SolicitacoesEfetivo lista={p.solicitacoes} />
-      <div className="abas" role="tablist">
-        {ABAS.map((a) => (
-          <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}>
-            {a.rotulo} ({porAba(a.id).length})
-          </button>
-        ))}
-      </div>
+      <h3 className="titulo-aba-cia">
+        {rotulo} ({visiveis.length})
+      </h3>
 
       {p.erro && (
         <p className="mensagem erro" role="alert">

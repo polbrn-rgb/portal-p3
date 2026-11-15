@@ -29,3 +29,11 @@ export async function irPara(page: Page, secao: string | RegExp) {
     .getByRole('link', typeof secao === 'string' ? { name: secao, exact: true } : { name: secao })
     .click();
 }
+
+/** Vai para uma aba da Cia/Força Tática pelo menu (no celular abre o ☰ antes). */
+export async function irParaAbaCia(page: Page, aba: 'Pendentes' | 'Respondidas' | 'Finalizadas') {
+  await page.locator('#menu-unidade').waitFor({ state: 'attached' });
+  const botao = page.getByRole('button', { name: 'Abrir menu' });
+  if (await botao.isVisible()) await botao.click();
+  await page.getByRole('navigation', { name: 'Seções da Cia' }).getByRole('link', { name: new RegExp(`^${aba}`) }).click();
+}

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { entrar, irPara, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Os dados que o motor (Apps Script) gravaria são criados direto no emulador.
@@ -160,9 +160,9 @@ test('tela da Cia: respondida com prazo vencido há um dia sai; atrasada sem res
   }
   await entrar(page, '6cia', SENHA_TESTE);
   await expect(page.getByText(`Atrasada sem resposta ${marca}`)).toBeVisible();
-  await page.getByRole('tab', { name: /Respondidas/ }).click();
+  await irParaAbaCia(page, 'Respondidas');
   await expect(page.getByText(`Respondida no prazo ${marca}`)).toBeVisible();
-  await page.getByRole('tab', { name: /Finalizadas/ }).click();
+  await irParaAbaCia(page, 'Finalizadas');
   await expect(page.getByRole('heading', { name: '6ª CIA' })).toBeVisible();
   await expect(page.getByText(`Respondida vencida ${marca}`)).toHaveCount(0);
 });
