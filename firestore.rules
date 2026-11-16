@@ -172,8 +172,10 @@ service cloud.firestore {
     }
 
     // Configuração que o motor lê (publicada pelo portal da P/3).
+    // config/listas (opções do numerador) a P/3 só lê: quem muda é o Administrador.
     match /config/{id} {
-      allow read, write: if ehP3();
+      allow read: if ehP3();
+      allow write: if ehP3() && id != 'listas';
     }
 
     // Arquivos (PDF) guardados em partes: a P/3 envia; a P/3 e as Cias baixam. Não se altera depois de enviado.

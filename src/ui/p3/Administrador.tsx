@@ -10,7 +10,20 @@ import {
   type Contador,
 } from '../../data/admin';
 import { lerUltimoNumero, PALAVRA_CONFIRMACAO } from '../../domain/admin';
-import { TIPOS_SAIDA } from '../../domain/listas';
+import { alterarLista, observarListas } from '../../data/listas';
+import {
+  adicionarItem,
+  alternarItem,
+  conhecidos,
+  ehFixo,
+  INFO_LISTAS,
+  listasPadrao,
+  moverItem,
+  TAMANHO_MAXIMO_ITEM,
+  type ChaveLista,
+  type ItemLista,
+  type Listas,
+} from '../../domain/listasConfig';
 import { mensagemErroLogin } from '../../domain/mensagens';
 import {
   ANO_NUMERACAO_POR_TIPO,
@@ -20,6 +33,7 @@ import {
 } from '../../domain/numeracao';
 import { entrarAdmin, sairAdmin } from '../../lib/appAdmin';
 import { cutucarMotor } from '../../lib/motor';
+import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
 
 /** Motivo real da falha, para não ficar só "parou no meio". */
@@ -33,27 +47,53 @@ function motivo(falha: unknown): string {
   return `Erro: ${codigo || (falha as Error)?.message || 'desconhecido'}.`;
 }
 
-/** Aba Administrador: senha própria (conta do Administrador), separada do login da P/3. */
-export function Administrador() {
+type SubAbaAdmin = 'numeracao' | 'listas' | 'zerar';
+
+const SUBABAS: { id: SubAbaAdmin; href: string; rotulo: string }[] = [
+  { id: 'numeracao', href: '#/admin', rotulo: 'Numeração' },
+  { id: 'listas', href: '#/admin/listas', rotulo: 'Listas do numerador' },
+  { id: 'zerar', href: '#/admin/zerar', rotulo: 'Zerar portal' },
+];
+
+export function subAbaAdmin(rota: string): SubAbaAdmin {
+  if (rota === '#/admin/listas') return 'listas';
+  if (rota === '#/admin/zerar') return 'zerar';
+  return 'numeracao';
+}
+
+/** Aba Administrador: senha própria (conta do Administrador), separada do login da P/3. Sub-abas no topo. */
+export function Administrador({ rota }: { rota: string }) {
   const [db, setDb] = useState<Firestore | null>(null);
-  // Saiu da aba: o Administrador sai junto.
+  // Saiu da aba Administrador: o Administrador sai junto (trocar de sub-aba não desloga).
   useEffect(() => () => void sairAdmin(), []);
+  const ativa = subAbaAdmin(rota);
 
   if (!db) return <EntrarAdmin aoEntrar={setDb} />;
   return (
     <>
-      <section className="painel">
-        <div className="painel-cabecalho">
-          <h2>Administrador</h2>
-          <button className="botao secundario" type="button" onClick={() => void sairAdmin().then(() => setDb(null))}>
-            🔒 Sair do Administrador
-          </button>
-        </div>
-      </section>
-      <Numeracao db={db} />
-      <Zerar db={db} />
+      <div className="admin-topo">
+        <nav className="abas abas-p3 subabas" aria-label="Administrador">
+          {SUBABAS.map((s) => (
+            <a key={s.id} href={s.href} aria-current={ativa === s.id ? 'page' : undefined}>
+              {s.rotulo}
+            </a>
+          ))}
+        </nav>
+        <button className="botao secundario" type="button" onClick={() => void sairAdmin().then(() => setDb(null))}>
+          🔒 Sair do Administrador
+        </button>
+      </div>
+      <ConteudoAdmin db={db} ativa={ativa} />
     </>
   );
+}
+
+function ConteudoAdmin({ db, ativa }: { db: Firestore; ativa: SubAbaAdmin }) {
+  const listas = useAoVivo<Listas>((ok, erro) => observarListas(db, ok, erro), [db], 'Não foi possível carregar as listas.');
+  const tipos = conhecidos(listas.valor ?? listasPadrao(), 'tiposSaida');
+  if (ativa === 'listas') return <ManutencaoListas db={db} listas={listas.valor} erro={listas.erro} />;
+  if (ativa === 'zerar') return <Zerar db={db} />;
+  return <Numeracao db={db} tipos={tipos} />;
 }
 
 function EntrarAdmin({ aoEntrar }: { aoEntrar: (db: Firestore) => void }) {
@@ -98,7 +138,7 @@ function anoDosTipos(): number {
   return Math.max(new Date().getFullYear(), ANO_NUMERACAO_POR_TIPO);
 }
 
-function Numeracao({ db }: { db: Firestore }) {
+function Numeracao({ db, tipos }: { db: Firestore; tipos: readonly string[] }) {
   const [contadores, setContadores] = useState<Contador[] | null>(null);
   const [erroLista, setErroLista] = useState('');
   const [qual, setQual] = useState(ID_CONTADOR_GERAL);
@@ -134,7 +174,7 @@ function Numeracao({ db }: { db: Firestore }) {
     setSalvando(true);
     try {
       await definirContador(db, qual, lido);
-      setAviso(`Pronto: ${rotuloContador(qual, TIPOS_SAIDA)} → a próxima será a ${lido + 1}.`);
+      setAviso(`Pronto: ${rotuloContador(qual, tipos)} → a próxima será a ${lido + 1}.`);
       setUltimo('');
       setForcar(false);
       await recarregar();
@@ -145,7 +185,7 @@ function Numeracao({ db }: { db: Firestore }) {
     }
   }
 
-  const opcoes = [ID_CONTADOR_GERAL, ...TIPOS_SAIDA.map((t) => idContadorTipo(ano, t))];
+  const opcoes = [ID_CONTADOR_GERAL, ...tipos.map((t) => idContadorTipo(ano, t))];
   const doAno = (contadores ?? []).filter((c) => c.id !== ID_CONTADOR_GERAL).sort((a, b) => a.id.localeCompare(b.id));
   const geral = contadores?.find((c) => c.id === ID_CONTADOR_GERAL)?.ultimo ?? 0;
 
@@ -161,12 +201,12 @@ function Numeracao({ db }: { db: Firestore }) {
       {contadores && (
         <ul className="lista-contadores">
           <li>
-            <span>{rotuloContador(ID_CONTADOR_GERAL, TIPOS_SAIDA)}</span>
+            <span>{rotuloContador(ID_CONTADOR_GERAL, tipos)}</span>
             <strong>último {geral}</strong>
           </li>
           {doAno.map((c) => (
             <li key={c.id}>
-              <span>{rotuloContador(c.id, TIPOS_SAIDA)}</span>
+              <span>{rotuloContador(c.id, tipos)}</span>
               <strong>último {c.ultimo}</strong>
             </li>
           ))}
@@ -178,7 +218,7 @@ function Numeracao({ db }: { db: Firestore }) {
           <select value={qual} onChange={(e) => { setQual(e.target.value); setErro(''); }}>
             {opcoes.map((id) => (
               <option key={id} value={id}>
-                {rotuloContador(id, TIPOS_SAIDA)}
+                {rotuloContador(id, tipos)}
               </option>
             ))}
           </select>
@@ -305,6 +345,104 @@ function Zerar({ db }: { db: Firestore }) {
         </div>
       )}
       {erro && emAndamento && <p className="mensagem erro" role="alert">{erro}</p>}
+      {aviso && <p className="mensagem aviso" role="status">{aviso}</p>}
+    </section>
+  );
+}
+
+/** Manutenção das listas do numerador: incluir, retirar/reativar e mudar a ordem das opções. */
+function ManutencaoListas({ db, listas, erro }: { db: Firestore; listas?: Listas; erro: string }) {
+  const [chave, setChave] = useState<ChaveLista>('tiposSaida');
+  const [novo, setNovo] = useState('');
+  const [erroNovo, setErroNovo] = useState('');
+  const [aviso, setAviso] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const titulo = INFO_LISTAS.find((i) => i.chave === chave)?.titulo ?? '';
+  const itens = listas?.[chave] ?? [];
+
+  async function aplicar(mudar: (l: ItemLista[]) => ItemLista[] | string, sucesso: string): Promise<boolean> {
+    setOcupado(true);
+    setAviso('');
+    try {
+      const problema = await alterarLista(db, chave, mudar);
+      if (problema) {
+        setAviso(problema);
+        return false;
+      }
+      setAviso(sucesso);
+      return true;
+    } catch (falha) {
+      setAviso(`Não foi possível gravar. ${motivo(falha)}`);
+      return false;
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function incluir(e: FormEvent) {
+    e.preventDefault();
+    const teste = adicionarItem(itens, novo);
+    if (typeof teste === 'string') return setErroNovo(teste);
+    setErroNovo('');
+    if (await aplicar((l) => adicionarItem(l, novo), `"${novo.trim()}" incluído em ${titulo}.`)) setNovo('');
+  }
+
+  return (
+    <section className="painel admin-listas" aria-label="Listas do numerador">
+      <h2>Listas do numerador</h2>
+      <p>
+        São as opções que aparecem ao cadastrar uma demanda. <strong>Retirar</strong> tira o item só das demandas novas: as
+        antigas continuam com ele, e dá para <strong>reativar</strong> depois. Itens com 🔒 são usados pelo sistema e não
+        podem ser retirados.
+      </p>
+      {erro && <p className="mensagem erro" role="alert">{erro}</p>}
+      <Campo rotulo="Lista" obrigatorio>
+        <select value={chave} onChange={(e) => { setChave(e.target.value as ChaveLista); setAviso(''); setErroNovo(''); }}>
+          {INFO_LISTAS.map((i) => (
+            <option key={i.chave} value={i.chave}>
+              {i.titulo}
+            </option>
+          ))}
+        </select>
+      </Campo>
+
+      <ul className="lista-itens" aria-label={`Itens de ${titulo}`}>
+        {itens.map((item, n) => (
+          <li key={item.valor} className={item.ativo ? '' : 'retirado'}>
+            <span className="item-valor">
+              {ehFixo(chave, item.valor) && <span title="Usado pelo sistema">🔒 </span>}
+              {item.valor}
+              {!item.ativo && <em> (retirado)</em>}
+            </span>
+            <span className="item-acoes">
+              <button className="botao secundario" type="button" aria-label={`Subir ${item.valor}`} disabled={ocupado || n === 0}
+                onClick={() => void aplicar((l) => moverItem(l, item.valor, -1), `"${item.valor}" subiu.`)}>
+                ↑
+              </button>
+              <button className="botao secundario" type="button" aria-label={`Descer ${item.valor}`} disabled={ocupado || n === itens.length - 1}
+                onClick={() => void aplicar((l) => moverItem(l, item.valor, 1), `"${item.valor}" desceu.`)}>
+                ↓
+              </button>
+              {!ehFixo(chave, item.valor) && (
+                <button className={`botao ${item.ativo ? 'perigo' : 'destaque'}`} type="button" disabled={ocupado}
+                  onClick={() => void aplicar((l) => alternarItem(chave, l, item.valor),
+                    item.ativo ? `"${item.valor}" retirado das demandas novas.` : `"${item.valor}" reativado.`)}>
+                  {item.ativo ? 'Retirar' : 'Reativar'}
+                </button>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <form className="admin-incluir" onSubmit={incluir} noValidate>
+        <Campo rotulo={`Incluir em ${titulo}`} erro={erroNovo} obrigatorio>
+          <input maxLength={TAMANHO_MAXIMO_ITEM} value={novo} onChange={(e) => setNovo(e.target.value)} />
+        </Campo>
+        <button className="botao destaque" type="submit" disabled={ocupado || !listas}>
+          + Incluir
+        </button>
+      </form>
       {aviso && <p className="mensagem aviso" role="status">{aviso}</p>}
     </section>
   );

@@ -1,12 +1,8 @@
 import type { Automacao } from './automacao';
 import { ehDataISO } from './datas';
+import { conhecidos, listasPadrao, type Listas } from './listasConfig';
 import {
-  CATEGORIAS,
-  MEIOS_SAIDA,
-  ORIGENS,
-  RESPONSAVEIS,
   RESPOSTAS,
-  TIPOS_SAIDA,
   type Categoria,
   type MeioSaida,
   type Origem,
@@ -115,18 +111,20 @@ function dataInvalida(valor: string): boolean {
   return valor !== '' && !ehDataISO(valor);
 }
 
-export function validarDemanda(d: DadosDemanda): ErrosDemanda {
+/** Valida contra as listas do numerador (aceita também item já retirado, para as demandas antigas). */
+export function validarDemanda(d: DadosDemanda, listas: Listas = listasPadrao()): ErrosDemanda {
   const erros: ErrosDemanda = {};
+  const tem = (chave: keyof Listas, valor: string) => conhecidos(listas, chave).includes(valor);
 
   if (!ehDataISO(d.dataEntrada)) erros.dataEntrada = 'Informe a data de entrada.';
-  if (d.origem && !(ORIGENS as readonly string[]).includes(d.origem)) erros.origem = 'Origem inválida.';
+  if (d.origem && !tem('origens', d.origem)) erros.origem = 'Origem inválida.';
   if (d.origem === 'SEI' && !d.numeroOrigem.trim()) erros.numeroOrigem = 'Informe o número do processo SEI.';
   if (!d.saida.trim()) erros.saida = 'Informe a demanda (resumo).';
-  if (!(CATEGORIAS as readonly string[]).includes(d.categoria)) erros.categoria = 'Escolha a categoria.';
-  if (!(TIPOS_SAIDA as readonly string[]).includes(d.tipoSaida)) erros.tipoSaida = 'Escolha o tipo de saída.';
-  if (d.meioSaida && !(MEIOS_SAIDA as readonly string[]).includes(d.meioSaida)) erros.meioSaida = 'Meio de saída inválido.';
+  if (!d.categoria || !tem('categorias', d.categoria)) erros.categoria = 'Escolha a categoria.';
+  if (!d.tipoSaida || !tem('tiposSaida', d.tipoSaida)) erros.tipoSaida = 'Escolha o tipo de saída.';
+  if (d.meioSaida && !tem('meiosSaida', d.meioSaida)) erros.meioSaida = 'Meio de saída inválido.';
   if (!(RESPOSTAS as readonly string[]).includes(d.resposta)) erros.resposta = 'Escolha Sim ou Não.';
-  if (d.responsavel && !(RESPONSAVEIS as readonly string[]).includes(d.responsavel)) erros.responsavel = 'Responsável inválido.';
+  if (d.responsavel && !tem('responsaveis', d.responsavel)) erros.responsavel = 'Responsável inválido.';
 
   for (const campo of ['inicioBtl', 'terminoBtl', 'prazoCPA', 'prazoCia'] as const) {
     if (dataInvalida(d[campo])) erros[campo] = 'Data inválida.';

@@ -20,21 +20,15 @@ import {
   type Demanda,
   type ErrosDemanda,
 } from '../../domain/demanda';
-import {
-  CATEGORIAS,
-  MEIOS_SAIDA,
-  ORIGENS,
-  RESPONSAVEIS,
-  RESPOSTAS,
-  TIPOS_SAIDA,
-  URL_PLANILHA_EVENTO,
-} from '../../domain/listas';
+import { RESPOSTAS, URL_PLANILHA_EVENTO } from '../../domain/listas';
+import { opcoesDoCampo } from '../../domain/listasConfig';
 import { demandaDaPendente, detalheDaPendente, ORIGEM_DO_TIPO, type Pendente } from '../../domain/pendente';
 import { ROTULO_SITUACAO, situacaoDaDemanda } from '../../domain/situacao';
 import { ORDEM_DESTINOS, siglaDoDestino, UNIDADES, type DestinoId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { irPara } from '../../lib/navegacao';
+import { useListas } from '../../lib/useListas';
 import { RespostasCias } from './RespostasCias';
 import { StatusAutomacao } from './StatusAutomacao';
 import { Campo } from '../Campo';
@@ -141,7 +135,8 @@ function novaComResponsavel(): DadosDemanda {
   const nova = demandaVazia(hojeISO());
   try {
     const salvo = localStorage.getItem(CHAVE_RESPONSAVEL);
-    if ((RESPONSAVEIS as readonly string[]).includes(salvo ?? '')) nova.responsavel = salvo as DadosDemanda['responsavel'];
+    // A lista de responsáveis é mantida pelo Administrador: o formulário só mostra o salvo se ele estiver ativo.
+    if (salvo) nova.responsavel = salvo as DadosDemanda['responsavel'];
   } catch {
     /* sem armazenamento */
   }
@@ -190,6 +185,15 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
     existente ? dadosDe(existente) : pendente ? demandaDaPendente(pendente, novaComResponsavel()) : novaComResponsavel(),
   );
   const [dados, setDados] = useState<DadosDemanda>(original);
+  const listas = useListas();
+  // Item retirado pelo Administrador: continua aparecendo só na demanda antiga que já o usa.
+  const atual = (valor: string) => (existente ? valor : '');
+  useEffect(() => {
+    if (existente) return;
+    setDados((d) =>
+      d.responsavel && !opcoesDoCampo(listas, 'responsaveis').includes(d.responsavel) ? { ...d, responsavel: '' } : d,
+    );
+  }, [listas, existente]);
   const [destinosAbertos, setDestinosAbertos] = useState(false);
   const [registrada, setRegistrada] = useState<{ numero: number; numeroDocumento?: string } | null>(null);
   const [erros, setErros] = useState<ErrosDemanda>({});
@@ -211,7 +215,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
     const limpo = normalizarDemanda(dados);
-    const encontrados = validarDemanda(limpo);
+    const encontrados = validarDemanda(limpo, listas);
     setErros(encontrados);
     setErroGeral('');
     if (Object.keys(encontrados).length > 0) {
@@ -305,7 +309,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
           <Campo rotulo="Origem" erro={erros.origem}>
             <select value={dados.origem} onChange={(e) => mudar('origem', e.target.value as DadosDemanda['origem'])}>
               <option value="">Selecione…</option>
-              {ORIGENS.map((o) => (
+              {opcoesDoCampo(listas, 'origens', atual(original.origem)).map((o) => (
                 <option key={o}>{o}</option>
               ))}
             </select>
@@ -328,14 +332,14 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
         <div className="grade">
           <Campo rotulo="Tipo de saída" erro={erros.tipoSaida} obrigatorio>
             <select value={dados.tipoSaida} onChange={(e) => mudar('tipoSaida', e.target.value as DadosDemanda['tipoSaida'])}>
-              {TIPOS_SAIDA.map((t) => (
+              {opcoesDoCampo(listas, 'tiposSaida', atual(original.tipoSaida)).map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>
           </Campo>
           <Campo rotulo="Meio de saída" erro={erros.meioSaida}>
             <select value={dados.meioSaida} onChange={(e) => mudar('meioSaida', e.target.value as DadosDemanda['meioSaida'])}>
-              {MEIOS_SAIDA.map((m) => (
+              {opcoesDoCampo(listas, 'meiosSaida', atual(original.meioSaida)).map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>
@@ -345,7 +349,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
           </Campo>
           <Campo rotulo="Categoria" erro={erros.categoria} obrigatorio>
             <select value={dados.categoria} onChange={(e) => mudar('categoria', e.target.value as DadosDemanda['categoria'])}>
-              {CATEGORIAS.map((c) => (
+              {opcoesDoCampo(listas, 'categorias', atual(original.categoria)).map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
@@ -356,7 +360,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
               onChange={(e) => mudar('responsavel', e.target.value as DadosDemanda['responsavel'])}
             >
               <option value="">—</option>
-              {RESPONSAVEIS.map((r) => (
+              {opcoesDoCampo(listas, 'responsaveis', atual(original.responsavel)).map((r) => (
                 <option key={r}>{r}</option>
               ))}
             </select>
