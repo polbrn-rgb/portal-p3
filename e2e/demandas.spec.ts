@@ -14,6 +14,7 @@ test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ p
   await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
   await page.getByLabel('1ª CIA', { exact: true }).check();
   await page.getByLabel('Prazo CPA').fill('2099-12-31');
+  await page.getByLabel('Observação').fill('Aguardando assinatura');
   await page.getByRole('button', { name: 'Salvar' }).click();
 
   // Como no painel do numerador: mostra o número gerado, para copiar.
@@ -25,6 +26,8 @@ test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ p
   await expect(item).toBeVisible();
   await expect(item).toContainText('Em aberto');
   await expect(item).toContainText('1ª CIA');
+  await expect(item.locator('.item-obs')).toHaveText('📝 Aguardando assinatura'); // a observação aparece no resumo
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 
   await page.getByLabel('Buscar demandas').fill(assunto.slice(-13));
   await expect(page.getByRole('link', { name: /Nº \d+/ })).toHaveCount(1);
