@@ -17,10 +17,10 @@ describe('numeração por tipo de saída (2027 em diante)', () => {
     expect(usaNumeracaoPorTipo('2030-06-15')).toBe(true);
   });
 
-  test('formato: TIPO 8BPMM-001/MM/AA', () => {
+  test('formato: TIPO 8BPMM-001/03/AA (03 = seção, igual o ano todo)', () => {
     expect(formatarNumeroDocumento('OFÍCIO', 1, '2027-03-10')).toBe('OFÍCIO 8BPMM-001/03/27');
-    expect(formatarNumeroDocumento('PARTE', 42, '2027-12-01')).toBe('PARTE 8BPMM-042/12/27');
-    expect(formatarNumeroDocumento('OFÍCIO', 1234, '2028-01-02')).toBe('OFÍCIO 8BPMM-1234/01/28');
+    expect(formatarNumeroDocumento('PARTE', 42, '2027-12-01')).toBe('PARTE 8BPMM-042/03/27');
+    expect(formatarNumeroDocumento('OFÍCIO', 1234, '2028-01-02')).toBe('OFÍCIO 8BPMM-1234/03/28');
   });
 
   test('um contador por tipo e por ano, com id sem acento', () => {

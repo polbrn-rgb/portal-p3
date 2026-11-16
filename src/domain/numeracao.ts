@@ -3,11 +3,13 @@ import type { TipoSaida } from './listas';
 // Numeração das demandas.
 // - Até 2026: um número só, sequencial (Nº 2151, 2152…), no contador "contadores/demandas".
 // - A partir de 2027: além do nº interno (que continua único e é o id da demanda), cada tipo de saída
-//   tem a sua sequência, que volta para 001 todo ano: OFÍCIO 8BPMM-001/03/27 (03 = mês da data de entrada).
+//   tem a sua sequência, que volta para 001 todo ano: OFÍCIO 8BPMM-001/03/27 (03 = nº da seção, fixo; 27 = ano).
 //   O contador de cada tipo fica em "contadores/tipo_{ano}_{TIPO}" e é criado sozinho no 1º uso do ano.
 
 export const ANO_NUMERACAO_POR_TIPO = 2027;
 export const PREFIXO_DOCUMENTO = '8BPMM-';
+/** Número da seção (P/3): fixo no número de todo documento. */
+export const NUMERO_SECAO = '03';
 export const ID_CONTADOR_GERAL = 'demandas';
 
 export function anoDe(dataISO: string): number {
@@ -32,11 +34,10 @@ export function idContadorTipo(ano: number, tipo: TipoSaida | string): string {
   return `tipo_${ano}_${slugTipo(tipo)}`;
 }
 
-/** OFÍCIO, 1, 2027-03-10 -> "OFÍCIO 8BPMM-001/03/27". */
+/** OFÍCIO, 1, 2027-08-10 -> "OFÍCIO 8BPMM-001/03/27" (03 = seção; o ano vem da data de entrada). */
 export function formatarNumeroDocumento(tipo: string, sequencia: number, dataEntrada: string): string {
-  const mes = dataEntrada.slice(5, 7);
   const ano = dataEntrada.slice(2, 4);
-  return `${tipo} ${PREFIXO_DOCUMENTO}${String(sequencia).padStart(3, '0')}/${mes}/${ano}`;
+  return `${tipo} ${PREFIXO_DOCUMENTO}${String(sequencia).padStart(3, '0')}/${NUMERO_SECAO}/${ano}`;
 }
 
 /** Como o número aparece nas listas: o nº do documento (2027 em diante) ou "Nº 2151". */

@@ -65,23 +65,23 @@ describe('numeração a partir de 2027', () => {
     const b = await criarDemandaNumerada(p3, dados({ dataEntrada: '2027-03-10', tipoSaida: 'OFÍCIO' }));
     const c = await criarDemandaNumerada(p3, dados({ dataEntrada: '2027-03-10', tipoSaida: 'PARTE' }));
     expect([a, b, c]).toEqual([
-      { numero: 2501, numeroDocumento: 'OFÍCIO 8BPMM-001/01/27' },
+      { numero: 2501, numeroDocumento: 'OFÍCIO 8BPMM-001/03/27' },
       { numero: 2502, numeroDocumento: 'OFÍCIO 8BPMM-002/03/27' },
       { numero: 2503, numeroDocumento: 'PARTE 8BPMM-001/03/27' },
     ]);
     const d = await criarDemandaNumerada(p3, dados({ dataEntrada: '2028-01-05', tipoSaida: 'OFÍCIO' }));
-    expect(d.numeroDocumento).toBe('OFÍCIO 8BPMM-001/01/28');
+    expect(d.numeroDocumento).toBe('OFÍCIO 8BPMM-001/03/28');
     // A Cia vê o nº do documento.
-    expect((await encaminhamentosDaDemanda(p3, '2501'))[0].numeroDocumento).toBe('OFÍCIO 8BPMM-001/01/27');
+    expect((await encaminhamentosDaDemanda(p3, '2501'))[0].numeroDocumento).toBe('OFÍCIO 8BPMM-001/03/27');
   });
 
   test('editar a demanda (até trocar o tipo) não muda o nº do documento', async () => {
     await criarDemanda(p3, dados({ dataEntrada: '2027-02-01' }));
     const salva = (await obterDemanda(p3, '1'))!;
     await atualizarDemanda(p3, '1', dadosDe(salva), { ...dadosDe(salva), tipoSaida: 'PARTE', destinos: ['1cia', '2cia'] });
-    expect((await obterDemanda(p3, '1'))?.numeroDocumento).toBe('OFÍCIO 8BPMM-001/02/27');
+    expect((await obterDemanda(p3, '1'))?.numeroDocumento).toBe('OFÍCIO 8BPMM-001/03/27');
     const encs = await encaminhamentosDaDemanda(p3, '1');
-    expect(encs.map((e) => e.numeroDocumento)).toEqual(['OFÍCIO 8BPMM-001/02/27', 'OFÍCIO 8BPMM-001/02/27']);
+    expect(encs.map((e) => e.numeroDocumento)).toEqual(['OFÍCIO 8BPMM-001/03/27', 'OFÍCIO 8BPMM-001/03/27']);
   });
 });
 

@@ -48,7 +48,7 @@ Pela aba **🔒 Administrador** (senha própria): em **Numeração**, escolha "G
 numerador antigo (2150 → a próxima será a 2151). Pelo terminal também funciona: `npm run contador -- 2150`.
 
 **A partir de 01/01/2027** cada tipo de saída tem a sua sequência, que volta para 001 todo ano sozinha:
-`OFÍCIO 8BPMM-001/03/27` (03 = mês da data de entrada; vale a data de entrada da demanda). O nº interno continua
+`OFÍCIO 8BPMM-001/03/27` (03 = nº da seção, fixo; 27 = ano da data de entrada da demanda). O nº interno continua
 único (é o id da demanda) e aparece pequeno na tela de "Demanda registrada". O nº do documento é dado no cadastro e
 não muda se a demanda for editada. Vai para as listas, para as Cias e para a coluna "Nº Documento" do backup.
 
