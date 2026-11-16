@@ -7,6 +7,7 @@ import type { RespostaEap } from '../../domain/eap';
 import type { SolicitacaoEfetivo } from '../../domain/efetivo';
 import {
   abaDoEncaminhamento,
+  abaDoPedido,
   encAtrasado,
   ROTULO_ENC,
   saiDaTelaDaCia,
@@ -79,7 +80,11 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       id: a.id as AbaCia,
       href: `#/${a.id}`,
       rotulo: a.rotulo,
-      contador: lista.filter((e) => abaDoEncaminhamento(e.status) === a.id).length,
+      contador:
+        lista.filter((e) => abaDoEncaminhamento(e.status) === a.id).length +
+        (a.id === 'pendentes'
+          ? (solicitacoes.valor ?? []).filter((s) => s.status !== 'respondida').length + (eaps.valor ?? []).filter((r) => r.status !== 'enviada').length
+          : 0),
     })),
     ...(temDocs
       ? [{ id: 'documentos' as AbaCia, href: '#/documentos', rotulo: 'Documentos Mensais', contador: contarPendentesDocs(unidade, mesRef, envios.valor ?? []) }]
@@ -186,6 +191,9 @@ function ListaUnidade(p: {
 }) {
   const hoje = hojeISO();
   const visiveis = p.lista.filter((e) => abaDoEncaminhamento(e.status) === p.aba);
+  // Efetivo e EAP também seguem a aba: sem resposta em Pendentes, respondidos em Respondidas.
+  const solicitacoes = p.solicitacoes.filter((s) => abaDoPedido(s.status === 'respondida') === p.aba);
+  const eaps = p.eaps.filter((r) => abaDoPedido(r.status === 'enviada') === p.aba);
   const rotulo = ABAS.find((a) => a.id === p.aba)?.rotulo;
 
   return (
@@ -193,8 +201,8 @@ function ListaUnidade(p: {
       <div className="painel-cabecalho">
         <h2>{p.sigla}</h2>
       </div>
-      <EapsDaCia lista={p.eaps} />
-      <SolicitacoesEfetivo lista={p.solicitacoes} />
+      <EapsDaCia lista={eaps} />
+      <SolicitacoesEfetivo lista={solicitacoes} />
       <h3 className="titulo-aba-cia">
         {rotulo} ({visiveis.length})
       </h3>
