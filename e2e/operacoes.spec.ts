@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { entrar, irPara, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('Ordem de Serviço + Operações Policiais entra no Checklist Operações', async ({ page }, info) => {
@@ -93,6 +93,16 @@ test('solicitação de efetivo: P/3 pede, Cia preenche pelo RE, P/3 vê quem vai
   await page.getByLabel('Enviado por').fill('2º Sgt PM Teste');
   await page.getByRole('button', { name: 'Enviar efetivo' }).click();
   await expect(page.getByText('Efetivo enviado para a P/3')).toBeVisible();
+  // Cada aba mostra só o que é dela: respondida sai de Pendentes e vai para Respondidas.
+  const pedido3 = () => page.getByRole('region', { name: 'Solicitações de efetivo' }).getByRole('link').filter({ hasText: saida });
+  await irParaAbaCia(page, 'Pendentes');
+  await expect(page.getByRole('heading', { name: /^Pendentes \(/ })).toBeVisible();
+  await expect(pedido3()).toHaveCount(0);
+  await irParaAbaCia(page, 'Respondidas');
+  await expect(pedido3()).toContainText('Respondida');
+  await irParaAbaCia(page, 'Finalizadas');
+  await expect(page.getByRole('heading', { name: /^Finalizadas \(/ })).toBeVisible();
+  await expect(pedido3()).toHaveCount(0);
   await sair(page);
 
   await entrar(page, 'p3', SENHA_TESTE);

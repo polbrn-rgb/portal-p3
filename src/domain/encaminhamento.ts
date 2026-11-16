@@ -147,6 +147,14 @@ export function saiDaTelaDaCia(e: Pick<Encaminhamento, 'status' | 'prazoCia' | '
 
 export type AbaUnidade = 'pendentes' | 'respondidas' | 'finalizadas';
 
+/**
+ * Aba da Cia para os pedidos que não são demandas do Numerador (solicitação de efetivo e EAP):
+ * sem resposta -> Pendentes; respondido -> Respondidas. Nenhum vai para Finalizadas.
+ */
+export function abaDoPedido(respondido: boolean): AbaUnidade {
+  return respondido ? 'respondidas' : 'pendentes';
+}
+
 export function abaDoEncaminhamento(status: StatusEnc): AbaUnidade | null {
   if (STATUS_PENDENTES.includes(status)) return 'pendentes';
   if (status === 'respondido') return 'respondidas';

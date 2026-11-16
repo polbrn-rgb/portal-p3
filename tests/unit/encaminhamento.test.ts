@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { demandaVazia, type Demanda } from '../../src/domain/demanda';
 import {
   abaDoEncaminhamento,
+  abaDoPedido,
   andamentoPorDemanda,
   encAtrasado,
   novoEncaminhamento,
@@ -91,6 +92,9 @@ describe('andamento e visão da Cia', () => {
   test('aba de cada status na tela da Cia', () => {
     expect(abaDoEncaminhamento('devolvido')).toBe('pendentes');
     expect(abaDoEncaminhamento('respondido')).toBe('respondidas');
+    // Solicitação de efetivo e EAP seguem a mesma ideia (sem Finalizadas).
+    expect(abaDoPedido(false)).toBe('pendentes');
+    expect(abaDoPedido(true)).toBe('respondidas');
     expect(abaDoEncaminhamento('aceito')).toBe('finalizadas');
     expect(abaDoEncaminhamento('cancelado')).toBe(null);
   });
