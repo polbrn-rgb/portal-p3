@@ -2252,3 +2252,18 @@ fieldset:has(> .erro-campo) > legend {
     padding-block: 8px;
   }
 }
+
+/* Controle de Operações: Relatório de Indicadores e Visualizar operações lado a lado no computador. */
+.controle-topo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .controle-topo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
