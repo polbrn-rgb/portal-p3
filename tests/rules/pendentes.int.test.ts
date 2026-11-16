@@ -83,7 +83,8 @@ describe('Demandas Pendentes', () => {
   });
 
   test('dar destino cria a demanda e tira a pendente da lista na mesma gravação', async () => {
-    await setDoc(doc(db, 'contadores/demandas'), { ultimo: 2100 });
+    // Número inicial: só o Administrador define (aqui, direto no emulador).
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore() as unknown as Firestore, 'contadores/demandas'), { ultimo: 2100 }));
     const id = await novaSei();
     const p = (await obterPendente(db, id))!;
 

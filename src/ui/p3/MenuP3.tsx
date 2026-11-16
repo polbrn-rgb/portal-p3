@@ -1,6 +1,6 @@
 import { MenuLateral } from '../MenuLateral';
 
-export type AbaP3 = 'numerador' | 'pendentes' | 'operacoes' | 'aperfeicoamento' | 'cfp' | 'sala' | 'painel';
+export type AbaP3 = 'numerador' | 'pendentes' | 'operacoes' | 'aperfeicoamento' | 'cfp' | 'sala' | 'painel' | 'admin';
 
 const ITENS: { id: AbaP3; href: string; rotulo: string }[] = [
   { id: 'numerador', href: '#/demandas', rotulo: 'Numerador' },
@@ -10,6 +10,7 @@ const ITENS: { id: AbaP3; href: string; rotulo: string }[] = [
   { id: 'cfp', href: '#/cfp', rotulo: 'CFP' },
   { id: 'sala', href: '#/sala', rotulo: 'Sala de Operações' },
   { id: 'painel', href: '#/painel', rotulo: 'Painel' },
+  { id: 'admin', href: '#/admin', rotulo: '🔒 Administrador' },
 ];
 
 /** Menu da P/3 (lateral no computador, ☰ no celular). */

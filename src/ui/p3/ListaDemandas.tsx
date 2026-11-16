@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { numeroExibido } from '../../domain/numeracao';
 import { alterarStatus, buscarConcluidas, excluirDemanda } from '../../data/demandas';
 import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { formatarData, hojeISO } from '../../domain/datas';
@@ -327,7 +328,7 @@ function ItemDemanda({ demanda: d, hoje, andamento }: PropsItem) {
   return (
     <a className={`item-demanda borda-${situacao}`} href={`#/demanda/${d.id}`}>
       <span className="item-topo">
-        <strong className="item-num">Nº {d.numero}</strong>
+        <strong className="item-num">{numeroExibido(d)}</strong>
         <span className={`selo selo-${situacao}`}>{ROTULO_SITUACAO[situacao]}</span>
       </span>
       <span className="item-saida">{d.saida}</span>

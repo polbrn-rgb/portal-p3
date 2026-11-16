@@ -10,6 +10,7 @@ import { useHash } from '../../lib/navegacao';
 import { useAoVivo, type AoVivo } from '../../lib/useAoVivo';
 import { MissoesCfp } from '../setores/PainelCfp';
 import { Recados } from '../setores/Recados';
+import { Administrador } from './Administrador';
 import { Aperfeicoamento } from './Aperfeicoamento';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { ControleOperacoes } from './ControleOperacoes';
@@ -67,6 +68,7 @@ function abaDaRota(hash: string): AbaP3 {
   if (/^#\/(pendentes|destinar)/.test(hash)) return 'pendentes';
   if (hash.startsWith('#/operacoes')) return 'operacoes';
   if (hash === '#/painel') return 'painel';
+  if (hash === '#/admin') return 'admin';
   if (hash.startsWith('#/cfp')) return 'cfp';
   if (hash === '#/sala') return 'sala';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
@@ -76,6 +78,7 @@ function abaDaRota(hash: string): AbaP3 {
 function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: AoVivo<Pendente[]>; operacoes: AoVivo<Operacao[]> }) {
 
   if (hash === '#/nova') return <NovaDemanda />;
+  if (hash === '#/admin') return <Administrador />;
   if (hash === '#/pendentes/sei') return <FormPendente key="sei" tipo="sei" />;
   if (hash === '#/pendentes/ordem') return <FormPendente key="ordem" tipo="ordem_verbal" />;
   const destinar = /^#\/destinar\/([\w-]+)$/.exec(hash);

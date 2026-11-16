@@ -2267,3 +2267,37 @@ fieldset:has(> .erro-campo) > legend {
     align-items: stretch;
   }
 }
+
+/* ---------- Administrador ---------- */
+.dica {
+  display: block;
+  margin: 4px 0;
+  color: var(--cor-suave);
+  font-size: 0.9rem;
+}
+
+.admin-entrar form,
+.admin-zerar form,
+.admin-zerar .cartao {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.lista-contadores {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.lista-contadores li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--cor-fundo);
+  overflow-wrap: anywhere;
+}

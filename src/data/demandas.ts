@@ -26,6 +26,7 @@ import {
   STATUS_PENDENTES,
   type Encaminhamento,
 } from '../domain/encaminhamento';
+import { formatarNumeroDocumento, idContadorTipo, anoDe, ID_CONTADOR_GERAL, usaNumeracaoPorTipo } from '../domain/numeracao';
 import { UNIDADES, unidadesParaEncaminhar } from '../domain/unidades';
 import { COLECAO_PENDENTES } from './pendentes';
 
@@ -51,9 +52,24 @@ export class PendenteJaResolvida extends Error {
  * Vindo da aba Demandas Pendentes, a pendente sai da lista na mesma gravação.
  */
 export async function criarDemanda(db: Firestore, dados: DadosDemanda, pendenteId?: string): Promise<number> {
+  return (await criarDemandaNumerada(db, dados, pendenteId)).numero;
+}
+
+/**
+ * Igual a criarDemanda, devolvendo também o nº do documento (de 2027 em diante, por tipo de saída:
+ * "OFÍCIO 8BPMM-001/03/27"). Tudo na mesma transação: nº interno e nº do tipo nunca se repetem.
+ */
+export async function criarDemandaNumerada(
+  db: Firestore,
+  dados: DadosDemanda,
+  pendenteId?: string,
+): Promise<{ numero: number; numeroDocumento?: string }> {
   return runTransaction(db, async (tx) => {
-    const refContador = doc(db, 'contadores', 'demandas');
+    const refContador = doc(db, 'contadores', ID_CONTADOR_GERAL);
     const contador = await tx.get(refContador);
+    const porTipo = usaNumeracaoPorTipo(dados.dataEntrada) && dados.tipoSaida !== '';
+    const refTipo = porTipo ? doc(db, 'contadores', idContadorTipo(anoDe(dados.dataEntrada), dados.tipoSaida)) : null;
+    const contadorTipo = refTipo ? await tx.get(refTipo) : null;
     const refPendente = pendenteId ? doc(db, COLECAO_PENDENTES, pendenteId) : null;
     const pendente = refPendente ? await tx.get(refPendente) : null;
     if (pendente && (!pendente.exists() || pendente.data().status !== 'pendente')) {
@@ -62,10 +78,15 @@ export async function criarDemanda(db: Firestore, dados: DadosDemanda, pendenteI
     const numero = (contador.exists() ? Number(contador.data().ultimo) : 0) + 1;
     const ref = doc(db, 'demandas', String(numero));
 
+    const sequencia = contadorTipo ? (contadorTipo.exists() ? Number(contadorTipo.data().ultimo) : 0) + 1 : 0;
+    const numeroDocumento = refTipo ? formatarNumeroDocumento(dados.tipoSaida, sequencia, dados.dataEntrada) : undefined;
+
     tx.set(refContador, { ultimo: numero });
+    if (refTipo) tx.set(refTipo, { ultimo: sequencia });
     tx.set(ref, {
       ...dados,
       numero,
+      ...(numeroDocumento ? { numeroDocumento } : {}),
       status: 'em_aberto',
       automacaoPendente: precisaAutomacao(dados),
       criadoEm: serverTimestamp(),
@@ -81,7 +102,7 @@ export async function criarDemanda(db: Firestore, dados: DadosDemanda, pendenteI
     }
 
     // Cada Cia marcada recebe o seu encaminhamento na mesma gravação.
-    const resumo = resumoDaDemanda({ ...dados, numero });
+    const resumo = resumoDaDemanda({ ...dados, numero, numeroDocumento });
     for (const unidade of unidadesParaEncaminhar(dados.destinos)) {
       tx.set(doc(db, 'encaminhamentos', idEncaminhamento(String(numero), unidade)), {
         ...novoEncaminhamento(String(numero), unidade, resumo),
@@ -89,7 +110,7 @@ export async function criarDemanda(db: Firestore, dados: DadosDemanda, pendenteI
         atualizadoEm: serverTimestamp(),
       });
     }
-    return numero;
+    return { numero, numeroDocumento };
   }, { maxAttempts: 10 });
 }
 
@@ -141,7 +162,9 @@ export async function atualizarDemanda(
         .filter((e) => e.exists())
         .map((e) => ({ ...(e.data() as Omit<Encaminhamento, 'id'>), id: e.id }));
 
-      const final = { ...atual, ...mudancas, numero };
+      // O nº do documento é dado na criação e não muda (nem trocando o tipo de saída).
+      const numeroDocumento = (snap.data() as Partial<Demanda>).numeroDocumento;
+      const final = { ...atual, ...mudancas, numero, numeroDocumento };
       const plano = planejarEncaminhamentos(final, existentes);
       const resumo = resumoDaDemanda(final);
       const agora = serverTimestamp();

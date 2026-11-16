@@ -44,8 +44,26 @@ Publicar as regras de segurança no banco real (depois de `npx firebase login` c
 
 ## Dia de entrar no ar: numeração
 
-Informe o último número usado no numerador (a próxima demanda continua dele):
-`npm run contador -- 2150` → a próxima será a 2151. Sem número, `npm run contador` só mostra onde está.
+Pela aba **🔒 Administrador** (senha própria): em **Numeração**, escolha "Geral" e informe o último número usado no
+numerador antigo (2150 → a próxima será a 2151). Pelo terminal também funciona: `npm run contador -- 2150`.
+
+**A partir de 01/01/2027** cada tipo de saída tem a sua sequência, que volta para 001 todo ano sozinha:
+`OFÍCIO 8BPMM-001/03/27` (03 = nº da seção, fixo; 27 = ano da data de entrada da demanda). O nº interno continua
+único (é o id da demanda) e aparece pequeno na tela de "Demanda registrada". O nº do documento é dado no cadastro e
+não muda se a demanda for editada. Vai para as listas, para as Cias e para a coluna "Nº Documento" do backup.
+
+## Aba Administrador
+
+Conta própria `8bpmmp3+admin@gmail.com` (criada pelo `npm run usuarios`; trocar a senha: `npm run usuarios -- --nova-senha admin`).
+A senha é pedida dentro da aba, a P/3 continua logada, e o Administrador sai ao trocar de aba. As regras do banco só
+deixam essa conta **mudar contador** (a P/3 só avança de 1 em 1 ao cadastrar) e **zerar**.
+
+- **Numeração**: mostra os contadores e define o último número usado de qualquer um (geral ou de um tipo no ano).
+  Voltar para um número menor pede confirmação.
+- **Zerar portal** (digite ZERAR): etapa 1 apaga os lançamentos e marca as demandas como excluídas, para o motor apagar
+  os eventos nas agendas e mandar as pastas do CFP para a lixeira; quando o contador "faltam X" chega a zero, a etapa 2
+  apaga as demandas e define o número inicial. Ficam efetivo, contas, configurações e agenda do CFP. O que já foi
+  gravado em planilhas do Drive e os relatórios em Word não são desfeitos.
 
 ## Agenda e pasta CFP (Apps Script)
 

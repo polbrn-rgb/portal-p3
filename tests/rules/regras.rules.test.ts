@@ -59,7 +59,20 @@ describe('P/3', () => {
     await assertSucceeds(setDoc(doc(db, 'demandas/d2'), { numero: 2102 }));
     await assertSucceeds(setDoc(doc(db, 'demandas/d1/historico/e1'), { acao: 'criada' }));
     await assertSucceeds(setDoc(doc(db, 'caixaEntrada/m1'), { assunto: 'E-mail' }));
-    await assertSucceeds(setDoc(doc(db, 'contadores/demandas'), { ultimo: 2102 }));
+    await assertSucceeds(setDoc(doc(db, 'contadores/demandas'), { ultimo: 1 }));
+    await assertSucceeds(getDoc(doc(db, 'contadores/demandas')));
+  });
+
+  test('contador: só avança de 1 em 1 (número inicial e voltar número é só o Administrador)', async () => {
+    const db = p3();
+    await assertFails(setDoc(doc(db, 'contadores/demandas'), { ultimo: 2100 }));
+    await assertSucceeds(setDoc(doc(db, 'contadores/demandas'), { ultimo: 1 }));
+    await assertSucceeds(setDoc(doc(db, 'contadores/demandas'), { ultimo: 2 }));
+    await assertFails(setDoc(doc(db, 'contadores/demandas'), { ultimo: 5 }));
+    await assertFails(setDoc(doc(db, 'contadores/demandas'), { ultimo: 1 }));
+    await assertFails(setDoc(doc(db, 'contadores/demandas'), { ultimo: 3, outro: true }));
+    await assertFails(deleteDoc(doc(db, 'contadores/demandas')));
+    await assertSucceeds(setDoc(doc(db, 'contadores/tipo_2027_OFICIO'), { ultimo: 1 }));
   });
 
   test('histórico não pode ser alterado nem apagado', async () => {
@@ -166,5 +179,24 @@ describe('sem acesso', () => {
   test('perfil de unidade sem a unidade no token não lê nada', async () => {
     const db = env.authenticatedContext('quebrado', { perfil: 'unidade' }).firestore() as unknown as Firestore;
     await assertFails(getDoc(doc(db, 'encaminhamentos/d1_1cia')));
+  });
+});
+
+describe('Administrador', () => {
+  const admin = () => env.authenticatedContext('conta-admin', { perfil: 'admin' }).firestore() as unknown as Firestore;
+
+  test('define o contador com qualquer número e apaga o que for preciso', async () => {
+    const db = admin();
+    await assertSucceeds(setDoc(doc(db, 'contadores/demandas'), { ultimo: 2150 }));
+    await assertSucceeds(setDoc(doc(db, 'contadores/demandas'), { ultimo: 10 }));
+    await assertSucceeds(getDocs(collection(db, 'encaminhamentos')));
+    await assertSucceeds(deleteDoc(doc(db, 'demandas/d1')));
+    await assertSucceeds(deleteDoc(doc(db, 'demandas/d1/historico/e1')));
+  });
+
+  test('Cia, Sala e CFP não mexem no contador', async () => {
+    await assertFails(setDoc(doc(cia('1cia'), 'contadores/demandas'), { ultimo: 1 }));
+    const sala = env.authenticatedContext('conta-sala', { perfil: 'sala' }).firestore() as unknown as Firestore;
+    await assertFails(setDoc(doc(sala, 'contadores/demandas'), { ultimo: 1 }));
   });
 });

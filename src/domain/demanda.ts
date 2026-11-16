@@ -47,6 +47,8 @@ export type DadosDemanda = {
 export type Demanda = DadosDemanda & {
   id: string;
   numero: number;
+  /** De 2027 em diante: nº do documento por tipo de saída (ex.: "OFÍCIO 8BPMM-001/03/27"). */
+  numeroDocumento?: string;
   status: StatusDemanda;
   /** Preenchido pelo Apps Script da P/3 (agenda, pasta CFP). */
   automacao?: Automacao;

@@ -53,7 +53,7 @@ describe('criarDemanda', () => {
   });
 
   test('continua do último número do numerador', async () => {
-    await setDoc(doc(db, 'contadores/demandas'), { ultimo: 2100 });
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore() as unknown as Firestore, 'contadores/demandas'), { ultimo: 2100 }));
     expect(await criarDemanda(db, dados())).toBe(2101);
     expect(await criarDemanda(db, dados())).toBe(2102);
   });

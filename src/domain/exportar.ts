@@ -27,6 +27,7 @@ const COLUNAS = [
   'Status',
   'Link de Evento?',
   'Respostas das Cias',
+  'Nº Documento',
 ];
 
 function celula(valor: string | number): string {
@@ -79,6 +80,7 @@ export function montarCsv(demandas: readonly Demanda[], encaminhamentos: readonl
         d.status === 'excluido' ? 'Excluída' : ROTULO_SITUACAO[situacao],
         simNao(d.linkEvento === true),
         respostasDasCias(porDemanda.get(d.id) ?? []),
+        d.numeroDocumento ?? '',
       ]
         .map(celula)
         .join(';');

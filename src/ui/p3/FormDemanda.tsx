@@ -3,7 +3,7 @@ import {
   alterarStatus,
   atualizarDemanda,
   ConflitoEdicao,
-  criarDemanda,
+  criarDemandaNumerada,
   obterDemanda,
   PendenteJaResolvida,
 } from '../../data/demandas';
@@ -148,11 +148,11 @@ function novaComResponsavel(): DadosDemanda {
   return nova;
 }
 
-function Registrada({ numero, aoNova, dePendente }: { numero: number; aoNova: () => void; dePendente: boolean }) {
+function Registrada({ numero, numeroDocumento, aoNova, dePendente }: { numero: number; numeroDocumento?: string; aoNova: () => void; dePendente: boolean }) {
   const [copiado, setCopiado] = useState(false);
   async function copiar() {
     try {
-      await navigator.clipboard.writeText(String(numero));
+      await navigator.clipboard.writeText(numeroDocumento || String(numero));
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2500);
     } catch {
@@ -163,7 +163,8 @@ function Registrada({ numero, aoNova, dePendente }: { numero: number; aoNova: ()
     <section className="painel">
       <div className="cartao registrada" role="status">
         <p>Demanda registrada</p>
-        <strong className="numero-gerado">Nº {numero}</strong>
+        <strong className="numero-gerado">{numeroDocumento || `Nº ${numero}`}</strong>
+        {numeroDocumento && <span className="dica">Nº interno {numero}</span>}
         <div className="acoes-linha">
           <button className="botao secundario" type="button" onClick={copiar}>
             {copiado ? 'Copiado!' : 'Copiar número'}
@@ -190,7 +191,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
   );
   const [dados, setDados] = useState<DadosDemanda>(original);
   const [destinosAbertos, setDestinosAbertos] = useState(false);
-  const [registrada, setRegistrada] = useState<number | null>(null);
+  const [registrada, setRegistrada] = useState<{ numero: number; numeroDocumento?: string } | null>(null);
   const [erros, setErros] = useState<ErrosDemanda>({});
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState('');
@@ -229,9 +230,9 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
         if (edicaoPrecisaAutomacao(campos)) cutucarMotor();
         irPara('#/demandas');
       } else {
-        const numero = await criarDemanda(db, limpo, pendente?.id);
+        const gerado = await criarDemandaNumerada(db, limpo, pendente?.id);
         if (precisaAutomacao(limpo)) cutucarMotor();
-        setRegistrada(numero);
+        setRegistrada(gerado);
         setSalvando(false);
       }
     } catch (e) {
@@ -264,7 +265,8 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
   if (registrada !== null) {
     return (
       <Registrada
-        numero={registrada}
+        numero={registrada.numero}
+        numeroDocumento={registrada.numeroDocumento}
         dePendente={Boolean(pendente)}
         aoNova={() => {
           setDados(novaComResponsavel());

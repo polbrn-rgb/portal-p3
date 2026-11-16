@@ -26,6 +26,7 @@ export type ResumoEnc = {
   numeroOrigem: string;
   prazoCia: string;
   observacao: string;
+  numeroDocumento?: string;
 };
 
 export type Encaminhamento = ResumoEnc & {
@@ -43,7 +44,7 @@ export type Encaminhamento = ResumoEnc & {
 type BaseResumo = Pick<
   Demanda,
   'numero' | 'saida' | 'categoria' | 'tipoSaida' | 'origem' | 'numeroOrigem' | 'prazoCia' | 'prazoCPA' | 'observacao'
->;
+> & { numeroDocumento?: string };
 
 export function idEncaminhamento(demandaId: string, unidadeId: UnidadeId): string {
   return `${demandaId}_${unidadeId}`;
@@ -60,6 +61,7 @@ export function resumoDaDemanda(d: BaseResumo): ResumoEnc {
     numeroOrigem: d.numeroOrigem,
     prazoCia: d.prazoCia || d.prazoCPA,
     observacao: d.observacao,
+    ...(d.numeroDocumento ? { numeroDocumento: d.numeroDocumento } : {}),
   };
 }
 

@@ -1,8 +1,8 @@
-// Cria as contas do portal (P/3, 7 Cias, Sala de Operações e CFP) e grava o perfil de cada uma.
+// Cria as contas do portal (P/3, 7 Cias, Sala de Operações, CFP e Administrador) e grava o perfil de cada uma.
 //
 // Uso:
 //   npm run usuarios                       cria o que falta e confere os perfis
-//   npm run usuarios -- --nova-senha 1cia  gera senha nova para a 1ª Cia (aceita "1cia,ft")
+//   npm run usuarios -- --nova-senha 1cia  gera senha nova para a 1ª Cia (aceita "1cia,ft"; "admin" = Administrador)
 //   npm run usuarios -- --chave caminho.json
 //
 // Precisa da chave da conta de serviço (Firebase > Configurações > Contas de serviço).
@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { CONTAS } from '../src/domain/contas';
+import { TODAS_CONTAS as CONTAS } from '../src/domain/contas';
 import { garantirContas } from './contas-admin';
 import { gerarSenha } from './senha';
 
