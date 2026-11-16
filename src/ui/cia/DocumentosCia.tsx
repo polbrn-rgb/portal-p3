@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { enviarDocMensal } from '../../data/documentosMensais';
 import { buscarPolicial } from '../../data/efetivo';
 import { formatarData } from '../../domain/datas';
@@ -180,16 +180,22 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
   );
 }
 
-function ListaCia(p: { documento: DocumentoMensal; unidade: UnidadeId; linhas: LinhaLista[]; aoMudar: (l: LinhaLista[]) => void; erros: Record<string, string> }) {
+function ListaCia(p: {
+  documento: DocumentoMensal;
+  unidade: UnidadeId;
+  linhas: LinhaLista[];
+  aoMudar: Dispatch<SetStateAction<LinhaLista[]>>;
+  erros: Record<string, string>;
+}) {
   const lista = p.documento.lista!;
   const max = maxLinhas(p.documento, p.unidade);
-  const mudar = (i: number, campo: string, valor: string) => p.aoMudar(p.linhas.map((l, k) => (k === i ? { ...l, [campo]: valor } : l)));
+  const mudar = (i: number, campo: string, valor: string) => p.aoMudar((ls) => ls.map((l, k) => (k === i ? { ...l, [campo]: valor } : l)));
 
   async function procurarRE(i: number, re: string) {
-    if (p.linhas[i]?.nome?.trim()) return;
     try {
       const pm = await buscarPolicial(db, re);
-      if (pm) mudar(i, 'nome', (pm.nomeCompleto || pm.nomeGuerra).toUpperCase());
+      // Só completa o nome se ele ainda estiver vazio (não apaga o que a Cia digitou enquanto buscava).
+      if (pm) p.aoMudar((ls) => ls.map((l, k) => (k === i && !l.nome?.trim() ? { ...l, nome: (pm.nomeCompleto || pm.nomeGuerra).toUpperCase() } : l)));
     } catch {
       /* sem conexão: digita o nome */
     }
@@ -233,14 +239,14 @@ function ListaCia(p: { documento: DocumentoMensal; unidade: UnidadeId; linhas: L
             </div>
           )}
           <div className="acoes-linha">
-            <button className="botao secundario" type="button" onClick={() => p.aoMudar(p.linhas.filter((_, k) => k !== i))}>
+            <button className="botao secundario" type="button" onClick={() => p.aoMudar((ls) => ls.filter((_, k) => k !== i))}>
               🗑️ Remover linha
             </button>
           </div>
         </fieldset>
       ))}
       <div className="acoes-linha">
-        <button className="botao secundario" type="button" disabled={p.linhas.length >= max} onClick={() => p.aoMudar([...p.linhas, {}])}>
+        <button className="botao secundario" type="button" disabled={p.linhas.length >= max} onClick={() => p.aoMudar((ls) => [...ls, {}])}>
           + Adicionar linha
         </button>
       </div>
