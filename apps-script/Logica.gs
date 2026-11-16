@@ -677,6 +677,18 @@ function celulasParaZerar(doc) {
   return valoresParaZerar(doc, '2026-01').map(function (x) { return x.celula; });
 }
 
+/**
+ * Documento preenchido direto na planilha (ex.: R.R.): ao zerar, apaga o intervalo em cada aba
+ * e troca o cabeçalho para o próximo mês. { abas, limpar, mes: { aba, celula, valor } | null }
+ */
+function zerarDireto(direto, mesRef) {
+  return {
+    abas: (direto.abas || []).slice(),
+    limpar: direto.limpar,
+    mes: direto.mes ? { aba: direto.mes.aba, celula: direto.mes.celula, valor: textoDoMes(direto.mes.modelo, proximoMes(mesRef)) } : null,
+  };
+}
+
 function nomeArquivoMensal(nome, mesRef) {
   var p = String(mesRef).split('-');
   return nome + ' - ' + MESES_SIGLA[Number(p[1]) - 1] + p[0];

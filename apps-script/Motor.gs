@@ -103,8 +103,12 @@ function diagnostico() {
   ok('Documentos Mensais (formato das planilhas)', function () {
     var cfg = obterDoc_('config/documentosMensais');
     if (!cfg) throw new Error('a P/3 ainda não abriu Operações → Documentos Mensais no portal');
-    return cfg.documentos.filter(function (d) { return d.celulas; }).map(function (d) {
-      try { conferirDocMensal_(d); return '✅ ' + d.nome; } catch (e) { return '❌ ' + d.nome + ': ' + e.message; }
+    return cfg.documentos.filter(function (d) { return d.celulas || d.direto; }).map(function (d) {
+      try {
+        if (d.direto) abasDiretas_(d);
+        else conferirDocMensal_(d);
+        return '✅ ' + d.nome;
+      } catch (e) { return '❌ ' + d.nome + ': ' + e.message; }
     }).join(' | ');
   });
   ok('Modelo da planilha da ICC', function () {
@@ -1125,6 +1129,11 @@ function processarDocsMensais_() {
     if (en.erro && en.erroEm && Date.now() - new Date(en.erroEm).getTime() < 30 * 60 * 1000) return; // espera para tentar de novo
     try {
       var doc = docs[en.docId];
+      if (doc && doc.direto) {
+        // Preenchido direto na aba da Cia: o envio é só a confirmação; nada a gravar.
+        gravarCampos_('docsMensais/' + envio.id, { gravado: true, gravadoEm: new Date().toISOString(), erro: '' });
+        return;
+      }
       if (!doc || !doc.celulas) throw new Error('documento sem configuração no portal');
       var e = estados[en.docId] || {};
       var acao = acaoEnvioMensal(e.mesRef, en.mesRef);
@@ -1199,6 +1208,7 @@ function arquivarDocMensal_(doc, mesRef, estado) {
   var copia = DriveApp.getFileById(doc.planilhaId).makeCopy(nomeArquivoMensal(doc.nome, mesRef), pastaArquivoDoMes_(mesRef));
   estado.arquivados = estado.arquivados || {};
   estado.arquivados[mesRef] = copia.getUrl();
+  if (doc.direto) return zerarDocDireto_(doc, mesRef);
   var zerar = valoresParaZerar(doc, mesRef);
   if (!zerar.length) return; // planilha do ano todo: só a cópia
   var cache = {};
@@ -1208,6 +1218,31 @@ function arquivarDocMensal_(doc, mesRef, estado) {
   }
   if (doc.mes && doc.mes.celula) {
     Object.keys(cache).forEach(function (n) { cache[n].getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, proximoMes(mesRef))); });
+  }
+}
+
+/** Abas do documento preenchido direto, conferidas pelas âncoras (todas antes de apagar qualquer uma). */
+function abasDiretas_(doc) {
+  var ss = SpreadsheetApp.openById(doc.planilhaId);
+  return doc.direto.abas.map(function (nome) {
+    var aba = ss.getSheetByName(nome);
+    if (!aba) throw new Error('aba "' + nome + '" não encontrada');
+    var lidos = {};
+    Object.keys(doc.direto.ancoras || {}).forEach(function (c) { lidos[c] = aba.getRange(c).getDisplayValue(); });
+    var erro = conferirAncoras(doc.direto.ancoras, lidos);
+    if (erro) throw new Error('aba "' + nome + '": ' + erro);
+    return aba;
+  });
+}
+
+/** R.R. e afins: apaga os registros de cada aba (a formatação fica) e põe o próximo mês no cabeçalho. */
+function zerarDocDireto_(doc, mesRef) {
+  var plano = zerarDireto(doc.direto, mesRef);
+  var abas = abasDiretas_(doc);
+  abas.forEach(function (aba) { aba.getRange(plano.limpar).clearContent(); });
+  if (plano.mes) {
+    var abaMes = SpreadsheetApp.openById(doc.planilhaId).getSheetByName(plano.mes.aba);
+    if (abaMes) abaMes.getRange(plano.mes.celula).setValue(plano.mes.valor);
   }
 }
 

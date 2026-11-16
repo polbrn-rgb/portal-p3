@@ -8,8 +8,9 @@ import {
   mesReferencia,
   preenchidoPeloPortal,
   prazoDoDocumento,
-  situacaoEnvio,
+  situacaoDoDocumento,
   urlPlanilha,
+  zeraAoArquivar,
   type DocumentoMensal,
   type EnvioMensal,
   type EstadoDocumento,
@@ -42,7 +43,7 @@ export function DocumentosMensais() {
     try {
       await pedirArquivamento(db, d.id, mesRef);
       cutucarMotor();
-      setAviso(`Pedido enviado: o motor guarda a cópia de ${rotuloMes(mesRef)}${preenchidoPeloPortal(d) && d.zerar !== false ? ' e zera a planilha' : ''}.`);
+      setAviso(`Pedido enviado: o motor guarda a cópia de ${rotuloMes(mesRef)}${zeraAoArquivar(d) ? ' e zera a planilha' : ''}.`);
     } catch {
       setAviso('Não foi possível pedir. Verifique a conexão e tente de novo.');
     }
@@ -103,12 +104,14 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
   const d = p.documento;
   const prazo = prazoDoDocumento(d, p.mesRef);
   const portal = preenchidoPeloPortal(d);
+  const comCias = portal || !!d.direto; // as Cias enviam ou confirmam pelo portal
+  const zera = zeraAoArquivar(d);
   const cias = ciasDoDocumento(d);
-  const situacoes = cias.map((u) => ({ u, s: situacaoEnvio(p.envios.find((e) => e.unidadeId === u), prazo) }));
+  const situacoes = cias.map((u) => ({ u, s: situacaoDoDocumento(d, p.envios.find((e) => e.unidadeId === u), prazo) }));
   const prontas = situacoes.filter((x) => x.s === 'gravado').length;
   const arquivo = p.estado?.arquivados?.[p.mesRef];
   const pedido = p.estado?.pedidoArquivar === p.mesRef;
-  const feito = portal ? cias.length > 0 && prontas === cias.length : !!p.estado?.feitos?.[p.mesRef];
+  const feito = comCias ? cias.length > 0 && prontas === cias.length : !!p.estado?.feitos?.[p.mesRef];
   const atrasado = !feito && hojeISO() > prazo;
   const erros = p.envios.filter((e) => e.erro && !e.gravado);
   const [confirmando, setConfirmando] = useState(false);
@@ -117,9 +120,12 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
     <article className={`item-pendente ${feito ? 'borda-doc-gravado' : atrasado ? 'borda-doc-atrasado' : ''}`} aria-label={d.nome}>
       <span className="item-topo">
         <strong className="pendente-assunto">{d.nome}</strong>
-        <span className="pendente-detalhe">{portal ? `${prontas}/${cias.length} Cias` : 'Direto na planilha'}</span>
+        <span className="pendente-detalhe">
+          {d.direto ? 'Direto na planilha · ' : ''}
+          {comCias ? `${prontas}/${cias.length} Cias` : 'Direto na planilha'}
+        </span>
       </span>
-      {portal ? (
+      {comCias ? (
         <ul className="chips-cias" aria-label={`Envios — ${d.nome}`}>
           {situacoes.map(({ u, s }) => (
             <li key={u} className={`chip-cia chip-${s}`} title={s}>
@@ -149,7 +155,7 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
           </a>
         ) : (
           <button className="botao secundario" type="button" disabled={pedido} onClick={() => setConfirmando(true)}>
-            {pedido ? '⏳ Arquivando…' : portal && d.zerar !== false ? '📦 Arquivar e zerar' : '📦 Arquivar cópia'}
+            {pedido ? '⏳ Arquivando…' : zera ? '📦 Arquivar e zerar' : '📦 Arquivar cópia'}
           </button>
         )}
       </div>
@@ -157,7 +163,7 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
         <div className="confirmar-linha" role="alertdialog" aria-label={`Confirmar arquivo — ${d.nome}`}>
           <p>
             Guardar a cópia de {rotuloMes(p.mesRef)} na pasta de arquivo
-            {portal && d.zerar !== false ? ' e zerar a planilha para o próximo mês' : ''}?
+            {zera ? ' e zerar a planilha para o próximo mês' : ''}?
           </p>
           <div className="acoes-linha">
             <button className="botao secundario" type="button" onClick={() => setConfirmando(false)}>

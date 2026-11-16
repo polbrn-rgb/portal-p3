@@ -2012,3 +2012,18 @@ fieldset:has(> .erro-campo) > legend {
   font-size: 1rem;
   cursor: pointer;
 }
+
+/* Documento preenchido direto na planilha (ex.: R.R.) */
+.passos-direto {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.passos-direto li + li {
+  margin-top: 4px;
+}
+
+.botao-largo {
+  width: 100%;
+  min-height: 48px;
+}

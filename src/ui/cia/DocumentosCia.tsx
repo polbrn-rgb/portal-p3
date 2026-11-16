@@ -4,6 +4,7 @@ import { buscarPolicial } from '../../data/efetivo';
 import { formatarData } from '../../domain/datas';
 import {
   camposDaUnidade,
+  daUnidade,
   documentosDoMes,
   lerValores,
   linhasDosValores,
@@ -12,7 +13,10 @@ import {
   valoresDaLista,
   type LinhaLista,
   ROTULO_SITUACAO_ENVIO,
+  rotuloSituacao,
+  situacaoDoDocumento,
   situacaoEnvio,
+  urlAbaDaCia,
   type DocumentoMensal,
   type EnvioMensal,
 } from '../../domain/documentosMensais';
@@ -27,7 +31,7 @@ const CHAVE_NOME = 'portalp3.respondidoPor';
 
 /** Documentos que esta Cia preenche no mês de referência. */
 export function documentosDaUnidade(u: UnidadeId, mesRef: string): DocumentoMensal[] {
-  return documentosDoMes(mesRef).filter((d) => camposDaUnidade(d, u).length > 0);
+  return documentosDoMes(mesRef).filter((d) => daUnidade(d, u));
 }
 
 export function contarPendentesDocs(u: UnidadeId, mesRef: string, envios: EnvioMensal[]): number {
@@ -48,7 +52,8 @@ export function ListaDocumentosCia(p: { unidade: UnidadeId; mesRef: string; envi
       <ul className="lista lista-pendentes">
         {docs.map((d) => {
           const prazo = prazoDoDocumento(d, p.mesRef);
-          const s = situacaoEnvio(
+          const s = situacaoDoDocumento(
+            d,
             p.envios.find((e) => e.docId === d.id),
             prazo,
           );
@@ -57,9 +62,10 @@ export function ListaDocumentosCia(p: { unidade: UnidadeId; mesRef: string; envi
               <a className={`item-pendente link-cartao borda-doc-${s}`} href={`#/documentos/${d.id}`}>
                 <span className="item-topo">
                   <strong className="pendente-assunto">{d.nome}</strong>
-                  <span className={`selo selo-doc-${s}`}>{ROTULO_SITUACAO_ENVIO[s]}</span>
+                  <span className={`selo selo-doc-${s}`}>{rotuloSituacao(d, s)}</span>
                 </span>
                 <span className="pendente-detalhe">
+                  {d.direto ? 'Direto na planilha · ' : ''}
                   Prazo {formatarData(prazo)} ({d.diaUtil}º dia útil)
                 </span>
               </a>
@@ -177,6 +183,93 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
         </a>
         <button className="botao destaque" type="button" disabled={enviando} onClick={enviar}>
           {enviando ? 'Enviando…' : p.envio ? 'Atualizar envio' : 'Enviar'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Documento preenchido direto na planilha (ex.: R.R.): link para a aba da Cia e confirmação do preenchimento. */
+export function ConfirmarDocumentoDireto(p: { documento: DocumentoMensal; unidade: UnidadeId; mesRef: string; envio?: EnvioMensal }) {
+  const d = p.documento;
+  const aba = d.direto?.abas[p.unidade];
+  const [nome, setNome] = useState(p.envio?.respondidoPor || lerNome());
+  const [erroNome, setErroNome] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const prazo = prazoDoDocumento(d, p.mesRef);
+  const s = situacaoDoDocumento(d, p.envio, prazo);
+  if (!aba) return <p className="mensagem erro">Este documento não é preenchido por esta Cia.</p>;
+
+  async function confirmar() {
+    setErro('');
+    if (!nome.trim()) {
+      setErroNome('Informe quem preencheu (posto/graduação e nome).');
+      return;
+    }
+    setErroNome('');
+    setEnviando(true);
+    try {
+      const envio = enviarDocMensal(db, { docId: d.id, mesRef: p.mesRef, unidadeId: p.unidade, valores: {}, respondidoPor: nome });
+      envio.catch(() => undefined);
+      await Promise.race([envio, new Promise((ok) => setTimeout(ok, 3000))]);
+      try {
+        localStorage.setItem(CHAVE_NOME, nome.trim());
+      } catch {
+        /* sem armazenamento: segue */
+      }
+      cutucarMotor();
+      irPara('#/documentos');
+    } catch {
+      setErro('Não foi possível confirmar. Verifique a conexão e tente de novo.');
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <section className="painel painel-estreito">
+      <div className="painel-cabecalho">
+        <h2>{d.nome}</h2>
+        <span className={`selo selo-doc-${s}`}>{rotuloSituacao(d, s)}</span>
+      </div>
+      <p className="ajuda-pendentes">
+        Dados de {rotuloMes(p.mesRef)} · prazo {formatarData(prazo)} ({d.diaUtil}º dia útil).
+      </p>
+      <div className="cartao grupo">
+        <ol className="passos-direto">
+          <li>
+            Toque em <strong>Abrir a planilha</strong>: ela abre na aba <strong>{aba.nome.trim()}</strong>.
+          </li>
+          <li>Preencha a lista de {rotuloMes(p.mesRef)} direto na planilha.</li>
+          <li>
+            Volte aqui e toque em <strong>Confirmar preenchimento</strong>.
+          </li>
+        </ol>
+        <a className="botao secundario botao-largo" href={urlAbaDaCia(d, p.unidade)} target="_blank" rel="noreferrer">
+          📂 Abrir a planilha
+        </a>
+      </div>
+      {p.envio && (
+        <p className="mensagem aviso" role="status">
+          Preenchimento confirmado por {p.envio.respondidoPor}. Se corrigir algo na planilha, não precisa confirmar de novo.
+        </p>
+      )}
+      <div className="cartao grupo">
+        <Campo rotulo="Preenchido por" obrigatorio erro={erroNome}>
+          <input value={nome} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
+        </Campo>
+      </div>
+      {erro && (
+        <p className="mensagem erro" role="alert">
+          {erro}
+        </p>
+      )}
+      <div className="barra-acoes">
+        <a className="botao secundario" href="#/documentos">
+          Voltar
+        </a>
+        <button className="botao destaque" type="button" disabled={enviando} onClick={confirmar}>
+          {enviando ? 'Confirmando…' : p.envio ? 'Confirmar de novo' : '✅ Confirmar preenchimento'}
         </button>
       </div>
     </section>

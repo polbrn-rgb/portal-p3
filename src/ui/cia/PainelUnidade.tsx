@@ -21,7 +21,7 @@ import { Campo } from '../Campo';
 import { MenuLateral } from '../MenuLateral';
 import { observarEnviosDaUnidade } from '../../data/documentosMensais';
 import { DOCUMENTOS, mesReferencia, type EnvioMensal } from '../../domain/documentosMensais';
-import { contarPendentesDocs, documentosDaUnidade, FormDocumentoCia, ListaDocumentosCia } from './DocumentosCia';
+import { ConfirmarDocumentoDireto, contarPendentesDocs, documentosDaUnidade, FormDocumentoCia, ListaDocumentosCia } from './DocumentosCia';
 import { EapsDaCia, ResponderEap } from './EapCia';
 import { observarIccsAbertas, observarRespostasIccDaUnidade } from '../../data/icc';
 import type { Icc, RespostaIcc } from '../../domain/icc';
@@ -109,7 +109,9 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       const d = DOCUMENTOS.find((x) => x.id === docAberto);
       if (!d) return <p className="mensagem erro">Documento não encontrado.</p>;
       if (envios.carregando) return <p className="carregando">Carregando…</p>;
-      return <FormDocumentoCia key={d.id} documento={d} unidade={unidade} mesRef={mesRef} envio={envios.valor?.find((e) => e.docId === d.id)} />;
+      const envio = envios.valor?.find((e) => e.docId === d.id);
+      if (d.direto) return <ConfirmarDocumentoDireto key={d.id} documento={d} unidade={unidade} mesRef={mesRef} envio={envio} />;
+      return <FormDocumentoCia key={d.id} documento={d} unidade={unidade} mesRef={mesRef} envio={envio} />;
     }
     if (ativa === 'aperfeicoamento') {
       return (
