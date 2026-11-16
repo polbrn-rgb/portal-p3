@@ -11,6 +11,13 @@ test('Controle de Operações: registra com objetivo, edita, exclui e pede o Rel
   await irPara(page, /^Operações/);
   await page.getByRole('navigation', { name: 'Operações' }).getByRole('link', { name: 'Controle de Operações' }).click();
   await expect(page.getByRole('heading', { name: 'Controle de Operações', level: 2 })).toBeVisible();
+  if (info.project.name === 'computador') {
+    // Relatório de Indicadores e Visualizar operações lado a lado.
+    const rel = await page.getByRole('group', { name: 'Relatório de Indicadores' }).boundingBox();
+    const ver = await page.getByRole('group', { name: 'Visualizar operações' }).boundingBox();
+    expect(Math.abs((rel?.y ?? 0) - (ver?.y ?? 99))).toBeLessThan(2);
+    expect((ver?.x ?? 0) > (rel?.x ?? 0) + (rel?.width ?? 0) - 1).toBe(true);
+  }
 
   // Sem os obrigatórios não salva.
   await page.getByRole('button', { name: '+ Nova operação' }).click();

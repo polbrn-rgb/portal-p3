@@ -78,13 +78,9 @@ export function ControleOperacoes() {
 
       {editando === 'nova' && <FormControle aoCancelar={() => setEditando(null)} aoSalvar={(d) => salvo(d, true)} />}
 
+      {/* No computador, Relatório e Visualizar ficam lado a lado; no celular, um embaixo do outro. */}
+      <div className="controle-topo">
       <RelatorioIndicadores mes={mes} aoMudarMes={setMes} semObjetivo={semObjetivo} totalDoMes={doMes.length} />
-
-      {aviso && (
-        <p className="mensagem aviso" role="status">
-          {aviso}
-        </p>
-      )}
 
       <div className="cartao grupo" role="group" aria-label="Visualizar operações">
         <h3>👁️ Visualizar operações</h3>
@@ -105,6 +101,13 @@ export function ControleOperacoes() {
           {visao === 'todas' ? 'Todas as operações' : `Operações de ${rotuloMes(mesLista)}`}: {lista.length}
         </p>
       </div>
+      </div>
+
+      {aviso && (
+        <p className="mensagem aviso" role="status">
+          {aviso}
+        </p>
+      )}
 
       {ops.erro && (
         <p className="mensagem erro" role="alert">
