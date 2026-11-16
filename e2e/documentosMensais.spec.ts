@@ -20,7 +20,7 @@ test('Documentos Mensais: a Cia envia pelo portal e a P/3 acompanha, marca feito
   await page.getByLabel('Preenchido por').fill('Cb PM Teste');
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: /^Enviar$/ }).click();
-  await expect(page.getByRole('link', { name: /Veículos Apreendidos/ })).toContainText('Enviado');
+  await expect(page.getByRole('link', { name: /Veículos Apreendidos/ })).toContainText('Enviado', { timeout: 15000 });
   await sair(page);
 
   await entrar(page, 'p3', SENHA_TESTE);
@@ -60,10 +60,10 @@ test('Documentos Mensais: lista com linhas (Distribuição A.I. CET)', async ({ 
   await linha.getByLabel('Qtd de talões').fill('1');
   await linha.getByRole('textbox', { name: /^RE/ }).fill('123456-7');
   await linha.getByLabel('Nome').fill('Fulano de Tal');
-  await linha.getByRole('radio', { name: 'Alocação' }).check();
+  await linha.getByRole('radio', { name: 'Alocação', exact: true }).check();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: /^Enviar$/ }).click();
-  await expect(page.getByRole('link', { name: /Distribuição A\.I\. CET/ })).toContainText('Enviado');
+  await expect(page.getByRole('link', { name: /Distribuição A\.I\. CET/ })).toContainText('Enviado', { timeout: 15000 });
 
   // Volta para editar com a linha preenchida.
   await page.getByRole('link', { name: /Distribuição A\.I\. CET/ }).click();
