@@ -1850,3 +1850,16 @@ fieldset:has(> .erro-campo) > legend {
 .confirmar-linha p {
   margin: 0 0 8px;
 }
+
+.opcoes-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+.lista-cia {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

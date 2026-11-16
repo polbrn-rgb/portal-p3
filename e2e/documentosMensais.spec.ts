@@ -31,14 +31,41 @@ test('Documentos Mensais: a Cia envia pelo portal e a P/3 acompanha, marca feito
   await expect(veiculos.getByRole('list', { name: /Envios/ })).toContainText(`⏳ ${sigla}`);
 
   // Direto na planilha: marca "feito" (um documento diferente em cada aparelho, para os testes não se cruzarem).
-  const direto = page.getByRole('article', { name: celular ? 'Dados Sobre BO Eletrônico' : 'Plano Diretor' });
+  const direto = page.getByRole('article', { name: celular ? 'R.R. - Relação de Remessa' : 'Plano Diretor' });
   await direto.getByRole('checkbox').click();
   await expect(direto.getByRole('checkbox')).toBeChecked();
 
   // Arquivar pede confirmação.
-  const arquivar = page.getByRole('article', { name: celular ? 'R.R. - Relação de Remessa' : 'Avaliação Periódica e Cumprimento de Metas' });
+  // BO Eletrônico é do ano todo: só guarda a cópia (não zera).
+  const arquivar = page.getByRole('article', { name: celular ? 'Dados Sobre BO Eletrônico' : 'Avaliação Periódica e Cumprimento de Metas' });
   await arquivar.getByRole('button', { name: '📦 Arquivar cópia' }).click();
   await arquivar.getByRole('alertdialog').getByRole('button', { name: 'Sim, arquivar' }).click();
   await expect(arquivar.getByRole('button', { name: '⏳ Arquivando…' })).toBeDisabled();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+});
+
+test('Documentos Mensais: lista com linhas (Distribuição A.I. CET)', async ({ page }, info) => {
+  const unidade = info.project.name === 'celular' ? '6cia' : '4cia';
+  await entrar(page, unidade, SENHA_TESTE);
+  await irParaAbaCia(page, 'Documentos Mensais');
+  await page.getByRole('link', { name: /Distribuição A\.I\. CET/ }).click();
+  await expect(page.getByText(/vai “NÃO HOUVE” na planilha/)).toBeVisible();
+
+  await page.getByRole('button', { name: '+ Adicionar linha' }).click();
+  const linha = page.getByRole('group', { name: 'Linha 1' });
+  await page.getByLabel('Preenchido por').fill('Sd PM Teste');
+  await page.getByRole('button', { name: /^Enviar$/ }).click();
+  await expect(linha.getByText('Escolha uma opção.')).toBeVisible();
+  await linha.getByLabel('Data').fill('2026-10-05');
+  await linha.getByLabel('Qtd de talões').fill('1');
+  await linha.getByLabel('RE').fill('123456-7');
+  await linha.getByLabel('Nome').fill('Fulano de Tal');
+  await linha.getByRole('radio', { name: 'Alocação' }).check();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+  await page.getByRole('button', { name: /^Enviar$/ }).click();
+  await expect(page.getByRole('link', { name: /Distribuição A\.I\. CET/ })).toContainText('Enviado');
+
+  // Volta para editar com a linha preenchida.
+  await page.getByRole('link', { name: /Distribuição A\.I\. CET/ }).click();
+  await expect(page.getByRole('group', { name: 'Linha 1' }).getByLabel('Nome')).toHaveValue('FULANO DE TAL');
 });

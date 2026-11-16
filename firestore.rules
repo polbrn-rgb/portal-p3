@@ -142,7 +142,7 @@ service cloud.firestore {
       return r.keys().hasOnly(['docId', 'mesRef', 'unidadeId', 'valores', 'respondidoPor', 'enviadoEm', 'gravado', 'gravadoEm', 'erro', 'erroEm'])
         && r.docId is string && r.mesRef is string && r.mesRef.matches('^[0-9]{4}-[0-9]{2}$')
         && id == r.docId + '_' + r.mesRef + '_' + r.unidadeId
-        && r.valores is map && r.valores.size() <= 60
+        && r.valores is map && r.valores.size() <= 200
         && r.respondidoPor is string && r.respondidoPor.size() > 0 && r.respondidoPor.size() <= 120
         && r.gravado == false
         && r.enviadoEm == request.time;

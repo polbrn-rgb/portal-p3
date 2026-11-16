@@ -6,7 +6,15 @@ import { UNIDADES, type UnidadeId } from './unidades';
 // grava cada número na célula certa, marca a legenda e, ao virar o mês, guarda uma cópia e zera a planilha.
 // Uma planilha nova entra aqui só por configuração (sem programar de novo).
 
-export type Campo = { id: string; rotulo: string; grupo?: string; texto?: boolean; decimal?: boolean };
+export type Campo = { id: string; rotulo: string; grupo?: string; texto?: boolean; decimal?: boolean; daLista?: boolean };
+
+/** Lista em que a Cia adiciona linhas (ex.: PM que receberam talão). Cada Cia tem um bloco de linhas. */
+export type ListaDoc = {
+  linhas: Partial<Record<UnidadeId, [number, number]>>; // primeira e última linha do bloco da Cia
+  colunas: { id: string; rotulo: string; coluna: string; tipo: 'data' | 're' | 'texto' | 'numero' }[];
+  opcao?: { id: string; rotulo: string; opcoes: { rotulo: string; coluna: string }[] }; // caixas de seleção (uma marcada)
+  semRegistro: { coluna: string; texto: string }; // ex.: "NÃO HOUVE" na primeira linha
+};
 
 export type DocumentoMensal = {
   id: string;
@@ -16,6 +24,11 @@ export type DocumentoMensal = {
   meses?: number[]; // só nesses meses (ex.: trimestral). Vazio = todo mês
   // Preenchido pelas Cias no portal (sem isto, a P/3 só acompanha e marca "feito"):
   aba?: string;
+  abas?: Partial<Record<UnidadeId, string>>; // uma aba por Cia (o resto é igual em todas)
+  colunaJaneiro?: string; // células com {M}: a coluna do mês (janeiro nesta coluna, fevereiro na seguinte...)
+  zerar?: boolean; // false = planilha do ano todo: só guarda a cópia, não zera
+  vazios?: Record<string, string | number | boolean>; // valor ao zerar, por campo (padrão: zerarCom)
+  lista?: ListaDoc;
   campos?: Campo[];
   celulas?: Partial<Record<UnidadeId, Record<string, string>>>; // Cia -> campo -> célula (ex.: "C3")
   legenda?: { modelo: string; celulas: Partial<Record<UnidadeId, string>> }; // "Preenchimento do Mês de {Mes} - {QUEM}"
@@ -50,6 +63,47 @@ const COLUNAS = (inicio: string): Record<UnidadeId, string> =>
 const LEGENDA_PADRAO = 'Preenchimento do Mês de {Mes} - {QUEM}';
 const linhasLegenda = (coluna: string, linha1Cia: number, ate: UnidadeId[] = CIAS) =>
   Object.fromEntries(ate.map((c) => [c, `${coluna}${linha1Cia + CIAS.indexOf(c)}`])) as Partial<Record<UnidadeId, string>>;
+
+/** Gera os campos e as células de uma lista: l1_data, l1_re, ..., l1_tipo0, l1_tipo1 ... */
+function comLista(d: DocumentoMensal & { lista: ListaDoc }): DocumentoMensal {
+  const { linhas, colunas, opcao } = d.lista;
+  const max = Math.max(...Object.values(linhas).map(([a, b]) => b - a + 1));
+  const campos: Campo[] = [];
+  const vazios: Record<string, string | boolean> = {};
+  for (let i = 1; i <= max; i++) {
+    for (const c of colunas) {
+      campos.push({ id: `l${i}_${c.id}`, rotulo: `${c.rotulo} (${i})`, daLista: true });
+      vazios[`l${i}_${c.id}`] = '';
+    }
+    opcao?.opcoes.forEach((_, k) => {
+      campos.push({ id: `l${i}_${opcao.id}${k}`, rotulo: `${opcao.rotulo} (${i})`, daLista: true });
+      vazios[`l${i}_${opcao.id}${k}`] = false;
+    });
+  }
+  const celulas: Partial<Record<UnidadeId, Record<string, string>>> = {};
+  for (const [u, [ini, fim]] of Object.entries(linhas) as [UnidadeId, [number, number]][]) {
+    const m: Record<string, string> = {};
+    for (let i = 1; i <= fim - ini + 1; i++) {
+      for (const c of colunas) m[`l${i}_${c.id}`] = `${c.coluna}${ini + i - 1}`;
+      opcao?.opcoes.forEach((o, k) => (m[`l${i}_${opcao.id}${k}`] = `${o.coluna}${ini + i - 1}`));
+    }
+    celulas[u] = m;
+  }
+  return { ...d, campos, celulas, vazios };
+}
+
+const BO_NATUREZAS = [
+  ['desap', 'Desaparecimento de pessoas'],
+  ['encontro', 'Encontro de pessoas desaparecidas'],
+  ['furtoCel', 'Furto de celular'],
+  ['perdaCel', 'Perda de celular'],
+  ['furtoVei', 'Furto de veículos'],
+  ['furtoPlaca', 'Furto de placas de veículos'],
+  ['perdaPlaca', 'Perda de placas de veículos'],
+  ['furtoDoc', 'Furto de documentos'],
+  ['perdaDoc', 'Perda de documentos'],
+  ['acidente', 'Acidente de trânsito'],
+] as const;
 
 const VISTORIA_TIPOS = { bike: 'Bicicleta elétrica', ciclo: 'Ciclomotor', auto: 'Autopropelido' };
 const VISTORIA_ACOES = { vist: ['B', 'Vistoriado'], rem: ['C', 'Removido'], loc: ['D', 'Localizado'], aut: ['E', 'Autuado'] } as const;
@@ -166,12 +220,63 @@ export const DOCUMENTOS: DocumentoMensal[] = [
     ancoras: { D11: '1ª', D16: '6ª', F8: 'Média de Vtr', N8: 'Observações' },
     zerarCom: '',
   },
+  {
+    // Uma aba por Cia; o ano todo na mesma planilha (coluna do mês): não zera, só guarda a cópia.
+    id: 'bo-eletronico',
+    nome: 'Dados Sobre BO Eletrônico',
+    diaUtil: 3,
+    planilhaId: '1HyLiAMGWe6ZtfrkvPcCXSrf6SAyi0h2S4wxXyRAhPLY',
+    abas: { '1cia': '1ª Cia', '2cia': '2ª Cia', '3cia': '3ª Cia', '4cia': '4ª Cia', '5cia': '5ª CIA', '6cia': '6ª CIA', ft: 'F TAT' },
+    colunaJaneiro: 'E',
+    zerar: false,
+    campos: [
+      { id: 'treinados', rotulo: 'PM treinados (quantidade)', grupo: 'Controle' },
+      { id: 'recursos', rotulo: 'Recursos materiais (possui? sim/não — o que falta?)', grupo: 'Controle', texto: true },
+      { id: 'espaco', rotulo: 'Problemas técnicos? Espaço para o cidadão? (o que falta?)', grupo: 'Controle', texto: true },
+      { id: 'problemas', rotulo: 'Existem problemas técnicos? (quais?)', grupo: 'Controle', texto: true },
+      ...BO_NATUREZAS.map(([id, rotulo]) => ({ id, rotulo, grupo: 'Naturezas de BO no mês' })),
+    ],
+    celulas: Object.fromEntries(
+      CIAS.map((u) => [
+        u,
+        {
+          treinados: 'E11',
+          recursos: 'G11',
+          espaco: 'J11',
+          problemas: 'N11',
+          ...Object.fromEntries(BO_NATUREZAS.map(([id], i) => [id, `{M}${21 + i}`])),
+        },
+      ]),
+    ),
+    ancoras: { A18: 'NATUREZAS DE BO', E8: 'PM TREINADOS', A21: 'DESAPARECIMENTO DE PESSOAS', A30: 'ACIDENTE DE TRÂNSITO', '{M}18': '{SIGLA}.-{AA}' },
+    zerarCom: '',
+  },
+  comLista({
+    id: 'distribuicao-ai-cet',
+    nome: 'Distribuição A.I. CET - Município',
+    diaUtil: 4,
+    planilhaId: '10CWe0-ZJ1_gIypULTm315UeljHurhHXB2yM-O3h3w2c',
+    aba: 'Rel de PM Port de Talão de AIT ',
+    lista: {
+      linhas: { '1cia': [10, 22], '2cia': [23, 32], '3cia': [33, 42], '4cia': [43, 52], '5cia': [53, 62], '6cia': [63, 72], ft: [73, 82] },
+      colunas: [
+        { id: 'data', rotulo: 'Data', coluna: 'B', tipo: 'data' },
+        { id: 'qtd', rotulo: 'Qtd de talões', coluna: 'C', tipo: 'numero' },
+        { id: 're', rotulo: 'RE', coluna: 'D', tipo: 're' },
+        { id: 'nome', rotulo: 'Nome', coluna: 'E', tipo: 'texto' },
+      ],
+      opcao: { id: 'tipo', rotulo: 'Tipo', opcoes: [{ rotulo: 'Alocação', coluna: 'G' }, { rotulo: 'Realocação', coluna: 'H' }] },
+      semRegistro: { coluna: 'E', texto: 'NÃO HOUVE' },
+    },
+    mes: { celula: 'A6', modelo: 'Assunto: Relação de PM portador de talão de AIT CET - Referente: {MES} DE {ANO}' },
+    ancoras: { B9: 'DATA', D9: 'RE', E9: 'NOME', G9: 'Alocação', H9: 'Realocação', F10: '1ª CIA', F23: '2ª CIA', F73: 'F.T.' },
+    zerarCom: '',
+  }),
   // Ainda preenchidas direto na planilha: a P/3 acompanha, marca "feito" e arquiva a cópia do mês.
   { id: 'plano-diretor', nome: 'Plano Diretor', diaUtil: 1, planilhaId: '1vSY6-9aHU7xKGLdSWwzpu9lgp1SgL5lwfhrTRji98ZM' },
   { id: 'avaliacao-periodica', nome: 'Avaliação Periódica e Cumprimento de Metas', diaUtil: 2, planilhaId: '1kLHkeia6NozgBm8nCvDal4xLC6M2CtWdkXmeNVsOZXM' },
-  { id: 'bo-eletronico', nome: 'Dados Sobre BO Eletrônico', diaUtil: 3, planilhaId: '1HyLiAMGWe6ZtfrkvPcCXSrf6SAyi0h2S4wxXyRAhPLY' },
+  // Lista de ~90 BOs por Cia/mês com 17 colunas: continua colada direto na planilha.
   { id: 'relacao-remessa', nome: 'R.R. - Relação de Remessa', diaUtil: 4, planilhaId: '1ZLsK2mL--WcHvwzLFpHdcwLyLK6LFJPYHnJgH3fntP0' },
-  { id: 'distribuicao-ai-cet', nome: 'Distribuição A.I. CET - Município', diaUtil: 4, planilhaId: '10CWe0-ZJ1_gIypULTm315UeljHurhHXB2yM-O3h3w2c' },
   { id: 'bcs-funcionamento', nome: 'BCS - Funcionamento (trimestral)', diaUtil: 4, planilhaId: '1MM1dkckQZ-9GFH1C7gOyrI3WZS_tCBlDwl6kBD7Xpwo', meses: [1, 4, 7, 10] },
   { id: 'bcs-produtividade', nome: 'BCS - Relatório Trimestral de Produtividade', diaUtil: 4, planilhaId: '1y_AgfUW7TaSc1jbWIMGegkrkj0RXd0a2gO3cfetDCto', meses: [1, 4, 7, 10] },
   { id: 'bcs-quadro', nome: 'BCS - Quadro Comparativo de Indicadores', diaUtil: 4, planilhaId: '1MtYGl3FzkQWxSOxK_EcB4bsSX_8dT4I1dIdVbr5ITV8', meses: [1, 4, 7, 10] },
@@ -272,7 +377,7 @@ export function prazoDoDocumento(d: DocumentoMensal, mesRef: string): string {
 
 // ---------- Envio da Cia ----------
 
-export type ValoresEnvio = Record<string, number | string>;
+export type ValoresEnvio = Record<string, number | string | boolean>;
 
 export type EnvioMensal = {
   id: string;
@@ -293,7 +398,7 @@ export function idEnvio(docId: string, mesRef: string, u: UnidadeId): string {
 export function lerValores(d: DocumentoMensal, u: UnidadeId, rascunho: Record<string, string>) {
   const valores: ValoresEnvio = {};
   const erros: Record<string, string> = {};
-  for (const c of camposDaUnidade(d, u)) {
+  for (const c of camposDaUnidade(d, u).filter((x) => !x.daLista)) {
     const t = (rascunho[c.id] ?? '').trim();
     if (c.texto) {
       valores[c.id] = t;
@@ -306,6 +411,65 @@ export function lerValores(d: DocumentoMensal, u: UnidadeId, rascunho: Record<st
     else valores[c.id] = n;
   }
   return { valores, erros };
+}
+
+// ---------- Lista (a Cia adiciona linhas) ----------
+
+export type LinhaLista = Record<string, string>; // coluna -> texto; a opção guarda o índice escolhido ("0", "1"...)
+
+export function maxLinhas(d: DocumentoMensal, u: UnidadeId): number {
+  const b = d.lista?.linhas[u];
+  return b ? b[1] - b[0] + 1 : 0;
+}
+
+/** "2026-10-05" -> "05/10/2026" */
+function dataBr(iso: string): string {
+  const [a, m, dd] = iso.split('-');
+  return `${dd}/${m}/${a}`;
+}
+
+/** Linhas digitadas -> valores de todas as células do bloco (as que sobram ficam em branco). */
+export function valoresDaLista(d: DocumentoMensal, u: UnidadeId, linhas: LinhaLista[]) {
+  const lista = d.lista!;
+  const max = maxLinhas(d, u);
+  const valores: ValoresEnvio = {};
+  const erros: Record<string, string> = {};
+  if (linhas.length > max) erros.__lista = `No máximo ${max} linhas para esta Cia.`;
+  for (let i = 1; i <= max; i++) {
+    const l = linhas[i - 1];
+    for (const c of lista.colunas) {
+      const t = (l?.[c.id] ?? '').trim();
+      const chave = `l${i}_${c.id}`;
+      if (l && !t) erros[chave] = 'Obrigatório.';
+      else if (l && c.tipo === 'numero' && !(Number.isInteger(Number(t)) && Number(t) > 0)) erros[chave] = 'Número inválido.';
+      valores[chave] = !l ? '' : c.tipo === 'data' ? dataBr(t) : c.tipo === 'numero' ? Number(t) : t.toUpperCase();
+    }
+    lista.opcao?.opcoes.forEach((_, k) => (valores[`l${i}_${lista.opcao!.id}${k}`] = !!l && l[lista.opcao!.id] === String(k)));
+    if (l && lista.opcao && !lista.opcao.opcoes[Number(l[lista.opcao.id])]) erros[`l${i}_${lista.opcao.id}`] = 'Escolha uma opção.';
+  }
+  if (!linhas.length) {
+    const col = lista.colunas.find((c) => c.coluna === lista.semRegistro.coluna);
+    if (col) valores[`l1_${col.id}`] = lista.semRegistro.texto;
+  }
+  return { valores, erros };
+}
+
+/** Valores já enviados -> linhas para editar. */
+export function linhasDosValores(d: DocumentoMensal, u: UnidadeId, valores: ValoresEnvio): LinhaLista[] {
+  const lista = d.lista!;
+  const out: LinhaLista[] = [];
+  for (let i = 1; i <= maxLinhas(d, u); i++) {
+    const vazia = lista.colunas.every((c) => !String(valores[`l${i}_${c.id}`] ?? '').trim() || valores[`l${i}_${c.id}`] === lista.semRegistro.texto);
+    if (vazia) break;
+    const l: LinhaLista = {};
+    for (const c of lista.colunas) {
+      const v = String(valores[`l${i}_${c.id}`] ?? '');
+      l[c.id] = c.tipo === 'data' && /^\d{2}\/\d{2}\/\d{4}$/.test(v) ? v.split('/').reverse().join('-') : v;
+    }
+    if (lista.opcao) l[lista.opcao.id] = String(lista.opcao.opcoes.findIndex((_, k) => valores[`l${i}_${lista.opcao!.id}${k}`] === true));
+    out.push(l);
+  }
+  return out;
 }
 
 export type SituacaoEnvio = 'enviado' | 'gravado' | 'erro' | 'pendente' | 'atrasado';
@@ -339,9 +503,23 @@ export type EstadoDocumento = {
 
 export function configParaMotor(lista = DOCUMENTOS) {
   return lista.map((d) => {
-    const { id, nome, planilhaId, aba, celulas, legenda, mes, ancoras, zerarCom } = d;
+    const { id, nome, planilhaId, aba, abas, colunaJaneiro, zerar, vazios, celulas, legenda, mes, ancoras, zerarCom } = d;
     return preenchidoPeloPortal(d)
-      ? { id, nome, planilhaId, aba, celulas, legenda: legenda ?? null, mes: mes ?? null, ancoras: ancoras ?? {}, zerarCom: zerarCom ?? '' }
+      ? {
+          id,
+          nome,
+          planilhaId,
+          aba: aba ?? null,
+          abas: abas ?? null,
+          colunaJaneiro: colunaJaneiro ?? null,
+          zerar: zerar !== false,
+          vazios: vazios ?? {},
+          celulas,
+          legenda: legenda ?? null,
+          mes: mes ?? null,
+          ancoras: ancoras ?? {},
+          zerarCom: zerarCom ?? '',
+        }
       : { id, nome, planilhaId };
   });
 }
