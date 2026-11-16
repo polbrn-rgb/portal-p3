@@ -137,6 +137,46 @@ const BCS_NATUREZAS = [
 ] as const;
 const CIAS_BCS: UnidadeId[] = ['1cia', '4cia', '6cia'];
 
+const AVAL_CRIMES = [
+  ['homicidio', 'Homicídio'],
+  ['rouboVeiculos', 'Roubo de veículos'],
+  ['furtoVeiculos', 'Furto de veículos'],
+  ['rouboOutros', 'Roubo outros'],
+  ['furtoOutros', 'Furto outros'],
+  ['rouboCarga', 'Roubo de carga'],
+  ['estupro', 'Estupro'],
+  ['latrocinio', 'Latrocínio'],
+  ['rouboBanco', 'Roubo a banco'],
+] as const; // linhas 5 a 13
+const AVAL_PRODUTIVIDADE = [
+  ['trafico', 'Flagrante de tráfico'],
+  ['flagrantes', 'Flagrantes outros'],
+  ['atos', 'Atos infracionais'],
+  ['procurados', 'Procurados capturados'],
+  ['armasFogo', 'Armas de fogo'],
+  ['armasBrancas', 'Armas brancas'],
+  ['abordadas', 'Pessoas abordadas'],
+  ['veiculos', 'Veículos vistoriados'],
+] as const; // linhas 18 a 25
+
+/** Duas colunas por mês: ano anterior ({M2}) e ano atual ({M2+1}). */
+function camposAvaliacao(itens: readonly (readonly [string, string])[], primeiraLinha: number, bloco: string) {
+  const campos: Campo[] = [];
+  const celulas: Record<string, string> = {};
+  for (const [quando, token, rotulo] of [
+    ['ant', '{M2}', 'ano anterior'],
+    ['atu', '{M2+1}', 'ano atual'],
+  ] as const) {
+    itens.forEach(([id, nome], i) => {
+      campos.push({ id: `${id}_${quando}`, rotulo: nome, grupo: `${bloco} — ${rotulo}` });
+      celulas[`${id}_${quando}`] = `${token}${primeiraLinha + i}`;
+    });
+  }
+  return { campos, celulas };
+}
+const AVAL_C = camposAvaliacao(AVAL_CRIMES, 5, 'Nove modalidades de crimes');
+const AVAL_P = camposAvaliacao(AVAL_PRODUTIVIDADE, 18, 'Produtividade');
+
 const VISTORIA_TIPOS = { bike: 'Bicicleta elétrica', ciclo: 'Ciclomotor', auto: 'Autopropelido' };
 const VISTORIA_ACOES = { vist: ['B', 'Vistoriado'], rem: ['C', 'Removido'], loc: ['D', 'Localizado'], aut: ['E', 'Autuado'] } as const;
 
@@ -304,9 +344,45 @@ export const DOCUMENTOS: DocumentoMensal[] = [
     ancoras: { B9: 'DATA', D9: 'RE', E9: 'NOME', G9: 'Alocação', H9: 'Realocação', F10: '1ª CIA', F23: '2ª CIA', F73: 'F.T.' },
     zerarCom: '',
   }),
-  // Ainda preenchidas direto na planilha: a P/3 acompanha, marca "feito" e arquiva a cópia do mês.
-  { id: 'plano-diretor', nome: 'Plano Diretor', diaUtil: 1, planilhaId: '1vSY6-9aHU7xKGLdSWwzpu9lgp1SgL5lwfhrTRji98ZM' },
-  { id: 'avaliacao-periodica', nome: 'Avaliação Periódica e Cumprimento de Metas', diaUtil: 2, planilhaId: '1kLHkeia6NozgBm8nCvDal4xLC6M2CtWdkXmeNVsOZXM' },
+  {
+    // As Cias preenchem só as linhas delas (ICC e reuniões); P/2, P/4, P/5 e SPJMD seguem direto na planilha.
+    id: 'plano-diretor',
+    nome: 'Plano Diretor',
+    diaUtil: 1,
+    planilhaId: '1vSY6-9aHU7xKGLdSWwzpu9lgp1SgL5lwfhrTRji98ZM',
+    aba: 'DADOS MENSAIS',
+    colunaJaneiro: 'G',
+    zerar: false,
+    campos: [
+      { id: 'icc', rotulo: 'Policiais participantes da ICC no mês' },
+      { id: 'reunioes', rotulo: 'Reuniões com o efetivo operacional no mês' },
+    ],
+    celulas: Object.fromEntries(
+      ([['1cia', 20], ['2cia', 28], ['3cia', 30], ['4cia', 32], ['5cia', 34], ['6cia', 36], ['ft', 38]] as const).map(([u, l]) => [
+        u,
+        { icc: `{M}${l}`, reunioes: `{M}${l + 1}` },
+      ]),
+    ),
+    ancoras: { B20: 'participantes da ICC', B21: 'reuniões desenvolvidas', C20: '1ª', C28: '2ª', C38: 'FT', B39: 'reuniões desenvolvidas', '{M}6': '{MES}' },
+    zerarCom: '',
+  },
+  {
+    // Uma aba por Cia; o ano todo (duas colunas por mês). A aba BTL soma e alimenta o Relatório de Indicadores.
+    id: 'avaliacao-periodica',
+    nome: 'Avaliação Periódica e Cumprimento de Metas',
+    diaUtil: 2,
+    planilhaId: '1kLHkeia6NozgBm8nCvDal4xLC6M2CtWdkXmeNVsOZXM',
+    abas: { '1cia': '1 CIA', '2cia': '2 CIA', '3cia': '3 CIA', '4cia': '4 CIA', '5cia': '5 CIA', '6cia': '6 CIA', ft: 'FT' },
+    colunaJaneiro: 'C',
+    zerar: false,
+    campos: [...AVAL_C.campos, ...AVAL_P.campos],
+    celulas: {
+      ...Object.fromEntries(CIAS.filter((u) => u !== 'ft').map((u) => [u, { ...AVAL_C.celulas, ...AVAL_P.celulas }])),
+      ft: AVAL_P.celulas, // FT preenche somente a produtividade
+    },
+    ancoras: { B5: 'HOMICÍDIO', B13: 'ROUBO A BANCO', B18: 'Flagrante de tráfico', B25: 'Veículos vistoriados', '{M2}3': '{MES}', '{M2}4': '{ANO_ANT}', '{M2+1}4': '{ANO}' },
+    zerarCom: '',
+  },
   // Lista de ~90 BOs por Cia/mês com 17 colunas: continua colada direto na planilha.
   { id: 'relacao-remessa', nome: 'R.R. - Relação de Remessa', diaUtil: 4, planilhaId: '1ZLsK2mL--WcHvwzLFpHdcwLyLK6LFJPYHnJgH3fntP0' },
   {

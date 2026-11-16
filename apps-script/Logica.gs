@@ -587,6 +587,7 @@ function textoDoMes(modelo, mesRef, quem) {
     .replace(/\{AA\}/g, p[0].slice(-2))
     .replace(/\{ANO\}/g, p[0])
     .replace(/\{TRI\}/g, Math.ceil((i + 1) / 3) + 'º')
+    .replace(/\{ANO_ANT\}/g, String(Number(p[0]) - 1))
     .replace(/\{QUEM\}/g, String(quem || '').trim());
 }
 
@@ -616,6 +617,8 @@ function resolverCelula(celula, mesRef, colunaJaneiro, colunaTrimestre1) {
   var mes = Number(String(mesRef).slice(5));
   var desloca = function (col, n) { return String.fromCharCode(String(col || 'A').charCodeAt(0) + n); };
   return String(celula)
+    .replace('{M2+1}', desloca(colunaJaneiro, 2 * (mes - 1) + 1)) // duas colunas por mês (ano anterior e atual)
+    .replace('{M2}', desloca(colunaJaneiro, 2 * (mes - 1)))
     .replace('{M}', desloca(colunaJaneiro, mes - 1))
     .replace('{T}', desloca(colunaTrimestre1, Math.ceil(mes / 3) - 1));
 }
