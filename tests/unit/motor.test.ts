@@ -243,6 +243,17 @@ describe('Checklist Operações (Apps Script)', () => {
     ]);
     expect(motor.linhasDoEfetivo([['sem', 'cabeçalho']])).toEqual([]);
   });
+
+  test('cadastro manual do portal vira linha nova na ordem das colunas da aba', () => {
+    const topo: unknown[][] = [
+      ['PREENCHA OS DADOS ABAIXO', '', '', '', '', ''],
+      ['Coluna 1', 'Post/Grad', 'RE', 'NOME COMPLETO', 'NOME DE GUERRA', 'Telefone'],
+    ];
+    const p = { re: '765432-1', posto: '2º Sgt PM', nomeGuerra: 'LIMA', nomeCompleto: 'JOSÉ LIMA', telefone: '(11) 98888-0000' };
+    const novaLinha = (motor as unknown as { novaLinhaEfetivo: (v: unknown[][], p: unknown) => unknown[] | null }).novaLinhaEfetivo;
+    expect(novaLinha(topo, p)).toEqual(['', '2º Sgt PM', '765432-1', 'JOSÉ LIMA', 'LIMA', '(11) 98888-0000']);
+    expect(novaLinha([['sem', 'cabeçalho']], p)).toBeNull();
+  });
 });
 
 describe('EAP: textos e turmas da planilha', () => {

@@ -1895,3 +1895,120 @@ fieldset:has(> .erro-campo) > legend {
 .tabela-icc .linha-erro th {
   color: #b52b27;
 }
+
+/* ---------- TDS (fotos de instrução do CFP) ---------- */
+.instrucao-tds p {
+  margin: 0 0 6px;
+}
+
+.instrucao-tds ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--cor-suave);
+}
+
+.policial-achado {
+  margin: 4px 0 0;
+  font-weight: 600;
+  color: #1e6b3f;
+}
+
+.grupo-manual {
+  border: 1px solid #e0a100;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  min-width: 0;
+}
+
+.grupo-manual legend {
+  font-weight: 700;
+  color: #7a4b00;
+  padding: 0 4px;
+}
+
+.contador-tds {
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+
+.contador-tds.esgotado {
+  color: var(--cor-destaque);
+}
+
+.campo-fotos {
+  position: relative;
+}
+
+.botao-fotos {
+  width: 100%;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.campo-fotos:has(input:disabled) .botao-fotos {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.campo-fotos:has(input:focus-visible) .botao-fotos {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.campo input.entrada-oculta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.grade-fotos {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.grade-fotos li {
+  position: relative;
+  min-width: 0;
+}
+
+.grade-fotos img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #e4e7ec;
+}
+
+.legenda-foto {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--cor-suave);
+  overflow-wrap: anywhere;
+  margin-top: 2px;
+}
+
+.tirar-foto {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}

@@ -207,8 +207,64 @@ service cloud.firestore {
     }
 
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
+    // O CFP (e a P/3) cadastram à mão quem não está no banco; o motor leva para a aba BD Efetivo.
+    // Só cria: quem já está no banco não é alterado pelo portal.
+    function efetivoManualValido(re) {
+      let p = request.resource.data;
+      return re.matches('^[0-9]{5,6}$')
+        && p.keys().hasOnly(['re', 'posto', 'nomeGuerra', 'nomeCompleto', 'telefone', 'manual', 'cadastradoEm'])
+        && p.keys().hasAll(['re', 'posto', 'nomeGuerra', 'nomeCompleto', 'manual', 'cadastradoEm'])
+        && p.manual == true
+        && p.cadastradoEm == request.time
+        && p.re is string && p.re.size() >= 5 && p.re.size() <= 12
+        && p.posto is string && p.posto.size() > 0 && p.posto.size() <= 30
+        && p.nomeGuerra is string && p.nomeGuerra.size() > 0 && p.nomeGuerra.size() <= 40
+        && p.nomeCompleto is string && p.nomeCompleto.size() > 0 && p.nomeCompleto.size() <= 120
+        && (!p.keys().hasAny(['telefone']) || (p.telefone is string && p.telefone.size() <= 20));
+    }
+
     match /efetivo/{re} {
       allow read: if logado();
+      allow create: if (ehPerfil('cfp') || ehP3()) && efetivoManualValido(re);
+    }
+
+    // TDS: até 5 fotos por CFP (RE) por mês. O id ({mes}_{re}_{vaga}, vaga 1 a 5) garante o limite;
+    // a foto (fotosTdsDados) e o resumo (fotosTds) são gravados juntos. Ninguém altera; só a P/3 apaga.
+    function fotoTdsValida(id) {
+      let f = request.resource.data;
+      return ehPerfil('cfp')
+        && f.keys().hasOnly(['mes', 're', 'cfp', 'data', 'assunto', 'vaga', 'miniatura', 'tamanho', 'enviadoEm'])
+        && f.keys().hasAll(['mes', 're', 'cfp', 'data', 'assunto', 'vaga', 'miniatura', 'tamanho', 'enviadoEm'])
+        && f.mes is string && f.mes.matches('^20[0-9]{2}-(0[1-9]|1[0-2])$')
+        && f.re is string && f.re.matches('^[0-9]{5,6}$')
+        && f.vaga is int && f.vaga >= 1 && f.vaga <= 5
+        && id == f.mes + '_' + f.re + '_' + string(f.vaga)
+        && f.data is string && f.data.matches(f.mes + '-(0[1-9]|[12][0-9]|3[01])')
+        && f.assunto is string && f.assunto.size() > 0 && f.assunto.size() <= 120
+        && f.cfp is map && f.cfp.keys().hasOnly(['posto', 'nomeGuerra'])
+        && f.cfp.posto is string && f.cfp.posto.size() <= 30
+        && f.cfp.nomeGuerra is string && f.cfp.nomeGuerra.size() > 0 && f.cfp.nomeGuerra.size() <= 40
+        && f.miniatura is string && f.miniatura.size() > 0 && f.miniatura.size() <= 60000
+        && f.tamanho is int && f.tamanho > 0 && f.tamanho <= 900000
+        && f.enviadoEm == request.time
+        && existsAfter(/databases/$(database)/documents/fotosTdsDados/$(id))
+        && getAfter(/databases/$(database)/documents/fotosTdsDados/$(id)).data.dados.size() == f.tamanho;
+    }
+
+    match /fotosTds/{id} {
+      allow read: if ehP3() || ehPerfil('cfp');
+      allow create: if fotoTdsValida(id);
+      allow delete: if ehP3();
+    }
+
+    match /fotosTdsDados/{id} {
+      allow read, delete: if ehP3();
+      allow create: if ehPerfil('cfp')
+        && request.resource.data.keys().hasOnly(['dados'])
+        && request.resource.data.dados is string
+        && request.resource.data.dados.size() > 0
+        && request.resource.data.dados.size() <= 900000
+        && existsAfter(/databases/$(database)/documents/fotosTds/$(id));
     }
 
     // Missões com pasta do CFP: gravadas pelo motor, lidas pelo CFP.

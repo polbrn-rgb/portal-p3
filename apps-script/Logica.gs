@@ -210,30 +210,34 @@ function normalizarRE(re) {
   return n.length > 6 ? n.slice(0, 6) : n;
 }
 
+/** Acha o cabeçalho do banco de efetivo (RE e NOME DE GUERRA) nas 10 primeiras linhas. null = não achou. */
+function cabecalhoDoEfetivo(valores) {
+  for (var i = 0; i < Math.min(10, valores.length); i++) {
+    var linha = valores[i].map(function (v) { return String(v).trim().toUpperCase(); });
+    var re = linha.indexOf('RE');
+    var guerra = -1;
+    linha.forEach(function (v, j) { if (guerra < 0 && v.indexOf('NOME DE GUERRA') >= 0) guerra = j; });
+    if (re < 0 || guerra < 0) continue;
+    var col = { re: re, guerra: guerra };
+    linha.forEach(function (v, j) {
+      if (col.posto === undefined && /POST|GRAD/.test(v)) col.posto = j;
+      if (col.tel === undefined && /TELEFONE|CELULAR/.test(v)) col.tel = j;
+      if (col.nome === undefined && (/NOME COMPLETO/.test(v) || v === 'NOME')) col.nome = j;
+      if (col.email === undefined && /E-?MAIL/.test(v)) col.email = j;
+    });
+    return { linha: i, largura: linha.length, col: col };
+  }
+  return null;
+}
+
 /**
  * Lê uma aba do banco de efetivo: acha o cabeçalho (RE e NOME DE GUERRA) nas 10 primeiras linhas
  * e devolve { chave, re, posto, nomeGuerra, telefone } de cada linha com RE.
  */
 function linhasDoEfetivo(valores) {
-  var cab = -1;
-  var col = {};
-  for (var i = 0; i < Math.min(10, valores.length) && cab < 0; i++) {
-    var linha = valores[i].map(function (v) { return String(v).trim().toUpperCase(); });
-    var re = linha.indexOf('RE');
-    var guerra = -1;
-    linha.forEach(function (v, j) { if (guerra < 0 && v.indexOf('NOME DE GUERRA') >= 0) guerra = j; });
-    if (re >= 0 && guerra >= 0) {
-      cab = i;
-      col.re = re;
-      col.guerra = guerra;
-      linha.forEach(function (v, j) {
-        if (col.posto === undefined && /POST|GRAD/.test(v)) col.posto = j;
-        if (col.tel === undefined && /TELEFONE|CELULAR/.test(v)) col.tel = j;
-        if (col.nome === undefined && (/NOME COMPLETO/.test(v) || v === 'NOME')) col.nome = j;
-        if (col.email === undefined && /E-?MAIL/.test(v)) col.email = j;
-      });
-    }
-  }
+  var achado = cabecalhoDoEfetivo(valores);
+  var cab = achado ? achado.linha : -1;
+  var col = achado ? achado.col : {};
   if (cab < 0) return [];
   var lista = [];
   for (var k = cab + 1; k < valores.length; k++) {
@@ -251,6 +255,24 @@ function linhasDoEfetivo(valores) {
     });
   }
   return lista;
+}
+
+/**
+ * Policial cadastrado à mão no portal (RE fora do banco) -> linha nova para a aba BD Efetivo,
+ * na ordem das colunas do cabeçalho. null = a aba não tem o cabeçalho com RE e NOME DE GUERRA.
+ */
+function novaLinhaEfetivo(valores, p) {
+  var achado = cabecalhoDoEfetivo(valores);
+  if (!achado) return null;
+  var linha = [];
+  for (var i = 0; i < achado.largura; i++) linha.push('');
+  var c = achado.col;
+  linha[c.re] = p.re || '';
+  linha[c.guerra] = p.nomeGuerra || '';
+  if (c.posto !== undefined) linha[c.posto] = p.posto || '';
+  if (c.tel !== undefined) linha[c.tel] = p.telefone || '';
+  if (c.nome !== undefined) linha[c.nome] = p.nomeCompleto || '';
+  return linha;
 }
 
 // ---------- Agenda do CFP -> página do CFP no portal ----------

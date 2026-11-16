@@ -3,8 +3,10 @@ import { observarAgendaCfp, type AgendaCfp, type MissaoCfp } from '../../data/mi
 import { formatarData, hojeISO } from '../../domain/datas';
 import { db } from '../../lib/firebase';
 import { cutucarMotor, URL_MOTOR } from '../../lib/motor';
+import { useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Recados } from './Recados';
+import { TdsCfp } from './TdsCfp';
 
 function horaDe(isoCompleto: string): string {
   const d = new Date(isoCompleto);
@@ -12,12 +14,21 @@ function horaDe(isoCompleto: string): string {
   return `${formatarData(hojeISO(d))} às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Página do CFP: recados do Cmt do P3 e as missões da agenda. */
+/** Página do CFP: recados do Cmt do P3 e as abas Missões (agenda) e TDS (fotos de instrução). */
 export function PainelCfp() {
+  const tds = useHash() === '#/tds';
   return (
     <>
       <Recados setor="cfp" />
-      <MissoesCfp />
+      <nav className="abas abas-p3 subabas" aria-label="Página do CFP">
+        <a href="#/" aria-current={tds ? undefined : 'page'}>
+          Missões
+        </a>
+        <a href="#/tds" aria-current={tds ? 'page' : undefined}>
+          TDS
+        </a>
+      </nav>
+      {tds ? <TdsCfp /> : <MissoesCfp />}
     </>
   );
 }
