@@ -117,7 +117,8 @@ describe('células de cada Cia', () => {
   test('Plano Diretor: linhas de cada Cia na coluna do mês', () => {
     const d = doc('plano-diretor');
     expect(gs.resolverCelula(d.celulas!['1cia']!.icc, '2026-10', 'G')).toBe('P20');
-    expect(gs.resolverCelula(d.celulas!.ft!.reunioes, '2026-12', 'G')).toBe('R39');
+    expect(gs.resolverCelula(d.celulas!['2cia']!.icc, '2026-10', 'G')).toBe('P27');
+    expect(gs.resolverCelula(d.celulas!.ft!.reunioes, '2026-12', 'G')).toBe('R38');
     expect(gs.ancorasDoMes(configParaMotor([d])[0], '2026-03')).toMatchObject({ I6: 'MARÇO' });
   });
 

@@ -345,7 +345,7 @@ export const DOCUMENTOS: DocumentoMensal[] = [
     zerarCom: '',
   }),
   {
-    // As Cias preenchem só as linhas delas (ICC e reuniões); P/2, P/4, P/5 e SPJMD seguem direto na planilha.
+    // As Cias preenchem só as linhas delas (ICC e reuniões). As linhas 7–19 e 22–26 (P/2, P/4, P/5, SPJMD) ficam ocultas.
     id: 'plano-diretor',
     nome: 'Plano Diretor',
     diaUtil: 1,
@@ -358,12 +358,12 @@ export const DOCUMENTOS: DocumentoMensal[] = [
       { id: 'reunioes', rotulo: 'Reuniões com o efetivo operacional no mês' },
     ],
     celulas: Object.fromEntries(
-      ([['1cia', 20], ['2cia', 28], ['3cia', 30], ['4cia', 32], ['5cia', 34], ['6cia', 36], ['ft', 38]] as const).map(([u, l]) => [
+      ([['1cia', 20], ['2cia', 27], ['3cia', 29], ['4cia', 31], ['5cia', 33], ['6cia', 35], ['ft', 37]] as const).map(([u, l]) => [
         u,
         { icc: `{M}${l}`, reunioes: `{M}${l + 1}` },
       ]),
     ),
-    ancoras: { B20: 'participantes da ICC', B21: 'reuniões desenvolvidas', C20: '1ª', C28: '2ª', C38: 'FT', B39: 'reuniões desenvolvidas', '{M}6': '{MES}' },
+    ancoras: { B20: 'participantes da ICC', B21: 'reuniões desenvolvidas', C20: '1ª', C27: '2ª', C29: '3ª', C37: 'FT', B38: 'reuniões desenvolvidas', '{M}6': '{MES}' },
     zerarCom: '',
   },
   {
