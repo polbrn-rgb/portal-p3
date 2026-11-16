@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { concluirZeragem, definirContador, iniciarZeragem, lerContadores, ZeragemNaoPronta } from '../../src/data/admin';
+import { concluirZeragem, definirContador, iniciarZeragem, lerContadores, observarZeragem, pularLimpeza, ZeragemNaoPronta, type SituacaoZeragem } from '../../src/data/admin';
 import { criarDemanda, criarDemandaNumerada, obterDemanda, atualizarDemanda, encaminhamentosDaDemanda } from '../../src/data/demandas';
 import { dadosDe, demandaVazia, type DadosDemanda } from '../../src/domain/demanda';
 
@@ -129,5 +129,22 @@ describe('zerar portal', () => {
   test('a P/3 não consegue zerar', async () => {
     await criarDemanda(p3, dados());
     await expect(iniciarZeragem(p3)).rejects.toThrow();
+  });
+
+  test('erro repetido aparece na tela e dá para seguir sem limpar', async () => {
+    await criarDemanda(p3, dados());
+    await criarDemanda(p3, dados());
+    await iniciarZeragem(admin);
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore() as unknown as Firestore;
+      await updateDoc(doc(db, 'demandas/1'), { automacao: { erro: 'cfp: limite de eventos', processadoEm: '2026-11-16T23:20:00.000Z' } });
+      await updateDoc(doc(db, 'demandas/2'), { automacaoPendente: false, automacao: { processadoEm: '2026-11-16T23:21:00.000Z' } });
+    });
+    const sit = await new Promise<SituacaoZeragem>((ok, falha) => {
+      const parar = observarZeragem(admin, (s) => s.comErro.length === 1 && (parar(), ok(s)), falha);
+    });
+    expect(sit).toMatchObject({ aguardandoMotor: 1, ultimaAtividade: '2026-11-16T23:21:00.000Z', comErro: [{ id: '1', numero: 1, erro: 'cfp: limite de eventos' }] });
+    await pularLimpeza(admin, ['1']);
+    expect(await concluirZeragem(admin, 0)).toBe(2);
   });
 });

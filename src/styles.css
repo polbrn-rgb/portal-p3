@@ -2359,3 +2359,9 @@ fieldset:has(> .erro-campo) > legend {
   gap: 12px;
   max-width: 420px;
 }
+
+.lista-erros {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}

@@ -214,10 +214,18 @@ function rodarMotor_(esperaMs) {
       // Falha no Gmail não pode travar a agenda: registra e tenta de novo na próxima rodada.
       console.error('E-mails: ' + e.message);
     }
+    // Busca uma fila maior que a rodada e põe por último as que já deram erro: um erro que se repete
+    // (ex.: limite do Google de apagar eventos) não trava as outras. Cada demanda no máximo 1 vez por rodada.
+    var vistas = {};
+    var comeco = Date.now();
     for (var i = 0; i < 3; i++) {
-      var pendentes = consultarPendentes_();
+      var pendentes = ordenarPendentes(consultarPendentes_()).filter(function (p) { return !vistas[p.nome]; });
       if (!pendentes.length) break;
-      pendentes.forEach(processarDemanda_);
+      pendentes.slice(0, CONFIG_P3.POR_RODADA).forEach(function (p) {
+        vistas[p.nome] = true;
+        processarDemanda_(p);
+      });
+      if (Date.now() - comeco > 4 * 60 * 1000) break; // o Apps Script corta em 6 minutos
     }
     try {
       processarPlanilhas_();
@@ -418,7 +426,7 @@ function consultarPendentes_() {
     structuredQuery: {
       from: [{ collectionId: 'demandas' }],
       where: { fieldFilter: { field: { fieldPath: 'automacaoPendente' }, op: 'EQUAL', value: { booleanValue: true } } },
-      limit: CONFIG_P3.POR_RODADA
+      limit: CONFIG_P3.POR_RODADA * 5
     }
   });
   if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));

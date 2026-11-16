@@ -712,3 +712,15 @@ function celulasIcc(unidadeId, r) {
   out[c + '8'] = of + sg + cb;
   return out;
 }
+
+/**
+ * Fila do motor: as que ainda não deram erro vão primeiro e as que já falharam vão por último
+ * (a que falhou há mais tempo antes). Assim um erro que se repete não trava as outras demandas.
+ */
+function ordenarPendentes(lista) {
+  var erro = function (p) { return (p.dados && p.dados.automacao && p.dados.automacao.erro) ? 1 : 0; };
+  var quando = function (p) { return (p.dados && p.dados.automacao && p.dados.automacao.processadoEm) || ''; };
+  return lista.slice().sort(function (a, b) {
+    return erro(a) - erro(b) || (quando(a) < quando(b) ? -1 : quando(a) > quando(b) ? 1 : 0);
+  });
+}

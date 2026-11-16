@@ -150,3 +150,10 @@ implantação e `npm run deploy:regras`.
   Erros aparecem em **Execuções** começando com `Relatório:` ou `Controle de Operações:`.
 - E-mail encaminhado não apareceu: rode **diagnostico** e veja a linha *E-mails do funcional*. Erros do Gmail
   aparecem em **Execuções** começando com `E-mails:`.
+
+## Atualização: fila do motor (novembro/2026)
+
+Cole de novo o `Motor.gs` e o `Logica.gs` e faça **Implantar → Gerenciar implantações → lápis → Nova versão → Implantar**.
+O motor agora põe por último as demandas que já deram erro, para um erro repetido (ex.: limite do Google de apagar
+muitos eventos seguidos) não travar as outras. O erro de cada uma aparece em **Administrador → Zerar portal**.
+

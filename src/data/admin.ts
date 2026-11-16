@@ -62,17 +62,33 @@ export async function iniciarZeragem(db: Firestore): Promise<{ apagados: number;
   return { apagados, demandas: demandas.length };
 }
 
+export type SituacaoZeragem = {
+  total: number;
+  zeradas: number;
+  aguardandoMotor: number;
+  novas: number;
+  /** Esperando o motor e com erro na última tentativa. */
+  comErro: { id: string; numero: number; erro: string }[];
+  /** Última vez que o motor mexeu numa demanda zerada (ISO), '' se nunca. */
+  ultimaAtividade: string;
+};
+
 /** Quantas demandas ainda esperam o motor limpar agenda/pasta, em tempo real. */
 export function observarZeragem(
   db: Firestore,
-  aoMudar: (situacao: { total: number; zeradas: number; aguardandoMotor: number; novas: number }) => void,
+  aoMudar: (situacao: SituacaoZeragem) => void,
   aoFalhar: (erro: Error) => void,
 ): () => void {
   return onSnapshot(
     collection(db, 'demandas'),
     (s) => {
-      const lista = s.docs.map((d) => d.data());
+      const lista = s.docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, any>);
+      const zeradas = lista.filter((d) => d.zerada === true);
       aoMudar({
+        comErro: lista
+          .filter((d) => d.automacaoPendente === true && d.automacao?.erro)
+          .map((d) => ({ id: d.id, numero: Number(d.numero), erro: String(d.automacao.erro) })),
+        ultimaAtividade: zeradas.reduce((m, d) => (String(d.automacao?.processadoEm ?? '') > m ? String(d.automacao.processadoEm) : m), ''),
         total: lista.length,
         zeradas: lista.filter((d) => d.zerada === true).length,
         aguardandoMotor: lista.filter((d) => d.automacaoPendente === true).length,
@@ -81,6 +97,18 @@ export function observarZeragem(
     },
     aoFalhar,
   );
+}
+
+/**
+ * Desiste de limpar agenda/pasta destas demandas (o motor deixa de tentar). O que sobrar na agenda ou no Drive
+ * fica para apagar à mão. Serve para quando o motor dá sempre o mesmo erro e a zeragem não anda.
+ */
+export async function pularLimpeza(db: Firestore, ids: readonly string[]): Promise<void> {
+  for (const lote of emLotes(ids)) {
+    const b = writeBatch(db);
+    for (const id of lote) b.update(doc(db, 'demandas', id), { automacaoPendente: false, limpezaPulada: true });
+    await b.commit();
+  }
 }
 
 export class ZeragemNaoPronta extends Error {

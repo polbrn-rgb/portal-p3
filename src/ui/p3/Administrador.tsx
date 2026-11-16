@@ -6,8 +6,10 @@ import {
   iniciarZeragem,
   lerContadores,
   observarZeragem,
+  pularLimpeza,
   ZeragemNaoPronta,
   type Contador,
+  type SituacaoZeragem,
 } from '../../data/admin';
 import { lerUltimoNumero, PALAVRA_CONFIRMACAO } from '../../domain/admin';
 import { alterarLista, observarListas } from '../../data/listas';
@@ -242,7 +244,12 @@ function Numeracao({ db, tipos }: { db: Firestore; tipos: readonly string[] }) {
   );
 }
 
-type Situacao = { total: number; zeradas: number; aguardandoMotor: number; novas: number };
+type Situacao = SituacaoZeragem;
+
+function horaDe(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
 
 function Zerar({ db }: { db: Firestore }) {
   const [situacao, setSituacao] = useState<Situacao | null>(null);
@@ -253,6 +260,7 @@ function Zerar({ db }: { db: Firestore }) {
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [iniciada, setIniciada] = useState(false);
+  const [confirmarPulo, setConfirmarPulo] = useState(false);
 
   useEffect(() => observarZeragem(db, setSituacao, () => setErro('Não foi possível acompanhar as demandas.')), [db]);
 
@@ -295,6 +303,19 @@ function Zerar({ db }: { db: Firestore }) {
     }
   }
 
+  async function pular(ids: string[]) {
+    setOcupado(true);
+    try {
+      await pularLimpeza(db, ids);
+      setConfirmarPulo(false);
+      setAviso(`${ids.length} demanda(s) liberada(s) sem limpeza. Confira a agenda e a pasta do CFP e apague à mão o que sobrou.`);
+    } catch (falha) {
+      setErroInicio(`Não foi possível liberar. ${motivo(falha)}`);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   const emAndamento = iniciada || (situacao !== null && situacao.zeradas > 0);
   const pronta = emAndamento && situacao !== null && situacao.aguardandoMotor === 0;
 
@@ -332,9 +353,51 @@ function Zerar({ db }: { db: Firestore }) {
               : 'O motor já limpou agenda e pastas. Falta apagar as demandas e definir o número inicial.'}
           </p>
           {situacao.aguardandoMotor > 0 && (
-            <button className="botao secundario" type="button" onClick={() => cutucarMotor()}>
-              ↻ Chamar o motor agora
-            </button>
+            <>
+              <p className="dica">
+                {situacao.ultimaAtividade
+                  ? `Última vez que o motor mexeu: ${horaDe(situacao.ultimaAtividade)}.`
+                  : 'O motor ainda não mexeu em nenhuma. Se passar de 10 minutos, veja no Apps Script (Execuções) se ele está rodando.'}
+              </p>
+              <button className="botao secundario" type="button" onClick={() => cutucarMotor()}>
+                ↻ Chamar o motor agora
+              </button>
+            </>
+          )}
+          {situacao.comErro.length > 0 && (
+            <div className="mensagem erro" role="alert">
+              <p>
+                <strong>{situacao.comErro.length} demanda(s) com erro na limpeza</strong> (o motor tenta de novo a cada 5
+                minutos):
+              </p>
+              <ul className="lista-erros">
+                {situacao.comErro.slice(0, 5).map((e) => (
+                  <li key={e.id}>
+                    Nº {e.numero}: {e.erro}
+                  </li>
+                ))}
+              </ul>
+              {!confirmarPulo ? (
+                <button className="botao secundario" type="button" disabled={ocupado} onClick={() => setConfirmarPulo(true)}>
+                  Seguir sem limpar estas
+                </button>
+              ) : (
+                <>
+                  <p>
+                    O motor para de tentar nestas {situacao.comErro.length}. O que sobrar delas na agenda ou no Drive você apaga
+                    à mão. Continuar?
+                  </p>
+                  <div className="acoes-linha">
+                    <button className="botao secundario" type="button" onClick={() => setConfirmarPulo(false)}>
+                      Cancelar
+                    </button>
+                    <button className="botao perigo" type="button" disabled={ocupado} onClick={() => void pular(situacao.comErro.map((e) => e.id))}>
+                      Sim, seguir sem limpar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <Campo rotulo="Último número já usado (a próxima demanda será ele + 1)" erro={erroInicio} obrigatorio>
             <input inputMode="numeric" value={ultimo} onChange={(e) => setUltimo(e.target.value)} />
