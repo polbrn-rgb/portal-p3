@@ -30,13 +30,14 @@ test('Documentos Mensais: a Cia envia pelo portal e a P/3 acompanha, marca feito
   const veiculos = page.getByRole('article', { name: 'Veículos Apreendidos' });
   await expect(veiculos.getByRole('list', { name: /Envios/ })).toContainText(`⏳ ${sigla}`);
 
-  // Direto na planilha: marca "feito" (um documento diferente em cada aparelho, para os testes não se cruzarem).
-  const direto = page.getByRole('article', { name: celular ? 'R.R. - Relação de Remessa' : 'Plano Diretor' });
-  await direto.getByRole('checkbox').click();
-  await expect(direto.getByRole('checkbox')).toBeChecked();
+  // Direto na planilha (só a R.R.): marca "feito" — só no computador, para os dois aparelhos não se cruzarem.
+  if (!celular) {
+    const direto = page.getByRole('article', { name: 'R.R. - Relação de Remessa' });
+    await direto.getByRole('checkbox').click();
+    await expect(direto.getByRole('checkbox')).toBeChecked();
+  }
 
-  // Arquivar pede confirmação.
-  // BO Eletrônico é do ano todo: só guarda a cópia (não zera).
+  // Planilhas do ano todo só guardam a cópia; arquivar pede confirmação.
   const arquivar = page.getByRole('article', { name: celular ? 'Dados Sobre BO Eletrônico' : 'Avaliação Periódica e Cumprimento de Metas' });
   await arquivar.getByRole('button', { name: '📦 Arquivar cópia' }).click();
   await arquivar.getByRole('alertdialog').getByRole('button', { name: 'Sim, arquivar' }).click();

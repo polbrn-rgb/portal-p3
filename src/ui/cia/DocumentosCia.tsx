@@ -101,7 +101,10 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
     if (Object.keys(e).length) return;
     setEnviando(true);
     try {
-      await enviarDocMensal(db, { docId: d.id, mesRef: p.mesRef, unidadeId: p.unidade, valores, respondidoPor: nome });
+      // O envio aparece na hora (o banco confirma em seguida); se a conexão estiver lenta, não prende a Cia na tela.
+      const envio = enviarDocMensal(db, { docId: d.id, mesRef: p.mesRef, unidadeId: p.unidade, valores, respondidoPor: nome });
+      envio.catch(() => undefined);
+      await Promise.race([envio, new Promise((ok) => setTimeout(ok, 3000))]);
       try {
         localStorage.setItem(CHAVE_NOME, nome.trim());
       } catch {
