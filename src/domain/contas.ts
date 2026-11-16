@@ -6,8 +6,12 @@ export const EMAIL_P3 = '8bpmmp3@gmail.com';
 
 /** Sala de Operações e CFP: login próprio, sem encaminhamento de demandas. */
 export type SetorId = 'sala' | 'cfp';
-export type ContaId = 'p3' | UnidadeId | SetorId;
-export type Claims = { perfil: 'p3' } | { perfil: 'unidade'; unidade: UnidadeId } | { perfil: SetorId };
+export type ContaId = 'p3' | UnidadeId | SetorId | 'admin';
+export type Claims =
+  | { perfil: 'p3' }
+  | { perfil: 'unidade'; unidade: UnidadeId }
+  | { perfil: SetorId }
+  | { perfil: 'admin' };
 
 export interface Conta {
   id: ContaId;
@@ -43,6 +47,15 @@ export const CONTAS: readonly Conta[] = [
   })),
   ...SETORES.map((s) => ({ id: s.id, sigla: s.sigla, email: emailDaConta(s.id), claims: { perfil: s.id } })),
 ];
+
+/**
+ * Conta do Administrador (8bpmmp3+admin@gmail.com): senha própria, usada só dentro da aba Administrador
+ * da P/3. Não aparece na tela de login. É a única que pode zerar o portal e mudar o contador do numerador.
+ */
+export const CONTA_ADMIN: Conta = { id: 'admin', sigla: 'Administrador', email: emailDaConta('admin'), claims: { perfil: 'admin' } };
+
+/** Todas as contas que o "npm run usuarios" cria (as do login + a do Administrador). */
+export const TODAS_CONTAS: readonly Conta[] = [...CONTAS, CONTA_ADMIN];
 
 /** Traduz o perfil gravado no login (custom claims) para a sessão do portal. */
 export function sessaoDosClaims(claims: Record<string, unknown>): Sessao {

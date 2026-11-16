@@ -74,3 +74,13 @@ describe('gerarSenha', () => {
     expect(new Set(senhas).size).toBe(50);
   });
 });
+
+describe('conta do Administrador', () => {
+  test('fora da tela de login, com perfil próprio, e criada pelo npm run usuarios', async () => {
+    const { CONTA_ADMIN, TODAS_CONTAS } = await import('../../src/domain/contas');
+    expect(CONTA_ADMIN).toMatchObject({ email: '8bpmmp3+admin@gmail.com', claims: { perfil: 'admin' } });
+    expect(CONTAS.some((c) => c.id === 'admin')).toBe(false);
+    expect(TODAS_CONTAS.at(-1)).toBe(CONTA_ADMIN);
+    expect(sessaoDosClaims({ perfil: 'admin' })).toEqual({ tipo: 'sem-perfil' });
+  });
+});

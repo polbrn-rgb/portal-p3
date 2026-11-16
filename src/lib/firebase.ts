@@ -9,7 +9,7 @@ import {
 
 // Estes dados identificam o projeto e não são secretos.
 // Quem protege os dados são as regras do Firestore (firestore.rules).
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyAwEs2x5y2G7VKvzTWPj0sekb_V9YtjjSg',
   authDomain: 'portal-p3.firebaseapp.com',
   projectId: 'portal-p3',
@@ -18,7 +18,7 @@ const firebaseConfig = {
   appId: '1:131519876159:web:f9edb11c2fbed29b8bbc8a',
 };
 
-const usarEmulador = import.meta.env.VITE_USE_EMULATORS === 'true';
+export const usarEmulador = import.meta.env.VITE_USE_EMULATORS === 'true';
 
 // Com o emulador, usa um projeto "demo-": nada sai do computador.
 export const app = initializeApp(

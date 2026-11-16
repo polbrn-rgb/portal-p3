@@ -16,6 +16,16 @@ service cloud.firestore {
       return logado() && request.auth.token.perfil == 'p3';
     }
 
+    // Conta do Administrador (senha própria, usada só na aba Administrador da P/3).
+    function ehAdmin() {
+      return logado() && request.auth.token.perfil == 'admin';
+    }
+
+    // O Administrador lê e grava tudo (zerar o portal, ajustar o contador do numerador).
+    match /{documento=**} {
+      allow read, write: if ehAdmin();
+    }
+
     function ehPerfil(perfil) {
       return logado() && request.auth.token.perfil == perfil;
     }
@@ -300,8 +310,13 @@ service cloud.firestore {
       allow read, write: if ehP3();
     }
 
+    // A P/3 só avança o contador de 1 em 1, ao cadastrar (o geral e o de cada tipo de saída por ano).
+    // Começar de outro número ou voltar o número é só pelo Administrador.
     match /contadores/{contadorId} {
-      allow read, write: if ehP3();
+      allow read: if ehP3();
+      allow create: if ehP3() && request.resource.data.keys().hasOnly(['ultimo']) && request.resource.data.ultimo == 1;
+      allow update: if ehP3() && request.resource.data.keys().hasOnly(['ultimo'])
+        && request.resource.data.ultimo == resource.data.ultimo + 1;
     }
   }
 }

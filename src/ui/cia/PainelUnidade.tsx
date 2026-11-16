@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { numeroExibido } from '../../domain/numeracao';
 import { observarEapDaUnidade } from '../../data/eap';
 import { observarSolicitacoesDaUnidade } from '../../data/efetivo';
 import { marcarEmAndamento, marcarVisualizado, observarDaUnidade, responder } from '../../data/encaminhamentos';
@@ -222,7 +223,7 @@ function ListaUnidade(p: {
             <li key={e.id}>
               <a className={`item-demanda item-cia ${atrasado ? 'borda-atrasado' : `borda-enc-${e.status}`}`} href={`#/enc/${e.id}`}>
                 <span className="item-topo">
-                  <strong className="item-num">Nº {e.numero}</strong>
+                  <strong className="item-num">{numeroExibido(e)}</strong>
                   <span className={`selo ${atrasado ? 'selo-atrasado' : `enc-${e.status}`}`}>
                     {atrasado ? 'Atrasado' : ROTULO_ENC[e.status]}
                   </span>
@@ -294,7 +295,7 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
   return (
     <section className="painel painel-estreito">
       <div className="painel-cabecalho">
-        <h2>Demanda nº {enc.numero}</h2>
+        <h2>Demanda {enc.numeroDocumento || `nº ${enc.numero}`}</h2>
         <span className={`selo enc-${enc.status}`}>{ROTULO_ENC[enc.status]}</span>
       </div>
 
