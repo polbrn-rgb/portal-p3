@@ -29,7 +29,7 @@ test('aba Administrador: senha própria, sub-abas e manutenção das listas do n
   // Listas: incluir um responsável, ver no cadastro de demanda, retirar.
   await subabas.getByRole('link', { name: 'Listas do numerador' }).click();
   const nome = `Sd Teste ${info.project.name} ${info.retry}`;
-  await page.getByLabel(/^Lista/).selectOption('responsaveis');
+  await page.getByRole('combobox', { name: /^Lista/ }).selectOption('responsaveis');
   await page.getByLabel(/Incluir em Responsável/).fill(nome);
   await page.getByRole('button', { name: '+ Incluir' }).click();
   const itens = page.getByRole('list', { name: 'Itens de Responsável' });
@@ -43,7 +43,7 @@ test('aba Administrador: senha própria, sub-abas e manutenção das listas do n
   await page.getByLabel(/Senha do Administrador/).fill(SENHA_TESTE);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await page.getByRole('navigation', { name: 'Administrador' }).getByRole('link', { name: 'Listas do numerador' }).click();
-  await page.getByLabel(/^Lista/).selectOption('responsaveis');
+  await page.getByRole('combobox', { name: /^Lista/ }).selectOption('responsaveis');
   await page.getByRole('listitem').filter({ hasText: nome }).getByRole('button', { name: 'Retirar' }).click();
   await expect(page.getByText(`"${nome}" retirado das demandas novas.`)).toBeVisible();
 
