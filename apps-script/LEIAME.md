@@ -121,6 +121,15 @@ Depois de colar esta versão: no portal, abra **Operações → Documentos Mensa
 rode **diagnostico** (linha *Documentos Mensais* deve mostrar ✅ em cada planilha); faça a **Nova versão** da
 implantação e `npm run deploy:regras`.
 
+## Aperfeiçoamento → ICC
+
+- A P/3 publica cada ICC no portal (número, prazo e o PDF da ordem). O motor cria a planilha **"ICC nº"** como cópia
+  do modelo (`PLANILHA_ICC_MODELO`, a ICC 427), na mesma pasta, e zera as colunas das Cias e do EM (D5:K8).
+- As Cias baixam a ordem e informam Oficiais, Subten/Sgt e Cb/Sd; o motor grava na coluna da Cia (linhas 5 a 7) e o
+  total na linha 8. O EM continua sendo preenchido direto na planilha.
+- O PDF fica guardado no próprio banco do portal (em partes), sem precisar do Drive nem de plano pago.
+- Rode **diagnostico**: a linha *Modelo da planilha da ICC* deve ficar ✅.
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

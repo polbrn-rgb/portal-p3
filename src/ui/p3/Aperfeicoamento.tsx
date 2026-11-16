@@ -18,12 +18,23 @@ import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo, Obrigatorio } from '../Campo';
+import { observarIccs } from '../../data/icc';
+import type { Icc } from '../../domain/icc';
+import { DetalheIcc, FormIcc, ListaIccP3 } from './IccP3';
 
 const CURTO: Record<string, string> = { cbsd1: 'Cb/Sd 1', cbsd2: 'Cb/Sd 2', cbsd3: 'Cb/Sd 3', sgt1: 'Sgt 1', sgt2: 'Sgt 2' };
 
-/** Aba Aperfeiçoamento da P/3. Por enquanto: EAP. */
+/** Aba Aperfeiçoamento da P/3: EAP e ICC. */
 export function Aperfeicoamento({ rota }: { rota: string }) {
   const eaps = useAoVivo<Eap[]>((ok, erro) => observarEaps(db, ok, erro), [], 'Não foi possível carregar o Aperfeiçoamento.');
+  const iccs = useAoVivo<Icc[]>((ok, erro) => observarIccs(db, ok, erro), [], 'Não foi possível carregar as ICC.');
+  const icc = /^#\/aperfeicoamento\/icc\/([^/]+)$/.exec(rota)?.[1];
+  if (icc === 'nova') return <FormIcc />;
+  if (icc) {
+    const i = iccs.valor?.find((x) => x.id === icc);
+    if (!i) return iccs.carregando ? <p className="carregando">Carregando…</p> : <p className="mensagem erro">ICC não encontrada.</p>;
+    return <DetalheIcc icc={i} />;
+  }
   const [, id, acao] = /^#\/aperfeicoamento(?:\/([^/]+))?(?:\/(editar))?$/.exec(rota) ?? [];
 
   if (id === 'nova') return <FormEap />;
@@ -66,6 +77,12 @@ export function Aperfeicoamento({ rota }: { rota: string }) {
           </li>
         ))}
       </ul>
+      {iccs.erro && (
+        <p className="mensagem erro" role="alert">
+          {iccs.erro}
+        </p>
+      )}
+      <ListaIccP3 iccs={iccs.valor ?? []} />
     </section>
   );
 }

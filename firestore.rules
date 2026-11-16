@@ -166,6 +166,46 @@ service cloud.firestore {
       allow read, write: if ehP3();
     }
 
+    // Arquivos (PDF) guardados em partes: a P/3 envia; a P/3 e as Cias baixam. Não se altera depois de enviado.
+    match /arquivos/{id} {
+      allow read: if ehP3() || ehPerfil('unidade');
+      allow create: if ehP3()
+        && request.resource.data.keys().hasOnly(['nome', 'tipo', 'tamanho', 'partes', 'criadoEm'])
+        && request.resource.data.tipo == 'application/pdf'
+        && request.resource.data.tamanho is int && request.resource.data.tamanho <= 10485760
+        && request.resource.data.partes is int && request.resource.data.partes > 0 && request.resource.data.partes <= 20;
+      match /partes/{n} {
+        allow read: if ehP3() || ehPerfil('unidade');
+        allow create: if ehP3() && request.resource.data.keys().hasOnly(['dados']) && request.resource.data.dados is string;
+      }
+    }
+
+    // Aperfeiçoamento → ICC: a P/3 cria e encerra; as Cias veem só as abertas.
+    match /iccs/{id} {
+      allow read: if ehP3() || (ehPerfil('unidade') && resource.data.status == 'aberta');
+      allow create: if ehP3()
+        && request.resource.data.keys().hasOnly(['numero', 'prazo', 'status', 'arquivo', 'planilha', 'criadoEm'])
+        && request.resource.data.status == 'aberta' && request.resource.data.planilha.status == 'pedida';
+      allow update: if ehP3() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prazo', 'status']);
+    }
+
+    // Resposta da Cia (id = icc_unidade): só a dela, só com a ICC aberta; o motor grava na planilha.
+    function respostaIccValida(id) {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['iccId', 'unidadeId', 'oficiais', 'sargentos', 'cabos', 'respondidoPor', 'enviadoEm', 'gravado', 'gravadoEm', 'erro', 'erroEm'])
+        && id == r.iccId + '_' + r.unidadeId
+        && r.oficiais is int && r.oficiais >= 0 && r.sargentos is int && r.sargentos >= 0 && r.cabos is int && r.cabos >= 0
+        && r.respondidoPor is string && r.respondidoPor.size() > 0 && r.respondidoPor.size() <= 120
+        && r.gravado == false && r.enviadoEm == request.time
+        && get(/databases/$(database)/documents/iccs/$(r.iccId)).data.status == 'aberta';
+    }
+
+    match /respostasIcc/{id} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create: if ehDaMinhaUnidade(request.resource.data) && respostaIccValida(id);
+      allow update: if ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && respostaIccValida(id);
+    }
+
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
     match /efetivo/{re} {
       allow read: if logado();

@@ -42,7 +42,9 @@ var CONFIG_P3 = {
   FAIXA_PRODUTIVIDADE: 'C50:E57', // 8 linhas: Flagrante de tráfico ... Veículos vistoriados
   PREFIXO_RELATORIO: '8BPMM-',
   // Operações → Documentos Mensais: cópia de cada mês (uma subpasta por mês)
-  PASTA_DOCS_MENSAIS_ARQUIVO: '1mkm8R8dTpYF1jp1C2kStpONI1eN95EpN'
+  PASTA_DOCS_MENSAIS_ARQUIVO: '1mkm8R8dTpYF1jp1C2kStpONI1eN95EpN',
+  // Aperfeiçoamento → ICC: modelo das planilhas (cada ICC nova é uma cópia zerada, na mesma pasta)
+  PLANILHA_ICC_MODELO: '1G5kd6AldoiYL8kV-mckAUf67aIBGy9LdhKzLiLNPJxw'
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -104,6 +106,11 @@ function diagnostico() {
     return cfg.documentos.filter(function (d) { return d.celulas; }).map(function (d) {
       try { conferirDocMensal_(d); return '✅ ' + d.nome; } catch (e) { return '❌ ' + d.nome + ': ' + e.message; }
     }).join(' | ');
+  });
+  ok('Modelo da planilha da ICC', function () {
+    var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_ICC_MODELO);
+    abaIcc_(ss);
+    return ss.getName();
   });
   ok('Planilha de indicadores', function () {
     var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_INDICADORES);
@@ -238,6 +245,11 @@ function rodarMotor_(esperaMs) {
       processarDocsMensais_();
     } catch (e7) {
       console.error('Documentos Mensais: ' + e7.message);
+    }
+    try {
+      processarIcc_();
+    } catch (e8) {
+      console.error('ICC: ' + e8.message);
     }
   } finally {
     trava.releaseLock();
@@ -1169,4 +1181,55 @@ function arquivarDocMensal_(doc, mesRef, estado) {
   if (doc.mes && doc.mes.celula) {
     Object.keys(cache).forEach(function (n) { cache[n].getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, proximoMes(mesRef))); });
   }
+}
+
+// ---------- Aperfeiçoamento → ICC ----------
+
+/** ICC nova: cópia zerada do modelo ("ICC nº"); respostas das Cias: coluna da Cia na planilha. */
+function processarIcc_() {
+  consultar_('iccs', 'planilha.status', 'pedida').forEach(function (i) {
+    try {
+      var ss = criarPlanilhaIcc_(i.dados.numero);
+      gravarCampos_('iccs/' + i.id, { planilha: { status: 'pronta', id: ss.getId(), url: ss.getUrl() } });
+    } catch (err) {
+      gravarCampos_('iccs/' + i.id, { planilha: { status: 'erro', erro: err.message } });
+    }
+  });
+  consultar_('respostasIcc', 'gravado', false, 30).forEach(function (r) {
+    var x = r.dados;
+    if (x.erro && x.erroEm && Date.now() - new Date(x.erroEm).getTime() < 30 * 60 * 1000) return;
+    try {
+      var icc = obterDoc_('iccs/' + x.iccId);
+      if (!icc || !icc.planilha || icc.planilha.status !== 'pronta') return; // espera a planilha ficar pronta
+      var aba = abaIcc_(SpreadsheetApp.openById(icc.planilha.id));
+      var cel = celulasIcc(x.unidadeId, x);
+      Object.keys(cel).forEach(function (c) { aba.getRange(c).setValue(cel[c]); });
+      gravarCampos_('respostasIcc/' + r.id, { gravado: true, gravadoEm: new Date().toISOString(), erro: '' });
+    } catch (err) {
+      gravarCampos_('respostasIcc/' + r.id, { erro: err.message, erroEm: new Date().toISOString() });
+    }
+  });
+}
+
+function abaIcc_(ss) {
+  var aba = ss.getSheets()[0];
+  var lidos = {};
+  Object.keys(ANCORAS_ICC).forEach(function (c) { lidos[c] = aba.getRange(c).getDisplayValue(); });
+  var erro = conferirAncoras(ANCORAS_ICC, lidos);
+  if (erro) throw new Error(erro);
+  return aba;
+}
+
+function criarPlanilhaIcc_(numero) {
+  var modelo = DriveApp.getFileById(CONFIG_P3.PLANILHA_ICC_MODELO);
+  var pastas = modelo.getParents();
+  var pasta = pastas.hasNext() ? pastas.next() : DriveApp.getRootFolder();
+  var nome = 'ICC ' + numero;
+  var existente = pasta.getFilesByName(nome);
+  var ss = SpreadsheetApp.open(existente.hasNext() ? existente.next() : modelo.makeCopy(nome, pasta));
+  var aba = abaIcc_(ss);
+  aba.getRange('D5:K8').clearContent(); // zera as Cias e o EM
+  aba.getRange('B5').setValue(Number(numero) || numero);
+  aba.setName(nome);
+  return ss;
 }
