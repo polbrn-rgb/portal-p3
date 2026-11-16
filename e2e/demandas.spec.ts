@@ -103,9 +103,16 @@ test('formulário não salva sem os campos obrigatórios', async ({ page }) => {
   await expect(resumo).not.toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
 });
 
-test('marcar TODAS cobre as 7 Cias', async ({ page }) => {
+test('marcar TODAS cobre as 7 Cias', async ({ page }, info) => {
   await entrar(page, 'p3', SENHA_TESTE);
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  if (info.project.name === 'computador') {
+    // Formulário compacto: no computador vai até a Observação sem rolar, com Destinos ao lado da Entrada.
+    await expect(page.getByLabel('Observação')).toBeInViewport();
+    const entrada = await page.locator('.grupo-entrada').boundingBox();
+    const destinos = await page.locator('.grupo-destinos').boundingBox();
+    expect(Math.abs((entrada?.y ?? 0) - (destinos?.y ?? 99))).toBeLessThan(2);
+  }
   // Destinos começam numa caixa fechada (ocupa pouco espaço) e abrem ao tocar.
   const caixa = page.getByRole('button', { name: /^Escolher destinos/ });
   await expect(caixa).toHaveText(/Nenhum destino/);
