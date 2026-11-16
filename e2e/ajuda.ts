@@ -37,3 +37,10 @@ export async function irParaAbaCia(page: Page, aba: 'Pendentes' | 'Respondidas' 
   if (await botao.isVisible()) await botao.click();
   await page.getByRole('navigation', { name: 'Seções da Cia' }).getByRole('link', { name: new RegExp(`^${aba}`) }).click();
 }
+
+/** Nova demanda / edição: abre a caixa de destinos (se estiver fechada) e marca o destino. */
+export async function marcarDestino(page: Page, nome: string) {
+  const caixa = page.getByRole('button', { name: /^Escolher destinos/ });
+  if ((await caixa.getAttribute('aria-expanded')) !== 'true') await caixa.click();
+  await page.getByLabel(nome, { exact: true }).check();
+}
