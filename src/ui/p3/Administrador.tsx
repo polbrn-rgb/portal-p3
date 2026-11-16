@@ -22,6 +22,17 @@ import { entrarAdmin, sairAdmin } from '../../lib/appAdmin';
 import { cutucarMotor } from '../../lib/motor';
 import { Campo } from '../Campo';
 
+/** Motivo real da falha, para não ficar só "parou no meio". */
+function motivo(falha: unknown): string {
+  const codigo = (falha as { code?: string }).code ?? '';
+  if (codigo === 'permission-denied') {
+    return 'O banco recusou (permissão). Publique as regras novas: no terminal do projeto, "npm run deploy:regras", e tente de novo.';
+  }
+  if (codigo === 'resource-exhausted') return 'A cota grátis do dia do Firebase acabou. Tente de novo amanhã.';
+  if (codigo === 'unavailable') return 'Sem conexão com o banco. Confira a internet e tente de novo.';
+  return `Erro: ${codigo || (falha as Error)?.message || 'desconhecido'}.`;
+}
+
 /** Aba Administrador: senha própria (conta do Administrador), separada do login da P/3. */
 export function Administrador() {
   const [db, setDb] = useState<Firestore | null>(null);
@@ -102,8 +113,8 @@ function Numeracao({ db }: { db: Firestore }) {
     try {
       setContadores(await lerContadores(db));
       setErroLista('');
-    } catch {
-      setErroLista('Não foi possível ler os contadores.');
+    } catch (falha) {
+      setErroLista(`Não foi possível ler os contadores. ${motivo(falha)}`);
     }
   }
   useEffect(() => {
@@ -127,8 +138,8 @@ function Numeracao({ db }: { db: Firestore }) {
       setUltimo('');
       setForcar(false);
       await recarregar();
-    } catch {
-      setErro('Não foi possível gravar. Tente de novo.');
+    } catch (falha) {
+      setErro(`Não foi possível gravar. ${motivo(falha)}`);
     } finally {
       setSalvando(false);
     }
@@ -220,8 +231,9 @@ function Zerar({ db }: { db: Firestore }) {
       setIniciada(true);
       setConfirmacao('');
       setAviso(`${r.apagados} registro(s) apagado(s). ${r.demandas} demanda(s) aguardando o motor limpar agenda e pastas.`);
-    } catch {
-      setErro('A zeragem parou no meio. Clique em "Zerar portal" de novo para continuar.');
+    } catch (falha) {
+      console.error('Zerar portal:', falha);
+      setErro(`A zeragem parou no meio. ${motivo(falha)} Depois clique em "Zerar portal" de novo para continuar.`);
     } finally {
       setOcupado(false);
     }
@@ -237,7 +249,7 @@ function Zerar({ db }: { db: Firestore }) {
       setIniciada(false);
       setAviso(`Portal zerado: ${n} demanda(s) apagada(s). A próxima demanda será a ${lido + 1}.`);
     } catch (falha) {
-      setErroInicio(falha instanceof ZeragemNaoPronta ? falha.message : 'Não foi possível concluir. Tente de novo.');
+      setErroInicio(falha instanceof ZeragemNaoPronta ? falha.message : `Não foi possível concluir. ${motivo(falha)}`);
     } finally {
       setOcupado(false);
     }
