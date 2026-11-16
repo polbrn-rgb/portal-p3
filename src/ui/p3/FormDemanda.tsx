@@ -318,10 +318,10 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
         </div>
       </fieldset>
 
-      <fieldset className="cartao grupo">
+      <fieldset className="cartao grupo grupo-saida">
         <legend>Saída</legend>
         <Campo rotulo="Demanda (resumo)" erro={erros.saida} obrigatorio>
-          <textarea rows={3} value={dados.saida} onChange={(e) => mudar('saida', e.target.value)} />
+          <textarea rows={2} value={dados.saida} onChange={(e) => mudar('saida', e.target.value)} />
         </Campo>
         <div className="grade">
           <Campo rotulo="Tipo de saída" erro={erros.tipoSaida} obrigatorio>
@@ -369,7 +369,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
         </div>
       </fieldset>
 
-      <fieldset className="cartao grupo">
+      <fieldset className="cartao grupo grupo-destinos">
         <legend>Destinos</legend>
         {/* Fechado mostra só os escolhidos; toca para abrir a lista e marcar. */}
         <button
@@ -380,7 +380,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
           aria-label={`Escolher destinos (${resumoDestinos || 'nenhum'})`}
           onClick={() => setDestinosAbertos((a) => !a)}
         >
-          <span className={resumoDestinos ? 'resumo-destinos' : 'resumo-destinos vazio-destinos'}>{resumoDestinos || 'Nenhum destino — toque para escolher'}</span>
+          <span className={resumoDestinos ? 'resumo-destinos' : 'resumo-destinos vazio-destinos'}>{resumoDestinos || 'Nenhum destino — escolher'}</span>
           <span className="seta-destinos" aria-hidden="true">
             {destinosAbertos ? '▲' : '▼'}
           </span>
@@ -427,7 +427,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
         </div>
       </fieldset>
 
-      <fieldset className="cartao grupo bloco-largo">
+      <fieldset className="cartao grupo grupo-complemento">
         <legend>Complemento</legend>
         <Campo rotulo="Observação" erro={erros.observacao}>
           <textarea rows={2} value={dados.observacao} onChange={(e) => mudar('observacao', e.target.value)} />

@@ -2121,3 +2121,134 @@ fieldset:has(> .erro-campo) > legend {
   width: 100%;
   min-height: 48px;
 }
+
+/* ---------- Nova demanda / edição: compacto, para caber sem rolar (nada foi tirado) ---------- */
+.formulario-demanda .cartao {
+  padding: 10px 14px 12px;
+}
+
+.formulario-demanda .grupo {
+  gap: 8px;
+}
+
+.formulario-demanda .grupo legend {
+  margin-bottom: 0;
+  font-size: 0.95rem;
+}
+
+.formulario-demanda .campo {
+  gap: 3px;
+}
+
+.formulario-demanda .campo .rotulo {
+  font-size: 0.9rem;
+}
+
+/* Celular: campos curtos dois por linha. */
+.formulario-demanda .grade {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.formulario-demanda .grupo-entrada .grade > :last-child {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 1024px) {
+  .formulario-demanda {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .formulario-demanda > * {
+    grid-column: 1 / -1;
+    order: 9;
+  }
+
+  /* Ordem na tela (o Destinos sobe para o lado da Entrada). */
+  .formulario-demanda > .painel-cabecalho { order: 0; }
+  .formulario-demanda > .origem-pendente { order: 1; }
+  .formulario-demanda > .grupo-entrada { order: 2; }
+  .formulario-demanda > .grupo-destinos { order: 3; }
+  .formulario-demanda > .grupo-saida { order: 4; }
+  .formulario-demanda > .grupo-prazos { order: 5; }
+  .formulario-demanda > .grupo-complemento { order: 6; }
+
+  /* Entrada e Destinos lado a lado; Saída numa faixa; Prazos e Complemento com a opção ao lado. */
+  .formulario-demanda > .grupo-entrada {
+    grid-column: span 8;
+  }
+
+  .formulario-demanda > .grupo-destinos {
+    grid-column: span 4;
+  }
+
+  .formulario-demanda .grupo-entrada .grade {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .formulario-demanda .grupo-entrada .grade > :last-child {
+    grid-column: auto;
+  }
+
+  /* Tipo, Meio, Nº de saída, Categoria, Responsável, Resposta: largura conforme o texto de cada um. */
+  .formulario-demanda .grupo-saida .grade {
+    grid-template-columns: 1.5fr 0.8fr 1fr 1.4fr 1fr 0.7fr;
+  }
+
+  .formulario-demanda .campo select {
+    padding-inline: 8px;
+  }
+
+  .formulario-demanda .grupo-prazos,
+  .formulario-demanda .grupo-complemento {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 6px 12px;
+  }
+
+  .formulario-demanda .grupo-prazos > legend,
+  .formulario-demanda .grupo-complemento > legend {
+    grid-column: 1 / -1;
+  }
+
+  .formulario-demanda .grupo-prazos .grade {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .formulario-demanda .campo input,
+  .formulario-demanda .campo select,
+  .seletor-destinos {
+    min-height: 40px;
+    padding-block: 6px;
+  }
+
+  .formulario-demanda .opcao {
+    min-height: 40px;
+  }
+
+  /* Menos respiro vertical no computador (títulos dos blocos menores). */
+  .painel.formulario-demanda {
+    padding-top: 12px;
+    gap: 8px;
+  }
+
+  .formulario-demanda .cartao {
+    padding: 8px 12px 10px;
+  }
+
+  .formulario-demanda .grupo {
+    gap: 6px;
+  }
+
+  .formulario-demanda .grupo legend {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .formulario-demanda > .barra-acoes {
+    padding-block: 8px;
+  }
+}
