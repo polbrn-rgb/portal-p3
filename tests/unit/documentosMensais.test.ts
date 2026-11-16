@@ -26,7 +26,7 @@ type Logica = {
   acaoEnvioMensal: (mesPlanilha: string | undefined, mesEnvio: string) => string;
   celulasParaZerar: (doc: unknown) => string[];
   valoresParaZerar: (doc: unknown, mes: string) => { u: string; celula: string; valor: unknown }[];
-  resolverCelula: (c: string, mes: string, colJan: string) => string;
+  resolverCelula: (c: string, mes: string, colJan: string | null, colTri?: string | null) => string;
   ancorasDoMes: (doc: unknown, mes: string) => Record<string, string>;
   abaDaCia: (doc: unknown, u: string) => string;
   nomeArquivoMensal: (nome: string, mes: string) => string;
@@ -95,6 +95,23 @@ describe('células de cada Cia', () => {
     expect(gs.resolverCelula(doc('bo-eletronico').celulas!['1cia']!.desap, '2026-01', 'E')).toBe('E21');
     expect(gs.resolverCelula('E11', '2026-10', 'E')).toBe('E11');
     expect(gs.ancorasDoMes(cfg, '2026-10')).toMatchObject({ N18: 'OUT.-26', A30: 'ACIDENTE DE TRÂNSITO' });
+  });
+
+  test('BCS: só 1ª, 4ª e 6ª Cia; coluna do trimestre; só nos meses do trimestre', () => {
+    const prod = configParaMotor([doc('bcs-produtividade')])[0];
+    const quadro = configParaMotor([doc('bcs-quadro')])[0];
+    expect(ciasDoDocumento(doc('bcs-produtividade'))).toEqual(['1cia', '4cia', '6cia']);
+    expect(gs.resolverCelula(doc('bcs-produtividade').celulas!['4cia']!.flagrantes, '2026-09', null, 'E')).toBe('G10');
+    expect(gs.resolverCelula(doc('bcs-quadro').celulas!['6cia']!.furtoOutros, '2026-12', null, 'C')).toBe('F22');
+    expect(gs.ancorasDoMes(prod, '2026-09')).toMatchObject({ G9: '3º Trimes' });
+    expect(gs.ancorasDoMes(quadro, '2026-03')).toMatchObject({ C13: '1º Trimestre' });
+    expect(gs.abaDaCia(quadro, '1cia')).toBe('1ª Cia ');
+    expect(doc('bcs-funcionamento').celulas?.['6cia']).toMatchObject({ tipo: 'C10', populacao: 'J10' });
+    expect(gs.textoDoMes('{TRI} TRIMESTRE DE {ANO}', '2026-09')).toBe('3º TRIMESTRE DE 2026');
+    expect(documentosDoMes('2026-09').filter((d) => d.id.startsWith('bcs')).length).toBe(3);
+    expect(documentosDoMes('2026-11').filter((d) => d.id.startsWith('bcs')).length).toBe(0);
+    const f = lerValores(doc('bcs-funcionamento'), '1cia', { tipo: 'BCS', endereco: '', municipio: 'SP', telefone: '1', vtr: '1', efetivo: '2', area: '2.600', populacao: '25.000' });
+    expect(Object.keys(f.erros)).toEqual(['endereco']);
   });
 
   test('Distribuição A.I. CET: bloco de linhas de cada Cia', () => {
