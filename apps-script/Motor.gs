@@ -251,6 +251,11 @@ function rodarMotor_(esperaMs) {
     } catch (e8) {
       console.error('ICC: ' + e8.message);
     }
+    try {
+      levarEfetivoManual_();
+    } catch (e9) {
+      console.error('Efetivo manual: ' + e9.message);
+    }
   } finally {
     trava.releaseLock();
   }
@@ -736,6 +741,29 @@ function sincronizarEfetivo() {
     if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
   }
   Logger.log('Banco de efetivo: ' + chaves.length + ' policiais. ' + resumo.join(' | '));
+}
+
+/**
+ * Policiais cadastrados à mão no portal (RE fora do banco, ex.: CFP na aba TDS): entram na aba BD Efetivo
+ * da planilha (se o RE ainda não estiver lá) e deixam de ser "manual" no portal.
+ */
+function levarEfetivoManual_() {
+  var novos = consultar_('efetivo', 'manual', true, 50);
+  if (!novos.length) return;
+  var aba = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_EFETIVO).getSheetByName(CONFIG_P3.ABA_EFETIVO);
+  if (!aba) throw new Error('Aba ' + CONFIG_P3.ABA_EFETIVO + ' não encontrada.');
+  var valores = aba.getRange(1, 1, Math.max(aba.getLastRow(), 1), Math.max(aba.getLastColumn(), 1)).getValues();
+  var naPlanilha = {};
+  linhasDoEfetivo(valores).forEach(function (p) { naPlanilha[p.chave] = true; });
+  novos.forEach(function (n) {
+    if (!naPlanilha[n.id]) {
+      var linha = novaLinhaEfetivo(valores, n.dados);
+      if (!linha) throw new Error('A aba ' + CONFIG_P3.ABA_EFETIVO + ' não tem o cabeçalho com RE e NOME DE GUERRA.');
+      aba.appendRow(linha);
+      naPlanilha[n.id] = true;
+    }
+    gravarCampos_('efetivo/' + n.id, { manual: false, naPlanilhaEm: new Date().toISOString() });
+  });
 }
 
 // ---------- Aperfeiçoamento: EAP ----------

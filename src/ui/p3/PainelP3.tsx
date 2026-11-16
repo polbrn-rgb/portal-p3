@@ -18,6 +18,7 @@ import { ListaDemandas } from './ListaDemandas';
 import { ListaPendentes } from './ListaPendentes';
 import { MenuP3, type AbaP3 } from './MenuP3';
 import { PainelPrazos } from './PainelPrazos';
+import { TdsP3 } from './TdsP3';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
@@ -58,7 +59,7 @@ function abaDaRota(hash: string): AbaP3 {
   if (/^#\/(pendentes|destinar)/.test(hash)) return 'pendentes';
   if (hash.startsWith('#/operacoes')) return 'operacoes';
   if (hash === '#/painel') return 'painel';
-  if (hash === '#/cfp') return 'cfp';
+  if (hash.startsWith('#/cfp')) return 'cfp';
   if (hash === '#/sala') return 'sala';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   return 'numerador';
@@ -80,11 +81,26 @@ function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: A
       </>
     );
   }
-  if (hash === '#/cfp') {
+  if (hash === '#/cfp' || hash === '#/cfp/tds') {
+    const tds = hash === '#/cfp/tds';
     return (
       <>
-        <Recados setor="cfp" podeEnviar />
-        <MissoesCfp />
+        <nav className="abas abas-p3 subabas" aria-label="CFP">
+          <a href="#/cfp" aria-current={tds ? undefined : 'page'}>
+            Missões e recados
+          </a>
+          <a href="#/cfp/tds" aria-current={tds ? 'page' : undefined}>
+            TDS
+          </a>
+        </nav>
+        {tds ? (
+          <TdsP3 />
+        ) : (
+          <>
+            <Recados setor="cfp" podeEnviar />
+            <MissoesCfp />
+          </>
+        )}
       </>
     );
   }

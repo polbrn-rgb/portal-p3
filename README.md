@@ -84,6 +84,13 @@ histórico das demandas.
   EAP"; o motor grava na aba da Cia com "Validado por" em H3. A P/3 acompanha, gera o compilado e encerra.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
+- **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de
+  efetivo completa posto e nome de guerra; se o RE não estiver lá, ele preenche posto/graduação, nome de guerra, nome
+  completo e telefone, que ficam salvos no banco e o motor leva para a aba BD Efetivo), a data e o assunto da instrução e
+  escolhe até **5 fotos por mês** no álbum do celular. As fotos são reduzidas no próprio celular (JPEG, maior lado 1600 px)
+  e ficam no banco (`fotosTds` + `fotosTdsDados`); o limite de 5 é garantido pelas regras de segurança. Na aba **CFP → TDS**
+  da P/3: escolhe o mês, vê as miniaturas por CFP, **⬇️ Baixar fotos (.zip)** (uma pasta por CFP) e, depois de baixar,
+  **🗑️ Apagar do sistema** (com confirmação).
 - **Sala Op.**: o botão **Recado para a Sala**, que funciona igual: aparece no alto da página da Sala de Operações.
 
 ## Backup

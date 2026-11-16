@@ -56,6 +56,10 @@ gatilho antigo do resumo diário por e-mail (que foi retirado). Para testar na h
   nome de guerra e telefone da planilha `PLANILHA_EFETIVO` para o portal. A aba `BD Efetivo` é lida primeiro; as
   outras abas com as colunas RE e NOME DE GUERRA completam. Para atualizar na hora, rode **sincronizarEfetivo**.
 
+- **Efetivo cadastrado à mão no portal** (ex.: CFP na aba TDS com RE fora do banco): a cada rodada o motor acrescenta
+  a linha na aba `BD Efetivo` (RE, posto/graduação, nome de guerra, nome completo e telefone, nas colunas do cabeçalho),
+  se o RE ainda não estiver lá.
+
 Depois de colar esta versão, rode **instalarAutomacao** de novo (ele cria o gatilho diário do efetivo).
 
 ## Página do CFP = agenda do CFP
