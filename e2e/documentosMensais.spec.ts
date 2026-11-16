@@ -58,7 +58,7 @@ test('Documentos Mensais: lista com linhas (Distribuição A.I. CET)', async ({ 
   await expect(linha.getByText('Escolha uma opção.')).toBeVisible();
   await linha.getByLabel('Data').fill('2026-10-05');
   await linha.getByLabel('Qtd de talões').fill('1');
-  await linha.getByLabel('RE').fill('123456-7');
+  await linha.getByRole('textbox', { name: /^RE/ }).fill('123456-7');
   await linha.getByLabel('Nome').fill('Fulano de Tal');
   await linha.getByRole('radio', { name: 'Alocação' }).check();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
