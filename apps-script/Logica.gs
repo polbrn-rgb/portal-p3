@@ -607,13 +607,43 @@ function acaoEnvioMensal(mesPlanilha, mesEnvio) {
   return mesPlanilha < mesEnvio ? 'arquivarAntes' : 'antigo';
 }
 
-/** Todas as células que a Cia preenche (para zerar ao arquivar). */
-function celulasParaZerar(doc) {
-  var out = [];
-  Object.keys(doc.celulas || {}).forEach(function (u) {
-    Object.keys(doc.celulas[u]).forEach(function (campo) { out.push(doc.celulas[u][campo]); });
+/** "{M}21" -> coluna do mês (janeiro em colunaJaneiro) + linha. Células sem {M} ficam como estão. */
+function resolverCelula(celula, mesRef, colunaJaneiro) {
+  if (String(celula).indexOf('{M}') < 0) return celula;
+  var col = String.fromCharCode(String(colunaJaneiro || 'A').charCodeAt(0) + Number(String(mesRef).slice(5)) - 1);
+  return String(celula).replace('{M}', col);
+}
+
+/** Âncoras do mês: células e textos com {M}/{SIGLA}/{AA}... resolvidos. */
+function ancorasDoMes(doc, mesRef) {
+  var out = {};
+  Object.keys(doc.ancoras || {}).forEach(function (c) {
+    out[resolverCelula(c, mesRef, doc.colunaJaneiro)] = textoDoMes(doc.ancoras[c], mesRef);
   });
   return out;
+}
+
+/** Aba de cada Cia (uma só ou uma por Cia). */
+function abaDaCia(doc, u) {
+  return (doc.abas && doc.abas[u]) || doc.aba || '';
+}
+
+/** O que zerar ao arquivar: [{ u, celula, valor }] (vazio quando a planilha é do ano todo). */
+function valoresParaZerar(doc, mesRef) {
+  if (doc.zerar === false) return [];
+  var out = [];
+  Object.keys(doc.celulas || {}).forEach(function (u) {
+    Object.keys(doc.celulas[u]).forEach(function (campo) {
+      var v = doc.vazios && campo in doc.vazios ? doc.vazios[campo] : doc.zerarCom === 0 ? 0 : '';
+      out.push({ u: u, celula: resolverCelula(doc.celulas[u][campo], mesRef, doc.colunaJaneiro), valor: v });
+    });
+  });
+  return out;
+}
+
+/** Todas as células que as Cias preenchem (compatibilidade). */
+function celulasParaZerar(doc) {
+  return valoresParaZerar(doc, '2026-01').map(function (x) { return x.celula; });
 }
 
 function nomeArquivoMensal(nome, mesRef) {

@@ -8,11 +8,13 @@ import {
   documentosDoMes,
   feriados,
   lerValores,
+  linhasDosValores,
   mesDoPrazo,
   mesReferencia,
   nesimoDiaUtil,
   preenchidoPeloPortal,
   situacaoEnvio,
+  valoresDaLista,
   versaoConfig,
   type EnvioMensal,
 } from '../../src/domain/documentosMensais';
@@ -23,6 +25,10 @@ type Logica = {
   conferirAncoras: (a: Record<string, string>, lidos: Record<string, string>) => string;
   acaoEnvioMensal: (mesPlanilha: string | undefined, mesEnvio: string) => string;
   celulasParaZerar: (doc: unknown) => string[];
+  valoresParaZerar: (doc: unknown, mes: string) => { u: string; celula: string; valor: unknown }[];
+  resolverCelula: (c: string, mes: string, colJan: string) => string;
+  ancorasDoMes: (doc: unknown, mes: string) => Record<string, string>;
+  abaDaCia: (doc: unknown, u: string) => string;
   nomeArquivoMensal: (nome: string, mes: string) => string;
 };
 const ctx: Record<string, unknown> = {};
@@ -67,13 +73,36 @@ describe('células de cada Cia', () => {
     expect(ciasDoDocumento(doc('escolas-ronda-escolar'))).not.toContain('ft');
   });
 
-  test('nenhuma célula repetida (nem entre dados e legenda) e todo documento do portal tem âncoras', () => {
+  test('nenhuma célula repetida na mesma aba (nem entre dados e legenda) e todo documento do portal tem âncoras', () => {
     for (const d of DOCUMENTOS.filter(preenchidoPeloPortal)) {
-      const todas = [...Object.values(d.celulas ?? {}).flatMap((c) => Object.values(c)), ...Object.values(d.legenda?.celulas ?? {})];
+      const cfg = configParaMotor([d])[0];
+      const todas = [
+        ...Object.entries(d.celulas ?? {}).flatMap(([u, c]) => Object.values(c).map((x) => `${gs.abaDaCia(cfg, u)}!${x}`)),
+        ...Object.entries(d.legenda?.celulas ?? {}).map(([u, x]) => `${gs.abaDaCia(cfg, u)}!${x}`),
+      ];
       expect(new Set(todas).size, d.id).toBe(todas.length);
       expect(Object.keys(d.ancoras ?? {}).length, d.id).toBeGreaterThan(2);
-      expect(gs.celulasParaZerar(configParaMotor([d])[0]).length).toBe(Object.values(d.celulas ?? {}).flatMap((c) => Object.values(c)).length);
+      const zerar = gs.valoresParaZerar(cfg, '2026-10');
+      expect(zerar.length, d.id).toBe(d.zerar === false ? 0 : Object.values(d.celulas ?? {}).flatMap((c) => Object.values(c)).length);
     }
+  });
+
+  test('BO Eletrônico: aba de cada Cia e a coluna do mês', () => {
+    const cfg = configParaMotor([doc('bo-eletronico')])[0];
+    expect(gs.abaDaCia(cfg, '5cia')).toBe('5ª CIA');
+    expect(gs.abaDaCia(cfg, 'ft')).toBe('F TAT');
+    expect(gs.resolverCelula(doc('bo-eletronico').celulas!['1cia']!.acidente, '2026-10', 'E')).toBe('N30');
+    expect(gs.resolverCelula(doc('bo-eletronico').celulas!['1cia']!.desap, '2026-01', 'E')).toBe('E21');
+    expect(gs.resolverCelula('E11', '2026-10', 'E')).toBe('E11');
+    expect(gs.ancorasDoMes(cfg, '2026-10')).toMatchObject({ N18: 'OUT.-26', A30: 'ACIDENTE DE TRÂNSITO' });
+  });
+
+  test('Distribuição A.I. CET: bloco de linhas de cada Cia', () => {
+    const d = doc('distribuicao-ai-cet');
+    expect(d.celulas?.['1cia']).toMatchObject({ l1_data: 'B10', l1_nome: 'E10', l1_tipo0: 'G10', l1_tipo1: 'H10', l13_re: 'D22' });
+    expect(d.celulas?.['1cia']?.l14_re).toBeUndefined();
+    expect(d.celulas?.ft).toMatchObject({ l1_re: 'D73', l10_tipo1: 'H82' });
+    expect(gs.valoresParaZerar(configParaMotor([d])[0], '2026-10').find((x) => x.celula === 'G10')?.valor).toBe(false);
   });
 });
 
@@ -82,6 +111,23 @@ describe('formulário e situação', () => {
     const r = lerValores(doc('escolas-ronda-escolar'), '1cia', { vtr: '1,5', efetivo: '3', estEx: '', estAt: '2.5', munEx: '0', munAt: '0', parEx: '-1', parAt: '0', obs: '' });
     expect(r.valores).toMatchObject({ vtr: 1.5, efetivo: 3, munEx: 0, obs: '' });
     expect(Object.keys(r.erros).sort()).toEqual(['estAt', 'estEx', 'parEx']);
+  });
+
+  test('lista: linhas viram as células do bloco; sem linha vai "NÃO HOUVE"; volta para editar', () => {
+    const d = doc('distribuicao-ai-cet');
+    const ok = valoresDaLista(d, '2cia', [{ data: '2026-10-05', qtd: '1', re: '104720-5', nome: 'Duílio', tipo: '0' }]);
+    expect(ok.erros).toEqual({});
+    expect(ok.valores).toMatchObject({ l1_data: '05/10/2026', l1_qtd: 1, l1_nome: 'DUÍLIO', l1_tipo0: true, l1_tipo1: false, l2_nome: '', l10_tipo0: false });
+    expect(Object.keys(ok.valores)).toHaveLength(10 * 6);
+    expect(linhasDosValores(d, '2cia', ok.valores)).toEqual([{ data: '2026-10-05', qtd: '1', re: '104720-5', nome: 'DUÍLIO', tipo: '0' }]);
+
+    const nada = valoresDaLista(d, '2cia', []);
+    expect(nada.valores.l1_nome).toBe('NÃO HOUVE');
+    expect(linhasDosValores(d, '2cia', nada.valores)).toEqual([]);
+
+    const ruim = valoresDaLista(d, '2cia', [{ data: '', qtd: 'x', re: '1', nome: 'A' }]);
+    expect(Object.keys(ruim.erros).sort()).toEqual(['l1_data', 'l1_qtd', 'l1_tipo']);
+    expect(valoresDaLista(d, '2cia', Array.from({ length: 11 }, () => ({}))).erros.__lista).toMatch(/No máximo 10/);
   });
 
   test('situação do envio', () => {

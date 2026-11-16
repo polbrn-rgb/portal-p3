@@ -42,7 +42,7 @@ export function DocumentosMensais() {
     try {
       await pedirArquivamento(db, d.id, mesRef);
       cutucarMotor();
-      setAviso(`Pedido enviado: o motor guarda a cópia de ${rotuloMes(mesRef)}${preenchidoPeloPortal(d) ? ' e zera a planilha' : ''}.`);
+      setAviso(`Pedido enviado: o motor guarda a cópia de ${rotuloMes(mesRef)}${preenchidoPeloPortal(d) && d.zerar !== false ? ' e zera a planilha' : ''}.`);
     } catch {
       setAviso('Não foi possível pedir. Verifique a conexão e tente de novo.');
     }
@@ -149,7 +149,7 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
           </a>
         ) : (
           <button className="botao secundario" type="button" disabled={pedido} onClick={() => setConfirmando(true)}>
-            {pedido ? '⏳ Arquivando…' : portal ? '📦 Arquivar e zerar' : '📦 Arquivar cópia'}
+            {pedido ? '⏳ Arquivando…' : portal && d.zerar !== false ? '📦 Arquivar e zerar' : '📦 Arquivar cópia'}
           </button>
         )}
       </div>
@@ -157,7 +157,7 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
         <div className="confirmar-linha" role="alertdialog" aria-label={`Confirmar arquivo — ${d.nome}`}>
           <p>
             Guardar a cópia de {rotuloMes(p.mesRef)} na pasta de arquivo
-            {portal ? ' e zerar a planilha para o próximo mês' : ''}?
+            {portal && d.zerar !== false ? ' e zerar a planilha para o próximo mês' : ''}?
           </p>
           <div className="acoes-linha">
             <button className="botao secundario" type="button" onClick={() => setConfirmando(false)}>

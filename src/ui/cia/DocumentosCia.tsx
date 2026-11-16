@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { enviarDocMensal } from '../../data/documentosMensais';
+import { buscarPolicial } from '../../data/efetivo';
 import { formatarData } from '../../domain/datas';
 import {
   camposDaUnidade,
   documentosDoMes,
   lerValores,
+  linhasDosValores,
+  maxLinhas,
   prazoDoDocumento,
+  valoresDaLista,
+  type LinhaLista,
   ROTULO_SITUACAO_ENVIO,
   situacaoEnvio,
   type DocumentoMensal,
@@ -80,6 +85,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
   const [rascunho, setRascunho] = useState<Record<string, string>>(() =>
     Object.fromEntries(campos.map((c) => [c.id, p.envio?.valores[c.id] !== undefined ? String(p.envio.valores[c.id]) : ''])),
   );
+  const [linhas, setLinhas] = useState<LinhaLista[]>(() => (d.lista && p.envio ? linhasDosValores(d, p.unidade, p.envio.valores) : []));
   const [nome, setNome] = useState(p.envio?.respondidoPor || lerNome());
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erro, setErro] = useState('');
@@ -88,7 +94,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
   const s = situacaoEnvio(p.envio, prazo);
 
   async function enviar() {
-    const { valores, erros: e } = lerValores(d, p.unidade, rascunho);
+    const { valores, erros: e } = d.lista ? valoresDaLista(d, p.unidade, linhas) : lerValores(d, p.unidade, rascunho);
     if (!nome.trim()) e.__nome = 'Informe quem preencheu (posto/graduação e nome).';
     setErros(e);
     setErro('');
@@ -111,7 +117,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
 
   // Agrupa os campos pelo título do grupo, na ordem da planilha.
   const grupos: { titulo: string; campos: typeof campos }[] = [];
-  for (const c of campos) {
+  for (const c of campos.filter((x) => !x.daLista)) {
     const t = c.grupo ?? '';
     if (grupos.at(-1)?.titulo !== t) grupos.push({ titulo: t, campos: [] });
     grupos.at(-1)!.campos.push(c);
@@ -131,6 +137,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
           A P/3 foi avisada: {p.envio.erro}
         </p>
       )}
+      {d.lista && <ListaCia documento={d} unidade={p.unidade} linhas={linhas} aoMudar={setLinhas} erros={erros} />}
       {grupos.map((g) => (
         <fieldset key={g.titulo || 'campos'} className="cartao grupo">
           {g.titulo && <legend className="legenda-grupo">{g.titulo}</legend>}
@@ -170,5 +177,79 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
         </button>
       </div>
     </section>
+  );
+}
+
+function ListaCia(p: {
+  documento: DocumentoMensal;
+  unidade: UnidadeId;
+  linhas: LinhaLista[];
+  aoMudar: Dispatch<SetStateAction<LinhaLista[]>>;
+  erros: Record<string, string>;
+}) {
+  const lista = p.documento.lista!;
+  const max = maxLinhas(p.documento, p.unidade);
+  const mudar = (i: number, campo: string, valor: string) => p.aoMudar((ls) => ls.map((l, k) => (k === i ? { ...l, [campo]: valor } : l)));
+
+  async function procurarRE(i: number, re: string) {
+    try {
+      const pm = await buscarPolicial(db, re);
+      // Só completa o nome se ele ainda estiver vazio (não apaga o que a Cia digitou enquanto buscava).
+      if (pm) p.aoMudar((ls) => ls.map((l, k) => (k === i && !l.nome?.trim() ? { ...l, nome: (pm.nomeCompleto || pm.nomeGuerra).toUpperCase() } : l)));
+    } catch {
+      /* sem conexão: digita o nome */
+    }
+  }
+
+  return (
+    <div className="lista-cia">
+      {p.linhas.length === 0 && (
+        <p className="cartao grupo vazio">Nenhuma linha: vai “{lista.semRegistro.texto}” na planilha. Se houve, toque em “+ Adicionar linha”.</p>
+      )}
+      {p.erros.__lista && (
+        <p className="mensagem erro" role="alert">
+          {p.erros.__lista}
+        </p>
+      )}
+      {p.linhas.map((l, i) => (
+        <fieldset key={i} className="cartao grupo" aria-label={`Linha ${i + 1}`}>
+          <legend className="legenda-grupo">Linha {i + 1}</legend>
+          <div className="grade-2">
+            {lista.colunas.map((c) => (
+              <Campo key={c.id} rotulo={c.rotulo} obrigatorio erro={p.erros[`l${i + 1}_${c.id}`]} className={c.tipo === 'texto' ? 'campo-largo' : undefined}>
+                <input
+                  type={c.tipo === 'data' ? 'date' : 'text'}
+                  inputMode={c.tipo === 'numero' ? 'numeric' : undefined}
+                  value={l[c.id] ?? ''}
+                  onChange={(e) => mudar(i, c.id, e.target.value)}
+                  onBlur={c.tipo === 're' ? (e) => void procurarRE(i, e.target.value) : undefined}
+                />
+              </Campo>
+            ))}
+          </div>
+          {lista.opcao && (
+            <div role="radiogroup" aria-label={lista.opcao.rotulo} className="opcoes-linha">
+              {lista.opcao.opcoes.map((o, k) => (
+                <label key={o.rotulo} className="campo-check-linha">
+                  <input type="radio" name={`opcao-${i}`} checked={l[lista.opcao!.id] === String(k)} onChange={() => mudar(i, lista.opcao!.id, String(k))} />
+                  {o.rotulo}
+                </label>
+              ))}
+              {p.erros[`l${i + 1}_${lista.opcao.id}`] && <span className="erro-campo">{p.erros[`l${i + 1}_${lista.opcao.id}`]}</span>}
+            </div>
+          )}
+          <div className="acoes-linha">
+            <button className="botao secundario" type="button" onClick={() => p.aoMudar((ls) => ls.filter((_, k) => k !== i))}>
+              🗑️ Remover linha
+            </button>
+          </div>
+        </fieldset>
+      ))}
+      <div className="acoes-linha">
+        <button className="botao secundario" type="button" disabled={p.linhas.length >= max} onClick={() => p.aoMudar((ls) => [...ls, {}])}>
+          + Adicionar linha
+        </button>
+      </div>
+    </div>
   );
 }

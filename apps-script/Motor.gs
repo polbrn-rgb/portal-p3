@@ -102,7 +102,7 @@ function diagnostico() {
     var cfg = obterDoc_('config/documentosMensais');
     if (!cfg) throw new Error('a P/3 ainda não abriu Operações → Documentos Mensais no portal');
     return cfg.documentos.filter(function (d) { return d.celulas; }).map(function (d) {
-      try { abaDoDocMensal_(d); return '✅ ' + d.nome; } catch (e) { return '❌ ' + d.nome + ': ' + e.message; }
+      try { conferirDocMensal_(d); return '✅ ' + d.nome; } catch (e) { return '❌ ' + d.nome + ': ' + e.message; }
     }).join(' | ');
   });
   ok('Planilha de indicadores', function () {
@@ -1101,29 +1101,49 @@ function processarDocsMensais_() {
   });
 }
 
-function abaDoDocMensal_(doc) {
+/** Aba da Cia (ou a única), conferida pelas âncoras do mês. */
+function abaDoDocMensal_(doc, u, mesRef, cache) {
+  var nome = abaDaCia(doc, u);
+  if (cache && cache[nome]) return cache[nome];
   var ss = SpreadsheetApp.openById(doc.planilhaId);
-  var aba = doc.aba ? ss.getSheetByName(doc.aba) : ss.getSheets()[0];
-  if (!aba) throw new Error('aba "' + doc.aba + '" não encontrada');
+  var aba = nome ? ss.getSheetByName(nome) : ss.getSheets()[0];
+  if (!aba) throw new Error('aba "' + nome + '" não encontrada');
+  var ancoras = ancorasDoMes(doc, mesRef);
   var lidos = {};
-  Object.keys(doc.ancoras || {}).forEach(function (c) { lidos[c] = aba.getRange(c).getDisplayValue(); });
-  var erro = conferirAncoras(doc.ancoras, lidos);
-  if (erro) throw new Error(erro);
+  Object.keys(ancoras).forEach(function (c) { lidos[c] = aba.getRange(c).getDisplayValue(); });
+  var erro = conferirAncoras(ancoras, lidos);
+  if (erro) throw new Error((nome ? 'aba "' + nome + '": ' : '') + erro);
+  if (cache) cache[nome] = aba;
   return aba;
 }
 
 function gravarEnvioMensal_(doc, en) {
-  var aba = abaDoDocMensal_(doc);
+  var aba = abaDoDocMensal_(doc, en.unidadeId, en.mesRef);
   var celulas = doc.celulas[en.unidadeId];
   if (!celulas) throw new Error('a ' + en.unidadeId + ' não preenche este documento');
   Object.keys(celulas).forEach(function (campo) {
     var v = (en.valores || {})[campo];
-    aba.getRange(celulas[campo]).setValue(v === undefined || v === null ? '' : v);
+    aba.getRange(resolverCelula(celulas[campo], en.mesRef, doc.colunaJaneiro)).setValue(v === undefined || v === null ? '' : v);
   });
   if (doc.legenda && doc.legenda.celulas && doc.legenda.celulas[en.unidadeId]) {
     aba.getRange(doc.legenda.celulas[en.unidadeId]).setValue(textoDoMes(doc.legenda.modelo, en.mesRef, en.respondidoPor));
   }
   if (doc.mes && doc.mes.celula) aba.getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, en.mesRef));
+}
+
+/** Mês de referência de hoje (no mês M as Cias mandam os dados do mês M-1). */
+function mesReferenciaHoje_() {
+  var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM');
+  var p = hoje.split('-').map(Number);
+  return p[1] === 1 ? (p[0] - 1) + '-12' : p[0] + '-' + ('0' + (p[1] - 1)).slice(-2);
+}
+
+/** Diagnóstico: confere as abas de cada documento preenchido pelo portal. */
+function conferirDocMensal_(doc) {
+  var mes = mesReferenciaHoje_();
+  var cache = {};
+  Object.keys(doc.celulas || {}).forEach(function (u) { abaDoDocMensal_(doc, u, mes, cache); });
+  return Object.keys(cache).length;
 }
 
 /** Pasta do mês dentro da pasta de arquivo (ex.: "2026-10 OUT"). */
@@ -1139,11 +1159,14 @@ function arquivarDocMensal_(doc, mesRef, estado) {
   var copia = DriveApp.getFileById(doc.planilhaId).makeCopy(nomeArquivoMensal(doc.nome, mesRef), pastaArquivoDoMes_(mesRef));
   estado.arquivados = estado.arquivados || {};
   estado.arquivados[mesRef] = copia.getUrl();
-  if (!doc.celulas) return;
-  var aba = abaDoDocMensal_(doc);
-  var valor = doc.zerarCom === 0 ? 0 : '';
-  aba.getRangeList(celulasParaZerar(doc)).setValue(valor);
-  var legenda = doc.legenda && doc.legenda.celulas ? Object.keys(doc.legenda.celulas).map(function (u) { return doc.legenda.celulas[u]; }) : [];
-  if (legenda.length) aba.getRangeList(legenda).clearContent();
-  if (doc.mes && doc.mes.celula) aba.getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, proximoMes(mesRef)));
+  var zerar = valoresParaZerar(doc, mesRef);
+  if (!zerar.length) return; // planilha do ano todo: só a cópia
+  var cache = {};
+  zerar.forEach(function (x) { abaDoDocMensal_(doc, x.u, mesRef, cache).getRange(x.celula).setValue(x.valor); });
+  if (doc.legenda && doc.legenda.celulas) {
+    Object.keys(doc.legenda.celulas).forEach(function (u) { abaDoDocMensal_(doc, u, mesRef, cache).getRange(doc.legenda.celulas[u]).clearContent(); });
+  }
+  if (doc.mes && doc.mes.celula) {
+    Object.keys(cache).forEach(function (n) { cache[n].getRange(doc.mes.celula).setValue(textoDoMes(doc.mes.modelo, proximoMes(mesRef))); });
+  }
 }
