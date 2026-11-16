@@ -13,9 +13,13 @@ import {
   mesReferencia,
   nesimoDiaUtil,
   preenchidoPeloPortal,
+  rotuloSituacao,
+  situacaoDoDocumento,
   situacaoEnvio,
+  urlAbaDaCia,
   valoresDaLista,
   versaoConfig,
+  zeraAoArquivar,
   type EnvioMensal,
 } from '../../src/domain/documentosMensais';
 
@@ -30,6 +34,7 @@ type Logica = {
   ancorasDoMes: (doc: unknown, mes: string) => Record<string, string>;
   abaDaCia: (doc: unknown, u: string) => string;
   nomeArquivoMensal: (nome: string, mes: string) => string;
+  zerarDireto: (direto: unknown, mes: string) => { abas: string[]; limpar: string; mes: { aba: string; celula: string; valor: string } | null };
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -201,5 +206,32 @@ describe('motor (Logica.gs)', () => {
     expect(gs.acaoEnvioMensal('2026-10', '2026-10')).toBe('gravar');
     expect(gs.acaoEnvioMensal('2026-09', '2026-10')).toBe('arquivarAntes');
     expect(gs.acaoEnvioMensal('2026-11', '2026-10')).toBe('antigo');
+  });
+});
+
+describe('R.R. - Relação de Remessa (direto na planilha)', () => {
+  const rr = doc('relacao-remessa');
+  test('todas as Cias e a FT, cada uma com o link para a própria aba', () => {
+    expect(ciasDoDocumento(rr)).toEqual(['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft']);
+    expect(urlAbaDaCia(rr, '4cia')).toBe('https://docs.google.com/spreadsheets/d/1ZLsK2mL--WcHvwzLFpHdcwLyLK6LFJPYHnJgH3fntP0/edit#gid=1376035401');
+    expect(preenchidoPeloPortal(rr)).toBe(false);
+    expect(zeraAoArquivar(rr)).toBe(true);
+  });
+
+  test('a confirmação da Cia já conta como pronto', () => {
+    const envio = { id: 'x', docId: rr.id, mesRef: '2026-10', unidadeId: '1cia', valores: {}, respondidoPor: 'Sgt', gravado: false } as EnvioMensal;
+    expect(situacaoDoDocumento(rr, undefined, '2026-11-06', '2026-11-05')).toBe('pendente');
+    expect(situacaoDoDocumento(rr, undefined, '2026-11-06', '2026-11-09')).toBe('atrasado');
+    expect(situacaoDoDocumento(rr, envio, '2026-11-06', '2026-11-09')).toBe('gravado');
+    expect(rotuloSituacao(rr, 'gravado')).toBe('✅ Confirmado');
+  });
+
+  test('zerar: apaga os BOs de todas as abas (Cias, Sede e M11) e põe o próximo mês no cabeçalho', () => {
+    const cfg = configParaMotor([rr])[0] as unknown as { direto: unknown };
+    const plano = gs.zerarDireto(cfg.direto, '2026-10');
+    expect(plano.abas).toEqual(['8º _ 1ª Cia', '8º _ 2ª Cia', '8º _ 3ª Cia', '8º _ 4ª Cia', '8º _ 5ª Cia', '8º _ 6ª Cia', 'FT', 'Sede ', 'M11_8º']);
+    expect(plano.limpar).toBe('B16:Q');
+    expect(plano.mes).toEqual({ aba: '8º _ 1ª Cia', celula: 'A6', valor: 'OPM - 8º BPM/M -NOVEMBRO/2026' });
+    expect(gs.zerarDireto(cfg.direto, '2026-12').mes?.valor).toBe('OPM - 8º BPM/M -JANEIRO/2027');
   });
 });

@@ -116,7 +116,12 @@ implantação e, no projeto, `npm run deploy:regras` (libera as coleções novas
   planilha mudou de formato, ele **não grava** e o erro aparece para a P/3 e para a Cia.
 - **Arquivo do mês:** "Arquivar e zerar" (ou o primeiro envio do mês seguinte, se ninguém arquivou) guarda uma cópia
   na pasta `PASTA_DOCS_MENSAIS_ARQUIVO`, numa subpasta do mês (ex.: `2026-10 OUT`), e só então zera as células das
-  Cias e a legenda. Os documentos que ainda são preenchidos direto na planilha só têm a cópia (não são zerados).
+  Cias e a legenda.
+- **R.R. - Relação de Remessa** (direto na planilha): a Cia abre pelo portal a aba dela na planilha, preenche a lista
+  de BOs e toca em **Confirmar preenchimento** (o motor só marca como pronto). Em "Arquivar e zerar" o motor guarda
+  a cópia, confere o cabeçalho de cada aba (A13 "Nº de", Q13 "NATUREZA") e só então apaga `B16:Q` nas abas das
+  Cias, da FT, da Sede e do M11 (a numeração da coluna A e a formatação ficam) e põe o próximo mês em A6 da aba da 1ª Cia.
+  Ela **não** é zerada sozinha no envio do mês seguinte: só quando a P/3 arquiva.
 - As células de cada Cia ficam no portal (`src/domain/documentosMensais.ts`); a P/3, ao abrir a aba, publica essa
   configuração para o motor.
 - A conta **8bpmmp3@gmail.com** precisa **editar** as planilhas da pasta DOCUMENTOS MENSAIS e a pasta de arquivo.

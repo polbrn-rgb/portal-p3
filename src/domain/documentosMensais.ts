@@ -16,6 +16,15 @@ export type ListaDoc = {
   semRegistro: { coluna: string; texto: string }; // ex.: "NÃO HOUVE" na primeira linha
 };
 
+/** Preenchido direto na planilha: cada Cia abre a aba dela pelo portal e confirma o preenchimento. */
+export type DiretoDoc = {
+  abas: Partial<Record<UnidadeId, { nome: string; gid: number }>>; // aba de cada Cia (o link abre nela)
+  outrasAbas?: string[]; // abas da P/3 que também são zeradas (ex.: consolidado)
+  limpar: string; // intervalo apagado em cada aba ao zerar (ex.: "B16:Q")
+  mes?: { aba: string; celula: string; modelo: string }; // cabeçalho do mês, atualizado ao zerar
+  ancoras: Record<string, string>; // conferidas em cada aba antes de apagar
+};
+
 export type DocumentoMensal = {
   id: string;
   nome: string;
@@ -36,6 +45,7 @@ export type DocumentoMensal = {
   mes?: { celula: string; modelo: string }; // cabeçalho com o mês de referência
   ancoras?: Record<string, string>; // textos que precisam estar na planilha (senão o motor não grava)
   zerarCom?: '' | 0;
+  direto?: DiretoDoc;
 };
 
 const CIAS: UnidadeId[] = ['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft'];
@@ -383,8 +393,29 @@ export const DOCUMENTOS: DocumentoMensal[] = [
     ancoras: { B5: 'HOMICÍDIO', B13: 'ROUBO A BANCO', B18: 'Flagrante de tráfico', B25: 'Veículos vistoriados', '{M2}3': '{MES}', '{M2}4': '{ANO_ANT}', '{M2+1}4': '{ANO}' },
     zerarCom: '',
   },
-  // Lista de ~90 BOs por Cia/mês com 17 colunas: continua colada direto na planilha.
-  { id: 'relacao-remessa', nome: 'R.R. - Relação de Remessa', diaUtil: 4, planilhaId: '1ZLsK2mL--WcHvwzLFpHdcwLyLK6LFJPYHnJgH3fntP0' },
+  {
+    // Lista de ~90 BOs por Cia/mês com 17 colunas: a Cia preenche direto na aba dela (link pelo portal) e confirma.
+    // Ao zerar, apaga os BOs (B16:Q, a numeração da coluna A fica) e troca o mês do cabeçalho.
+    id: 'relacao-remessa',
+    nome: 'R.R. - Relação de Remessa',
+    diaUtil: 4,
+    planilhaId: '1ZLsK2mL--WcHvwzLFpHdcwLyLK6LFJPYHnJgH3fntP0',
+    direto: {
+      abas: {
+        '1cia': { nome: '8º _ 1ª Cia', gid: 1627692297 },
+        '2cia': { nome: '8º _ 2ª Cia', gid: 1822109475 },
+        '3cia': { nome: '8º _ 3ª Cia', gid: 454766756 },
+        '4cia': { nome: '8º _ 4ª Cia', gid: 1376035401 },
+        '5cia': { nome: '8º _ 5ª Cia', gid: 1829284365 },
+        '6cia': { nome: '8º _ 6ª Cia', gid: 1282647073 },
+        ft: { nome: 'FT', gid: 577131511 },
+      },
+      outrasAbas: ['Sede ', 'M11_8º'],
+      limpar: 'B16:Q',
+      mes: { aba: '8º _ 1ª Cia', celula: 'A6', modelo: 'OPM - 8º BPM/M -{MES}/{ANO}' },
+      ancoras: { A13: 'Nº de', Q13: 'NATUREZA' },
+    },
+  },
   {
     // Dados da base (endereço, telefone, efetivo...): a Cia confirma a cada trimestre. Não zera.
     id: 'bcs-funcionamento',
@@ -461,13 +492,29 @@ export function preenchidoPeloPortal(d: DocumentoMensal): boolean {
   return !!(d.campos?.length && d.celulas);
 }
 
+/** "Arquivar e zerar" (e não só guardar a cópia). */
+export function zeraAoArquivar(d: DocumentoMensal): boolean {
+  return (preenchidoPeloPortal(d) && d.zerar !== false) || !!d.direto;
+}
+
 export function camposDaUnidade(d: DocumentoMensal, u: UnidadeId): Campo[] {
   const cel = d.celulas?.[u];
   return cel ? (d.campos ?? []).filter((c) => cel[c.id]) : [];
 }
 
+/** A Cia cuida deste documento (pelo portal ou direto na aba dela). */
+export function daUnidade(d: DocumentoMensal, u: UnidadeId): boolean {
+  return camposDaUnidade(d, u).length > 0 || !!d.direto?.abas[u];
+}
+
 export function ciasDoDocumento(d: DocumentoMensal): UnidadeId[] {
-  return UNIDADES.map((u) => u.id).filter((u) => camposDaUnidade(d, u).length > 0);
+  return UNIDADES.map((u) => u.id).filter((u) => daUnidade(d, u));
+}
+
+/** Link que abre a planilha já na aba da Cia (documento preenchido direto). */
+export function urlAbaDaCia(d: DocumentoMensal, u: UnidadeId): string {
+  const aba = d.direto?.abas[u];
+  return aba ? `${urlPlanilha(d)}#gid=${aba.gid}` : urlPlanilha(d);
 }
 
 // ---------- Mês de referência e dias úteis ----------
@@ -651,6 +698,16 @@ export function situacaoEnvio(envio: EnvioMensal | undefined, prazo: string, hoj
   return hoje > prazo ? 'atrasado' : 'pendente';
 }
 
+/** Situação no documento: no preenchido direto, a confirmação da Cia já conta como pronto. */
+export function situacaoDoDocumento(d: DocumentoMensal, envio: EnvioMensal | undefined, prazo: string, hoje = hojeISO()): SituacaoEnvio {
+  if (d.direto) return envio ? 'gravado' : hoje > prazo ? 'atrasado' : 'pendente';
+  return situacaoEnvio(envio, prazo, hoje);
+}
+
+export function rotuloSituacao(d: DocumentoMensal, s: SituacaoEnvio): string {
+  return d.direto && s === 'gravado' ? '✅ Confirmado' : ROTULO_SITUACAO_ENVIO[s];
+}
+
 export const ROTULO_SITUACAO_ENVIO: Record<SituacaoEnvio, string> = {
   gravado: '✅ Na planilha',
   enviado: '⏳ Enviado',
@@ -691,7 +748,19 @@ export function configParaMotor(lista = DOCUMENTOS) {
           ancoras: ancoras ?? {},
           zerarCom: zerarCom ?? '',
         }
-      : { id, nome, planilhaId };
+      : d.direto
+        ? {
+            id,
+            nome,
+            planilhaId,
+            direto: {
+              abas: [...Object.values(d.direto.abas).map((a) => a!.nome), ...(d.direto.outrasAbas ?? [])],
+              limpar: d.direto.limpar,
+              mes: d.direto.mes ?? null,
+              ancoras: d.direto.ancoras,
+            },
+          }
+        : { id, nome, planilhaId };
   });
 }
 
