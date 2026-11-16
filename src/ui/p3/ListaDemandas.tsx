@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { buscarConcluidas, excluirDemanda } from '../../data/demandas';
+import { alterarStatus, buscarConcluidas, excluirDemanda } from '../../data/demandas';
 import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { formatarData, hojeISO } from '../../domain/datas';
 import type { Demanda } from '../../domain/demanda';
@@ -37,6 +37,22 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
   const [aExcluir, setAExcluir] = useState<Demanda | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [avisoExclusao, setAvisoExclusao] = useState('');
+  const [aConcluir, setAConcluir] = useState<Demanda | null>(null);
+  const [concluindo, setConcluindo] = useState(false);
+
+  // Atalho da lista: concluir sem abrir a demanda (sempre com confirmação).
+  async function confirmarConclusao() {
+    if (!aConcluir) return;
+    setConcluindo(true);
+    try {
+      await alterarStatus(db, aConcluir.id, 'concluido');
+      setAvisoExclusao(`Demanda nº ${aConcluir.numero} concluída.`);
+    } catch {
+      setAvisoExclusao('Não foi possível concluir. Tente de novo.');
+    }
+    setAConcluir(null);
+    setConcluindo(false);
+  }
 
   async function confirmarExclusao() {
     if (!aExcluir) return;
@@ -171,7 +187,7 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
       {!carregando && !erro && visiveis.length === 0 && <p className="vazio">Nenhuma demanda encontrada.</p>}
 
       {visiveis.length > 0 && (
-        <div className="cabecalho-lista com-lixeira" aria-hidden="true">
+        <div className={`cabecalho-lista com-lixeira${aba === 'abertas' ? ' com-concluir' : ''}`} aria-hidden="true">
           <span>Nº</span>
           <span>Saída</span>
           <span>Categoria</span>
@@ -184,6 +200,21 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
         {visiveis.map((d) => (
           <li key={d.id} className="linha-com-lixeira">
             <ItemDemanda demanda={d} hoje={hoje} andamento={andamentoDe(d)} />
+            <div className="acoes-item">
+            {d.status === 'em_aberto' && (
+              <button
+                className="botao-lixeira botao-concluir"
+                type="button"
+                title="Concluir demanda"
+                aria-label={`Concluir demanda nº ${d.numero}`}
+                onClick={() => {
+                  setAvisoExclusao('');
+                  setAConcluir(d);
+                }}
+              >
+                ✅
+              </button>
+            )}
             <button
               className="botao-lixeira"
               type="button"
@@ -196,12 +227,35 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
             >
               🗑️
             </button>
+            </div>
           </li>
         ))}
       </ul>
 
       {aExcluir && (
-        <ConfirmarExclusao demanda={aExcluir} excluindo={excluindo} aoConfirmar={confirmarExclusao} aoCancelar={() => setAExcluir(null)} />
+        <Confirmar
+          demanda={aExcluir}
+          titulo={`Excluir a demanda nº ${aExcluir.numero}?`}
+          texto="Ela some do Numerador, das Cias e do Checklist Operações. Os eventos dela nas agendas (inclusive a do CFP) são apagados e a pasta do CFP vai para a lixeira do Drive. O número não é reaproveitado e isso não pode ser desfeito pelo portal."
+          botao="🗑️ Sim, excluir"
+          ocupadoTexto="Excluindo…"
+          ocupado={excluindo}
+          aoConfirmar={confirmarExclusao}
+          aoCancelar={() => setAExcluir(null)}
+        />
+      )}
+      {aConcluir && (
+        <Confirmar
+          demanda={aConcluir}
+          titulo={`Concluir a demanda nº ${aConcluir.numero}?`}
+          texto="Ela vai para as Concluídas. As Cias que responderam ficam com a resposta aceita e as que ainda não responderam deixam de ver a demanda. Se precisar, dá para reabrir pela própria demanda."
+          botao="✅ Sim, concluir"
+          classeBotao="destaque"
+          ocupadoTexto="Concluindo…"
+          ocupado={concluindo}
+          aoConfirmar={confirmarConclusao}
+          aoCancelar={() => setAConcluir(null)}
+        />
       )}
 
       {aba === 'concluidas' && temMais && concluidas.length > 0 && (
@@ -213,41 +267,47 @@ export function ListaDemandas({ filtroInicial = 'todas' }: { filtroInicial?: Sit
   );
 }
 
-type PropsConfirmar = { demanda: Demanda; excluindo: boolean; aoConfirmar: () => void; aoCancelar: () => void };
+type PropsConfirmar = {
+  demanda: Demanda;
+  titulo: string;
+  texto: string;
+  botao: string;
+  classeBotao?: 'perigo' | 'destaque';
+  ocupadoTexto: string;
+  ocupado: boolean;
+  aoConfirmar: () => void;
+  aoCancelar: () => void;
+};
 
-/** Confirmação antes de excluir (na própria página, sem a janela do navegador). */
-function ConfirmarExclusao({ demanda: d, excluindo, aoConfirmar, aoCancelar }: PropsConfirmar) {
+/** Confirmação antes de excluir ou concluir (na própria página, sem a janela do navegador). */
+function Confirmar({ demanda: d, titulo, texto, botao, classeBotao = 'perigo', ocupadoTexto, ocupado, aoConfirmar, aoCancelar }: PropsConfirmar) {
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !excluindo) aoCancelar();
+      if (e.key === 'Escape' && !ocupado) aoCancelar();
     };
     window.addEventListener('keydown', aoTeclar);
     return () => window.removeEventListener('keydown', aoTeclar);
-  }, [excluindo, aoCancelar]);
+  }, [ocupado, aoCancelar]);
 
   return (
-    <div className="fundo-dialogo" onClick={() => !excluindo && aoCancelar()}>
+    <div className="fundo-dialogo" onClick={() => !ocupado && aoCancelar()}>
       <div
         className="dialogo"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="titulo-excluir"
-        aria-describedby="texto-excluir"
+        aria-labelledby="titulo-confirmar"
+        aria-describedby="texto-confirmar"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 id="titulo-excluir">Excluir a demanda nº {d.numero}?</h3>
+        <h3 id="titulo-confirmar">{titulo}</h3>
         <p className="dialogo-saida">{d.saida}</p>
-        <p id="texto-excluir">
-          Ela some do Numerador, das Cias e do Checklist Operações. Os eventos dela nas agendas (inclusive a do CFP) são
-          apagados e a pasta do CFP vai para a lixeira do Drive. O número não é reaproveitado e isso não pode ser desfeito
-          pelo portal.
-        </p>
+        <p id="texto-confirmar">{texto}</p>
         <div className="acoes-linha">
-          <button className="botao secundario" type="button" autoFocus disabled={excluindo} onClick={aoCancelar}>
+          <button className="botao secundario" type="button" autoFocus disabled={ocupado} onClick={aoCancelar}>
             Cancelar
           </button>
-          <button className="botao perigo" type="button" disabled={excluindo} onClick={aoConfirmar}>
-            {excluindo ? 'Excluindo…' : '🗑️ Sim, excluir'}
+          <button className={`botao ${classeBotao}`} type="button" disabled={ocupado} onClick={aoConfirmar}>
+            {ocupado ? ocupadoTexto : botao}
           </button>
         </div>
       </div>
