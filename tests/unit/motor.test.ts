@@ -23,6 +23,7 @@ type Motor = {
   numeroDaDescricao: (descricao: unknown) => number;
   missaoDaAgenda: (ev: Record<string, string>) => Record<string, unknown>;
   ordenarMissoes: (lista: { id: string; titulo: string; inicio: string }[]) => { id: string }[];
+  ordenarPendentes: (lista: { nome: string; dados: Record<string, unknown> }[]) => { nome: string }[];
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -355,5 +356,18 @@ describe('agenda do CFP -> página do CFP', () => {
     ];
     expect(motor.ordenarMissoes(lista).map((m) => m.id)).toEqual(['a', 'b', 'c']);
     expect(lista[0].id).toBe('c');
+  });
+});
+
+describe('fila do motor', () => {
+  test('as que deram erro vão por último (a mais antiga primeiro): erro repetido não trava a fila', () => {
+    const p = (nome: string, automacao?: Record<string, string>) => ({ nome, dados: automacao ? { automacao } : {} });
+    const fila = motor.ordenarPendentes([
+      p('a', { erro: 'limite', processadoEm: '2026-11-16T23:10' }),
+      p('b'),
+      p('c', { erro: 'limite', processadoEm: '2026-11-16T23:05' }),
+      p('d', { processadoEm: '2026-11-16T23:00' }),
+    ]);
+    expect(fila.map((x) => x.nome)).toEqual(['b', 'd', 'c', 'a']);
   });
 });
