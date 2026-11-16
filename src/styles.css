@@ -1242,6 +1242,28 @@ fieldset:has(> .erro-campo) > legend {
   cursor: pointer;
 }
 
+/* Ações ao lado da demanda: no celular uma embaixo da outra; no computador lado a lado. */
+.acoes-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 44px;
+}
+
+.acoes-item > .botao-lixeira {
+  flex: 1 1 44px;
+}
+
+.botao-concluir {
+  border-color: #b9dcc4;
+}
+
+.botao-lixeira.botao-concluir:hover,
+.botao-lixeira.botao-concluir:focus-visible {
+  background: #e8f5ec;
+  border-color: #1e6b3f;
+}
+
 .botao-lixeira:hover,
 .botao-lixeira:focus-visible {
   background: #fbeaea;
@@ -1302,6 +1324,19 @@ fieldset:has(> .erro-campo) > legend {
   /* A lixeira ocupa 44px + 8px à direita de cada linha: o cabeçalho acompanha. */
   .cabecalho-lista.com-lixeira {
     margin-right: 52px;
+  }
+
+  .cabecalho-lista.com-lixeira.com-concluir {
+    margin-right: 104px;
+  }
+
+  .acoes-item {
+    flex-direction: row;
+    flex-basis: auto;
+  }
+
+  .acoes-item > .botao-lixeira {
+    flex: 0 0 44px;
   }
 }
 

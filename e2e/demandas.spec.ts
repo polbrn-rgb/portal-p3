@@ -41,6 +41,40 @@ test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ p
   await expect(page.getByRole('link', { name: new RegExp(assunto) })).toContainText('Concluído');
 });
 
+test('atalho ✅ na lista conclui a demanda sem abrir, só depois de confirmar', async ({ page }, info) => {
+  const assunto = `Concluir atalho ${info.project.name} ${Date.now()}`;
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await page.getByLabel(/^Origem/).selectOption('SEI');
+  await page.getByLabel('Nº do processo SEI').fill('006.00000003/2026-01');
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
+  await page.getByLabel('2ª CIA', { exact: true }).check();
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByRole('status')).toContainText('Demanda registrada');
+  await page.getByRole('link', { name: 'Ver lista' }).click();
+
+  const item = page.getByRole('link', { name: new RegExp(assunto) });
+  const numero = (await item.locator('.item-num').innerText()).replace(/\D/g, '');
+  const atalho = page.getByRole('button', { name: `Concluir demanda nº ${numero}` });
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+
+  await atalho.click();
+  const dialogo = page.getByRole('alertdialog', { name: `Concluir a demanda nº ${numero}?` });
+  await expect(dialogo).toContainText(assunto);
+  await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialogo).toHaveCount(0);
+  await expect(item).toBeVisible(); // cancelou: nada mudou
+
+  await atalho.click();
+  await dialogo.getByRole('button', { name: '✅ Sim, concluir' }).click();
+  await expect(page.getByText(`Demanda nº ${numero} concluída.`)).toBeVisible();
+  await expect(item).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Concluídas' }).click();
+  await expect(page.getByRole('link', { name: new RegExp(assunto) })).toContainText('Concluído');
+  await expect(page.getByRole('button', { name: `Concluir demanda nº ${numero}` })).toHaveCount(0); // já concluída
+});
+
 test('formulário não salva sem os campos obrigatórios', async ({ page }) => {
   await entrar(page, 'p3', SENHA_TESTE);
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
