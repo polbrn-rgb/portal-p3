@@ -6,7 +6,7 @@ import { UNIDADES, type UnidadeId } from './unidades';
 // grava cada número na célula certa, marca a legenda e, ao virar o mês, guarda uma cópia e zera a planilha.
 // Uma planilha nova entra aqui só por configuração (sem programar de novo).
 
-export type Campo = { id: string; rotulo: string; grupo?: string; texto?: boolean; decimal?: boolean; daLista?: boolean };
+export type Campo = { id: string; rotulo: string; grupo?: string; texto?: boolean; obrigatorio?: boolean; decimal?: boolean; daLista?: boolean };
 
 /** Lista em que a Cia adiciona linhas (ex.: PM que receberam talão). Cada Cia tem um bloco de linhas. */
 export type ListaDoc = {
@@ -26,6 +26,7 @@ export type DocumentoMensal = {
   aba?: string;
   abas?: Partial<Record<UnidadeId, string>>; // uma aba por Cia (o resto é igual em todas)
   colunaJaneiro?: string; // células com {M}: a coluna do mês (janeiro nesta coluna, fevereiro na seguinte...)
+  colunaTrimestre1?: string; // células com {T}: a coluna do trimestre (1º nesta coluna, 2º na seguinte...)
   zerar?: boolean; // false = planilha do ano todo: só guarda a cópia, não zera
   vazios?: Record<string, string | number | boolean>; // valor ao zerar, por campo (padrão: zerarCom)
   lista?: ListaDoc;
@@ -104,6 +105,37 @@ const BO_NATUREZAS = [
   ['perdaDoc', 'Perda de documentos'],
   ['acidente', 'Acidente de trânsito'],
 ] as const;
+
+// BCS (só a 1ª, a 4ª e a 6ª Cia têm): trimestral, prazo em janeiro, abril, julho e outubro.
+const TRIMESTRAL = [1, 4, 7, 10];
+const BCS_PRODUCAO = [
+  ['flagrantes', 'Prisões em flagrante'],
+  ['armas', 'Armas de fogo apreendidas'],
+  ['entorpecentes', 'Entorpecentes apreendidos (kg)'],
+  ['suspeitas', 'Pessoas suspeitas abordadas'],
+  ['procuradas', 'Pessoas procuradas capturadas'],
+  ['veiculos', 'Veículos suspeitos abordados'],
+  ['bopm', 'BOPM preenchidos'],
+  ['raiia', 'RAIIA'],
+  ['palestras', 'Palestras realizadas'],
+  ['acoes', 'Ações sociais desenvolvidas'],
+  ['projetos', 'Projetos sociais da BCS'],
+  ['elogios', 'Elogios da comunidade'],
+  ['atoInfracional', 'Flagrantes de ato infracional'],
+  ['criancas', 'Crianças/adolescentes apreendidos'],
+] as const;
+const BCS_NATUREZAS = [
+  ['estupro', 'Estupro'],
+  ['latrocinio', 'Latrocínio'],
+  ['homicidio', 'Homicídio doloso'],
+  ['rouboOutros', 'Roubo outros'],
+  ['rouboVeiculos', 'Roubo veículos'],
+  ['rouboCargas', 'Roubo cargas'],
+  ['furtoVeiculos', 'Furto veículos'],
+  ['rouboBanco', 'Roubo a banco'],
+  ['furtoOutros', 'Furto outros'],
+] as const;
+const CIAS_BCS: UnidadeId[] = ['1cia', '4cia', '6cia'];
 
 const VISTORIA_TIPOS = { bike: 'Bicicleta elétrica', ciclo: 'Ciclomotor', auto: 'Autopropelido' };
 const VISTORIA_ACOES = { vist: ['B', 'Vistoriado'], rem: ['C', 'Removido'], loc: ['D', 'Localizado'], aut: ['E', 'Autuado'] } as const;
@@ -277,9 +309,70 @@ export const DOCUMENTOS: DocumentoMensal[] = [
   { id: 'avaliacao-periodica', nome: 'Avaliação Periódica e Cumprimento de Metas', diaUtil: 2, planilhaId: '1kLHkeia6NozgBm8nCvDal4xLC6M2CtWdkXmeNVsOZXM' },
   // Lista de ~90 BOs por Cia/mês com 17 colunas: continua colada direto na planilha.
   { id: 'relacao-remessa', nome: 'R.R. - Relação de Remessa', diaUtil: 4, planilhaId: '1ZLsK2mL--WcHvwzLFpHdcwLyLK6LFJPYHnJgH3fntP0' },
-  { id: 'bcs-funcionamento', nome: 'BCS - Funcionamento (trimestral)', diaUtil: 4, planilhaId: '1MM1dkckQZ-9GFH1C7gOyrI3WZS_tCBlDwl6kBD7Xpwo', meses: [1, 4, 7, 10] },
-  { id: 'bcs-produtividade', nome: 'BCS - Relatório Trimestral de Produtividade', diaUtil: 4, planilhaId: '1y_AgfUW7TaSc1jbWIMGegkrkj0RXd0a2gO3cfetDCto', meses: [1, 4, 7, 10] },
-  { id: 'bcs-quadro', nome: 'BCS - Quadro Comparativo de Indicadores', diaUtil: 4, planilhaId: '1MtYGl3FzkQWxSOxK_EcB4bsSX_8dT4I1dIdVbr5ITV8', meses: [1, 4, 7, 10] },
+  {
+    // Dados da base (endereço, telefone, efetivo...): a Cia confirma a cada trimestre. Não zera.
+    id: 'bcs-funcionamento',
+    nome: 'BCS - Funcionamento (trimestral)',
+    diaUtil: 4,
+    planilhaId: '1MM1dkckQZ-9GFH1C7gOyrI3WZS_tCBlDwl6kBD7Xpwo',
+    meses: TRIMESTRAL,
+    aba: 'Plan1',
+    zerar: false,
+    campos: [
+      { id: 'tipo', rotulo: 'Tipo (BCS, BCSD, PPM, B Op ou BCM)', texto: true, obrigatorio: true },
+      { id: 'endereco', rotulo: 'Endereço completo (rua, nº, bairro e CEP)', texto: true, obrigatorio: true },
+      { id: 'municipio', rotulo: 'Município', texto: true, obrigatorio: true },
+      { id: 'telefone', rotulo: 'Telefone', texto: true, obrigatorio: true },
+      { id: 'vtr', rotulo: 'Vtr de apoio (comunitária)' },
+      { id: 'efetivo', rotulo: 'Efetivo (PM que atuam no local)' },
+      { id: 'area', rotulo: 'Área abrangida (km²)', texto: true, obrigatorio: true },
+      { id: 'populacao', rotulo: 'População beneficiada', texto: true, obrigatorio: true },
+    ],
+    celulas: linhaPorCia(
+      { '1cia': 8, '4cia': 9, '6cia': 10 },
+      {
+        tipo: { coluna: 'C' },
+        endereco: { coluna: 'D' },
+        municipio: { coluna: 'E' },
+        telefone: { coluna: 'F' },
+        vtr: { coluna: 'G' },
+        efetivo: { coluna: 'H' },
+        area: { coluna: 'I' },
+        populacao: { coluna: 'J' },
+      },
+    ),
+    mes: { celula: 'A5', modelo: '{TRI} TRIMESTRE DE {ANO}' },
+    ancoras: { C7: 'Tipo', J7: 'Popula', B8: '1ª', B9: '4ª', B10: '6ª' },
+    zerarCom: '',
+  },
+  {
+    id: 'bcs-produtividade',
+    nome: 'BCS - Relatório Trimestral de Produtividade',
+    diaUtil: 4,
+    planilhaId: '1y_AgfUW7TaSc1jbWIMGegkrkj0RXd0a2gO3cfetDCto',
+    meses: TRIMESTRAL,
+    abas: { '1cia': '1ª Cia', '4cia': '4ª CIA', '6cia': '6ª CIA' },
+    colunaTrimestre1: 'E',
+    zerar: false,
+    campos: BCS_PRODUCAO.map(([id, rotulo]) => ({ id, rotulo, decimal: id === 'entorpecentes' })),
+    celulas: Object.fromEntries(CIAS_BCS.map((u) => [u, Object.fromEntries(BCS_PRODUCAO.map(([id], i) => [id, `{T}${10 + i}`]))])),
+    ancoras: { B9: 'PRODUÇÃO', B10: 'Prisões em Flagrantes', B23: 'Crianças/Adolescentes Apreendidos', '{T}9': '{TRI} Trimes' },
+    zerarCom: '',
+  },
+  {
+    id: 'bcs-quadro',
+    nome: 'BCS - Quadro Comparativo de Indicadores',
+    diaUtil: 4,
+    planilhaId: '1MtYGl3FzkQWxSOxK_EcB4bsSX_8dT4I1dIdVbr5ITV8',
+    meses: TRIMESTRAL,
+    abas: { '1cia': '1ª Cia ', '4cia': '4ª Cia', '6cia': '6ª Cia' },
+    colunaTrimestre1: 'C',
+    zerar: false,
+    campos: BCS_NATUREZAS.map(([id, rotulo]) => ({ id, rotulo })),
+    celulas: Object.fromEntries(CIAS_BCS.map((u) => [u, Object.fromEntries(BCS_NATUREZAS.map(([id], i) => [id, `{T}${14 + i}`]))])),
+    ancoras: { A13: 'NATUREZA', A14: 'ESTUPRO', A22: 'FURTO OUTROS', '{T}13': '{TRI} Trimestre' },
+    zerarCom: '',
+  },
 ];
 
 export const PASTA_ARQUIVO_MENSAIS = '1mkm8R8dTpYF1jp1C2kStpONI1eN95EpN';
@@ -401,6 +494,7 @@ export function lerValores(d: DocumentoMensal, u: UnidadeId, rascunho: Record<st
   for (const c of camposDaUnidade(d, u).filter((x) => !x.daLista)) {
     const t = (rascunho[c.id] ?? '').trim();
     if (c.texto) {
+      if (c.obrigatorio && !t) erros[c.id] = 'Preencha este campo.';
       valores[c.id] = t;
       continue;
     }
@@ -503,7 +597,7 @@ export type EstadoDocumento = {
 
 export function configParaMotor(lista = DOCUMENTOS) {
   return lista.map((d) => {
-    const { id, nome, planilhaId, aba, abas, colunaJaneiro, zerar, vazios, celulas, legenda, mes, ancoras, zerarCom } = d;
+    const { id, nome, planilhaId, aba, abas, colunaJaneiro, colunaTrimestre1, zerar, vazios, celulas, legenda, mes, ancoras, zerarCom } = d;
     return preenchidoPeloPortal(d)
       ? {
           id,
@@ -512,6 +606,7 @@ export function configParaMotor(lista = DOCUMENTOS) {
           aba: aba ?? null,
           abas: abas ?? null,
           colunaJaneiro: colunaJaneiro ?? null,
+          colunaTrimestre1: colunaTrimestre1 ?? null,
           zerar: zerar !== false,
           vazios: vazios ?? {},
           celulas,

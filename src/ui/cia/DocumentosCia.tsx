@@ -143,7 +143,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
           {g.titulo && <legend className="legenda-grupo">{g.titulo}</legend>}
           <div className="grade-2">
             {g.campos.map((c) => (
-              <Campo key={c.id} rotulo={c.rotulo} obrigatorio={!c.texto} erro={erros[c.id]} className={c.texto ? 'campo-largo' : undefined}>
+              <Campo key={c.id} rotulo={c.rotulo} obrigatorio={!c.texto || c.obrigatorio} erro={erros[c.id]} className={c.texto ? 'campo-largo' : undefined}>
                 {c.texto ? (
                   <textarea rows={2} value={rascunho[c.id]} onChange={(e) => setRascunho({ ...rascunho, [c.id]: e.target.value })} />
                 ) : (

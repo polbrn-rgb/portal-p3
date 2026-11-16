@@ -586,6 +586,7 @@ function textoDoMes(modelo, mesRef, quem) {
     .replace(/\{SIGLA\}/g, MESES_SIGLA[i])
     .replace(/\{AA\}/g, p[0].slice(-2))
     .replace(/\{ANO\}/g, p[0])
+    .replace(/\{TRI\}/g, Math.ceil((i + 1) / 3) + 'º')
     .replace(/\{QUEM\}/g, String(quem || '').trim());
 }
 
@@ -607,18 +608,23 @@ function acaoEnvioMensal(mesPlanilha, mesEnvio) {
   return mesPlanilha < mesEnvio ? 'arquivarAntes' : 'antigo';
 }
 
-/** "{M}21" -> coluna do mês (janeiro em colunaJaneiro) + linha. Células sem {M} ficam como estão. */
-function resolverCelula(celula, mesRef, colunaJaneiro) {
-  if (String(celula).indexOf('{M}') < 0) return celula;
-  var col = String.fromCharCode(String(colunaJaneiro || 'A').charCodeAt(0) + Number(String(mesRef).slice(5)) - 1);
-  return String(celula).replace('{M}', col);
+/**
+ * "{M}21" -> coluna do mês (janeiro em colunaJaneiro) + linha; "{T}10" -> coluna do trimestre
+ * (1º em colunaTrimestre1). Células sem {M}/{T} ficam como estão.
+ */
+function resolverCelula(celula, mesRef, colunaJaneiro, colunaTrimestre1) {
+  var mes = Number(String(mesRef).slice(5));
+  var desloca = function (col, n) { return String.fromCharCode(String(col || 'A').charCodeAt(0) + n); };
+  return String(celula)
+    .replace('{M}', desloca(colunaJaneiro, mes - 1))
+    .replace('{T}', desloca(colunaTrimestre1, Math.ceil(mes / 3) - 1));
 }
 
 /** Âncoras do mês: células e textos com {M}/{SIGLA}/{AA}... resolvidos. */
 function ancorasDoMes(doc, mesRef) {
   var out = {};
   Object.keys(doc.ancoras || {}).forEach(function (c) {
-    out[resolverCelula(c, mesRef, doc.colunaJaneiro)] = textoDoMes(doc.ancoras[c], mesRef);
+    out[resolverCelula(c, mesRef, doc.colunaJaneiro, doc.colunaTrimestre1)] = textoDoMes(doc.ancoras[c], mesRef);
   });
   return out;
 }
@@ -635,7 +641,7 @@ function valoresParaZerar(doc, mesRef) {
   Object.keys(doc.celulas || {}).forEach(function (u) {
     Object.keys(doc.celulas[u]).forEach(function (campo) {
       var v = doc.vazios && campo in doc.vazios ? doc.vazios[campo] : doc.zerarCom === 0 ? 0 : '';
-      out.push({ u: u, celula: resolverCelula(doc.celulas[u][campo], mesRef, doc.colunaJaneiro), valor: v });
+      out.push({ u: u, celula: resolverCelula(doc.celulas[u][campo], mesRef, doc.colunaJaneiro, doc.colunaTrimestre1), valor: v });
     });
   });
   return out;

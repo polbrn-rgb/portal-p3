@@ -1123,7 +1123,7 @@ function gravarEnvioMensal_(doc, en) {
   if (!celulas) throw new Error('a ' + en.unidadeId + ' não preenche este documento');
   Object.keys(celulas).forEach(function (campo) {
     var v = (en.valores || {})[campo];
-    aba.getRange(resolverCelula(celulas[campo], en.mesRef, doc.colunaJaneiro)).setValue(v === undefined || v === null ? '' : v);
+    aba.getRange(resolverCelula(celulas[campo], en.mesRef, doc.colunaJaneiro, doc.colunaTrimestre1)).setValue(v === undefined || v === null ? '' : v);
   });
   if (doc.legenda && doc.legenda.celulas && doc.legenda.celulas[en.unidadeId]) {
     aba.getRange(doc.legenda.celulas[en.unidadeId]).setValue(textoDoMes(doc.legenda.modelo, en.mesRef, en.respondidoPor));

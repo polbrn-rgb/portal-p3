@@ -59,7 +59,9 @@ test('Documentos Mensais: lista com linhas (Distribuição A.I. CET)', async ({ 
   await linha.getByLabel('Data').fill('2026-10-05');
   await linha.getByLabel('Qtd de talões').fill('1');
   await linha.getByRole('textbox', { name: /^RE/ }).fill('123456-7');
-  await linha.getByLabel('Nome').fill('Fulano de Tal');
+  await linha.getByRole('textbox', { name: /^RE/ }).blur();
+  await expect(linha.getByLabel('Nome')).toHaveValue('SILVA'); // veio do banco de efetivo pelo RE
+  await linha.getByLabel('Nome').fill('Fulano de Tal'); // a Cia pode trocar
   await linha.getByRole('radio', { name: 'Alocação', exact: true }).check();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: /^Enviar$/ }).click();
