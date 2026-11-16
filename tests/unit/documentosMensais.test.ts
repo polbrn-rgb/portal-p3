@@ -114,6 +114,26 @@ describe('células de cada Cia', () => {
     expect(Object.keys(f.erros)).toEqual(['endereco']);
   });
 
+  test('Plano Diretor: linhas de cada Cia na coluna do mês', () => {
+    const d = doc('plano-diretor');
+    expect(gs.resolverCelula(d.celulas!['1cia']!.icc, '2026-10', 'G')).toBe('P20');
+    expect(gs.resolverCelula(d.celulas!['2cia']!.icc, '2026-10', 'G')).toBe('P27');
+    expect(gs.resolverCelula(d.celulas!.ft!.reunioes, '2026-12', 'G')).toBe('R38');
+    expect(gs.ancorasDoMes(configParaMotor([d])[0], '2026-03')).toMatchObject({ I6: 'MARÇO' });
+  });
+
+  test('Avaliação Periódica: duas colunas por mês; FT só a produtividade', () => {
+    const d = doc('avaliacao-periodica');
+    const cfg = configParaMotor([d])[0];
+    expect(gs.resolverCelula(d.celulas!['1cia']!.homicidio_ant, '2026-01', 'C')).toBe('C5');
+    expect(gs.resolverCelula(d.celulas!['1cia']!.homicidio_atu, '2026-01', 'C')).toBe('D5');
+    expect(gs.resolverCelula(d.celulas!['3cia']!.veiculos_atu, '2026-12', 'C')).toBe('Z25');
+    expect(gs.ancorasDoMes(cfg, '2026-10')).toMatchObject({ U3: 'OUTUBRO', U4: '2025', V4: '2026' });
+    expect(gs.abaDaCia(cfg, 'ft')).toBe('FT');
+    expect(Object.keys(d.celulas!.ft!)).toHaveLength(16);
+    expect(Object.keys(d.celulas!['2cia']!)).toHaveLength(34);
+  });
+
   test('Distribuição A.I. CET: bloco de linhas de cada Cia', () => {
     const d = doc('distribuicao-ai-cet');
     expect(d.celulas?.['1cia']).toMatchObject({ l1_data: 'B10', l1_nome: 'E10', l1_tipo0: 'G10', l1_tipo1: 'H10', l13_re: 'D22' });
