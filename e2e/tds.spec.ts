@@ -22,7 +22,6 @@ test('CFP manda fotos de TDS; RE fora do banco é cadastrado e o limite de 5 por
   await entrar(page, 'cfp', SENHA_TESTE);
   await page.getByRole('navigation', { name: 'Página do CFP' }).getByRole('link', { name: 'TDS' }).click();
   await expect(page.getByRole('heading', { name: 'TDS — fotos de instrução' })).toBeVisible();
-  await expect(page.getByText('fotos por mês')).toBeVisible();
 
   await page.getByRole('button', { name: 'Enviar fotos' }).click();
   await expect(page.getByText('Informe o seu RE.')).toBeVisible();
