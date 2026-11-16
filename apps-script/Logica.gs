@@ -659,3 +659,22 @@ function nomeArquivoMensal(nome, mesRef) {
   var p = String(mesRef).split('-');
   return nome + ' - ' + MESES_SIGLA[Number(p[1]) - 1] + p[0];
 }
+
+// ---------- Aperfeiçoamento → ICC ----------
+// Planilha "ICC nº": linha 4 cabeçalho (QTD 1ª CIA … QTD FT, QTD EM), linhas 5 a 8 Oficiais, Subten e Sgt, Cb e Sd, Total.
+
+var COLUNAS_ICC = { '1cia': 'D', '2cia': 'E', '3cia': 'F', '4cia': 'G', '5cia': 'H', '6cia': 'I', ft: 'J' };
+var ANCORAS_ICC = { C4: 'GRADUAÇÃO', C5: 'Oficiais', C6: 'Subten e Sgt', C7: 'Cb e Sd', C8: 'Total', D4: 'QTD 1ª CIA', J4: 'QTD FT', K4: 'QTD EM' };
+
+/** Células da Cia na planilha da ICC e os valores (o total é a soma). */
+function celulasIcc(unidadeId, r) {
+  var c = COLUNAS_ICC[unidadeId];
+  if (!c) throw new Error('a ' + unidadeId + ' não tem coluna na planilha da ICC');
+  var of = Number(r.oficiais) || 0, sg = Number(r.sargentos) || 0, cb = Number(r.cabos) || 0;
+  var out = {};
+  out[c + '5'] = of;
+  out[c + '6'] = sg;
+  out[c + '7'] = cb;
+  out[c + '8'] = of + sg + cb;
+  return out;
+}

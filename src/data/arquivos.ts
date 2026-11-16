@@ -1,0 +1,52 @@
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
+import { dividirEmPartes, type ArquivoRef } from '../domain/icc';
+
+// Arquivos (PDF) guardados no próprio banco, em partes de até ~700 KB: arquivos/{id} e arquivos/{id}/partes/{n}.
+// Só a P/3 envia; a P/3 e as Cias baixam.
+
+function paraBase64(arquivo: Blob): Promise<string> {
+  return new Promise((ok, falha) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => falha(r.error);
+    r.readAsDataURL(arquivo);
+  });
+}
+
+export async function enviarArquivo(db: Firestore, arquivo: File, aoProgredir?: (feito: number) => void): Promise<ArquivoRef> {
+  const partes = dividirEmPartes(await paraBase64(arquivo));
+  const ref = doc(collection(db, 'arquivos'));
+  for (let i = 0; i < partes.length; i++) {
+    await setDoc(doc(db, 'arquivos', ref.id, 'partes', String(i)), { dados: partes[i] });
+    aoProgredir?.((i + 1) / partes.length);
+  }
+  // O "cabeçalho" por último: só existe quando todas as partes já estão lá.
+  await setDoc(ref, { nome: arquivo.name, tipo: 'application/pdf', tamanho: arquivo.size, partes: partes.length, criadoEm: serverTimestamp() });
+  return { id: ref.id, nome: arquivo.name, tamanho: arquivo.size };
+}
+
+export async function baixarArquivo(db: Firestore, id: string): Promise<{ nome: string; blob: Blob }> {
+  const cab = await getDoc(doc(db, 'arquivos', id));
+  if (!cab.exists()) throw new Error('Arquivo não encontrado.');
+  const { nome, partes, tipo } = cab.data() as { nome: string; partes: number; tipo: string };
+  const lidas = await getDocs(collection(db, 'arquivos', id, 'partes'));
+  const porOrdem = lidas.docs.sort((a, b) => Number(a.id) - Number(b.id)).map((d) => String(d.data().dados ?? ''));
+  if (porOrdem.length !== partes) throw new Error('Arquivo incompleto.');
+  const bin = atob(porOrdem.join(''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { nome, blob: new Blob([bytes], { type: tipo }) };
+}
+
+/** Baixa e entrega o arquivo ao navegador (também no celular). */
+export async function salvarNoAparelho(db: Firestore, id: string): Promise<void> {
+  const { nome, blob } = await baixarArquivo(db, id);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

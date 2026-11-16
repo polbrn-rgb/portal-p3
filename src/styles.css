@@ -1863,3 +1863,35 @@ fieldset:has(> .erro-campo) > legend {
   flex-direction: column;
   gap: 8px;
 }
+
+/* Aperfeiçoamento → ICC */
+.tabela-rolagem {
+  overflow-x: auto;
+}
+
+.tabela-icc {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.tabela-icc th,
+.tabela-icc td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #e3e7ee;
+  text-align: center;
+}
+
+.tabela-icc th[scope='row'] {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabela-icc .linha-total {
+  font-weight: 700;
+}
+
+.tabela-icc .linha-atrasado th,
+.tabela-icc .linha-erro th {
+  color: #b52b27;
+}

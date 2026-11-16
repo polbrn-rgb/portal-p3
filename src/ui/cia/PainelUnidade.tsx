@@ -23,6 +23,9 @@ import { observarEnviosDaUnidade } from '../../data/documentosMensais';
 import { DOCUMENTOS, mesReferencia, type EnvioMensal } from '../../domain/documentosMensais';
 import { contarPendentesDocs, documentosDaUnidade, FormDocumentoCia, ListaDocumentosCia } from './DocumentosCia';
 import { EapsDaCia, ResponderEap } from './EapCia';
+import { observarIccsAbertas, observarRespostasIccDaUnidade } from '../../data/icc';
+import type { Icc, RespostaIcc } from '../../domain/icc';
+import { AperfeicoamentoCia, contarPendentesIcc } from './IccCia';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
@@ -31,10 +34,11 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-type AbaCia = AbaUnidade | 'documentos';
+type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento';
 
 function abaDaRota(hash: string): AbaCia | undefined {
   if (hash.startsWith('#/documentos')) return 'documentos';
+  if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash === '#/respondidas') return 'respondidas';
   if (hash === '#/finalizadas') return 'finalizadas';
   if (/^#\/(enc|efetivo|eap)\//.test(hash)) return undefined;
@@ -67,6 +71,9 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   const mesRef = mesReferencia();
   const envios = useAoVivo<EnvioMensal[]>((ok, erro) => observarEnviosDaUnidade(db, unidade, mesRef, ok, erro), [unidade, mesRef]);
   const temDocs = documentosDaUnidade(unidade, mesRef).length > 0;
+  const iccs = useAoVivo<Icc[]>((ok, erro) => observarIccsAbertas(db, ok, erro), []);
+  const respostasIcc = useAoVivo<RespostaIcc[]>((ok, erro) => observarRespostasIccDaUnidade(db, unidade, ok, erro), [unidade]);
+  const temIcc = (iccs.valor ?? []).length > 0;
   const itens = [
     ...ABAS.map((a) => ({
       id: a.id as AbaCia,
@@ -76,6 +83,16 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     })),
     ...(temDocs
       ? [{ id: 'documentos' as AbaCia, href: '#/documentos', rotulo: 'Documentos Mensais', contador: contarPendentesDocs(unidade, mesRef, envios.valor ?? []) }]
+      : []),
+    ...(temIcc || ativa === 'aperfeicoamento'
+      ? [
+          {
+            id: 'aperfeicoamento' as AbaCia,
+            href: '#/aperfeicoamento',
+            rotulo: 'Aperfeiçoamento',
+            contador: contarPendentesIcc(iccs.valor ?? [], respostasIcc.valor ?? []),
+          },
+        ]
       : []),
   ];
   const docAberto = /^#\/documentos\/([\w-]+)$/.exec(hash)?.[1];
@@ -93,6 +110,11 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       if (!d) return <p className="mensagem erro">Documento não encontrado.</p>;
       if (envios.carregando) return <p className="carregando">Carregando…</p>;
       return <FormDocumentoCia key={d.id} documento={d} unidade={unidade} mesRef={mesRef} envio={envios.valor?.find((e) => e.docId === d.id)} />;
+    }
+    if (ativa === 'aperfeicoamento') {
+      return (
+        <AperfeicoamentoCia unidade={unidade} iccs={iccs.valor ?? []} respostas={respostasIcc.valor ?? []} carregando={iccs.carregando || respostasIcc.carregando} />
+      );
     }
     if (ativa === 'documentos') {
       return <ListaDocumentosCia unidade={unidade} mesRef={mesRef} envios={envios.valor ?? []} carregando={envios.carregando} />;
