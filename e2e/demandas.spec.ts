@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { entrar, irPara, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, marcarDestino, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ page }, info) => {
@@ -12,7 +12,7 @@ test('P/3 cadastra, busca, conclui e acha a demanda nas concluídas', async ({ p
   await page.getByLabel('Nº do processo SEI').fill('006.00000001/2026-01');
   await page.getByLabel('Demanda (resumo)').fill(assunto);
   await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
-  await page.getByLabel('1ª CIA', { exact: true }).check();
+  await marcarDestino(page, '1ª CIA');
   await page.getByLabel('Prazo CPA').fill('2099-12-31');
   await page.getByLabel('Observação').fill('Aguardando assinatura');
   await page.getByRole('button', { name: 'Salvar' }).click();
@@ -49,7 +49,7 @@ test('atalho ✅ na lista conclui a demanda sem abrir, só depois de confirmar',
   await page.getByLabel('Nº do processo SEI').fill('006.00000003/2026-01');
   await page.getByLabel('Demanda (resumo)').fill(assunto);
   await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
-  await page.getByLabel('2ª CIA', { exact: true }).check();
+  await marcarDestino(page, '2ª CIA');
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByRole('status')).toContainText('Demanda registrada');
   await page.getByRole('link', { name: 'Ver lista' }).click();
@@ -106,10 +106,19 @@ test('formulário não salva sem os campos obrigatórios', async ({ page }) => {
 test('marcar TODAS cobre as 7 Cias', async ({ page }) => {
   await entrar(page, 'p3', SENHA_TESTE);
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
-  await page.getByLabel('TODAS', { exact: true }).check();
+  // Destinos começam numa caixa fechada (ocupa pouco espaço) e abrem ao tocar.
+  const caixa = page.getByRole('button', { name: /^Escolher destinos/ });
+  await expect(caixa).toHaveText(/Nenhum destino/);
+  await expect(page.getByLabel('6ª CIA', { exact: true })).toBeHidden();
+  await marcarDestino(page, 'TODAS');
   await expect(page.getByLabel('6ª CIA', { exact: true })).toBeChecked();
   await expect(page.getByLabel('6ª CIA', { exact: true })).toBeDisabled();
   await expect(page.getByLabel('P/2', { exact: true })).not.toBeChecked();
+  await marcarDestino(page, 'P/2');
+  await caixa.click();
+  await expect(page.getByLabel('6ª CIA', { exact: true })).toBeHidden();
+  await expect(caixa).toHaveText(/TODAS \(as 7 Cias\), P\/2/);
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });
 
 test('Cia não vê o cadastro de demandas', async ({ page }) => {
@@ -214,7 +223,7 @@ test('P/3 exclui demanda pela lixeira, só depois de confirmar, e a Cia deixa de
   await page.getByLabel('Nº do processo SEI').fill('006.00000002/2026-01');
   await page.getByLabel('Demanda (resumo)').fill(assunto);
   await page.getByLabel('Categoria').selectOption('Pedidos de Policiamento');
-  await page.getByLabel('5ª CIA', { exact: true }).check();
+  await marcarDestino(page, '5ª CIA');
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByRole('status')).toContainText('Demanda registrada');
   await page.getByRole('link', { name: 'Ver lista' }).click();

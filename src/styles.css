@@ -993,6 +993,47 @@ fieldset:has(> .erro-campo) > legend {
   gap: 8px;
 }
 
+.opcoes[hidden] {
+  display: none;
+}
+
+/* Destinos da demanda: caixa fechada com os escolhidos; abre a lista ao tocar. */
+.seletor-destinos {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #c9ced6;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seletor-destinos[aria-expanded='true'] {
+  border-color: var(--cor-primaria);
+  margin-bottom: 10px;
+}
+
+.resumo-destinos {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.vazio-destinos {
+  font-weight: 400;
+  color: var(--cor-suave);
+}
+
+.seta-destinos {
+  flex: 0 0 auto;
+  color: var(--cor-suave);
+}
+
 .opcao {
   display: inline-flex;
   align-items: center;

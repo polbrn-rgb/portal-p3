@@ -189,6 +189,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
     existente ? dadosDe(existente) : pendente ? demandaDaPendente(pendente, novaComResponsavel()) : novaComResponsavel(),
   );
   const [dados, setDados] = useState<DadosDemanda>(original);
+  const [destinosAbertos, setDestinosAbertos] = useState(false);
   const [registrada, setRegistrada] = useState<number | null>(null);
   const [erros, setErros] = useState<ErrosDemanda>({});
   const [salvando, setSalvando] = useState(false);
@@ -276,6 +277,9 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
 
   const ehSEI = dados.origem === 'SEI';
   const todas = dados.destinos.includes('TODAS');
+  const resumoDestinos = ORDEM_DESTINOS.filter((id) => dados.destinos.includes(id))
+    .map((id) => (id === 'TODAS' ? `TODAS (as ${UNIDADES.length} Cias)` : siglaDoDestino(id)))
+    .join(', ');
 
   return (
     <form className="painel formulario-demanda" onSubmit={salvar} noValidate>
@@ -367,7 +371,21 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
 
       <fieldset className="cartao grupo">
         <legend>Destinos</legend>
-        <div className="opcoes">
+        {/* Fechado mostra só os escolhidos; toca para abrir a lista e marcar. */}
+        <button
+          type="button"
+          className="seletor-destinos"
+          aria-expanded={destinosAbertos}
+          aria-controls="opcoes-destinos"
+          aria-label={`Escolher destinos (${resumoDestinos || 'nenhum'})`}
+          onClick={() => setDestinosAbertos((a) => !a)}
+        >
+          <span className={resumoDestinos ? 'resumo-destinos' : 'resumo-destinos vazio-destinos'}>{resumoDestinos || 'Nenhum destino — toque para escolher'}</span>
+          <span className="seta-destinos" aria-hidden="true">
+            {destinosAbertos ? '▲' : '▼'}
+          </span>
+        </button>
+        <div id="opcoes-destinos" className="opcoes" hidden={!destinosAbertos}>
           {ORDEM_DESTINOS.map((id) => {
             const coberta = todas && UNIDADES.some((u) => u.id === id);
             return (

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, irParaAbaCia, sair, sobraLateral } from './ajuda';
+import { entrar, irParaAbaCia, marcarDestino, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Fluxo completo: P/3 cria para a 3ª Cia -> 3ª Cia responde -> P/3 devolve -> Cia corrige -> P/3 aceita.
@@ -13,7 +13,7 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
   await page.getByLabel('Demanda (resumo)').fill(assunto);
   await page.getByLabel('Categoria').selectOption('Escoltas');
-  await page.getByLabel('3ª CIA', { exact: true }).check();
+  await marcarDestino(page, '3ª CIA');
   await page.getByLabel('Prazo CPA').fill('2099-12-31');
   await page.getByRole('button', { name: 'Salvar' }).click();
   await page.getByRole('link', { name: 'Ver lista' }).click();
