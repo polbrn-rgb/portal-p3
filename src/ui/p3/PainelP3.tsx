@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { limparEncaminhamentosOrfaos } from '../../data/encaminhamentos';
 import { observarOperacoes } from '../../data/operacoes';
 import { observarPendentes } from '../../data/pendentes';
 import type { Operacao } from '../../domain/operacao';
@@ -45,6 +47,12 @@ export function PainelP3() {
   const hash = useHash();
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
+  // Demanda apagada que ainda aparecia para a Cia: sai da tela dela.
+  useEffect(() => {
+    limparEncaminhamentosOrfaos(db)
+      .then((n) => n && console.info(`Portal P3: ${n} encaminhamento(s) de demanda apagada removido(s) das Cias.`))
+      .catch(() => undefined);
+  }, []);
   return (
     <div className="layout-p3">
       <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} />

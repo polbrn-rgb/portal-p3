@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, getDocs, type Firestore } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, updateDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { alterarStatus, atualizarDemanda, criarDemanda, encaminhamentosDaDemanda, obterDemanda } from '../../src/data/demandas';
 import {
   aceitarResposta,
   devolverResposta,
+  limparEncaminhamentosOrfaos,
   marcarEmAndamento,
   marcarVisualizado,
   observarDaUnidade,
@@ -130,5 +131,30 @@ describe('resposta da Cia e decisão da P/3', () => {
 
     await alterarStatus(p3, id, 'concluido');
     expect(await statusPorUnidade(id)).toEqual({ '1cia': 'aceito', '2cia': 'cancelado' });
+  });
+});
+
+describe('demanda apagada fora da lixeira', () => {
+  test('a P/3 ao abrir o portal tira da Cia o que ficou sem demanda (apagada ou excluída); o resto fica', async () => {
+    const viva = await criarDemanda(p3, dados(['1cia', '2cia']));
+    const apagada = await criarDemanda(p3, dados(['1cia']));
+    const excluida = await criarDemanda(p3, dados(['1cia']));
+    const respondida = await criarDemanda(p3, dados(['2cia']));
+    const [r] = await encaminhamentosDaDemanda(p3, String(respondida));
+    await marcarVisualizado(cia('2cia'), r);
+    await responder(cia('2cia'), { ...r, status: 'visualizado' }, 'Feito.', 'Cb PM Teste');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore() as unknown as Firestore;
+      await deleteDoc(doc(admin, 'demandas', String(apagada))); // ex.: apagada direto no Firebase
+      await updateDoc(doc(admin, 'demandas', String(excluida)), { status: 'excluido' });
+      await deleteDoc(doc(admin, 'demandas', String(respondida)));
+    });
+    expect((await listaDaCia('1cia')).map((e) => e.numero).sort()).toEqual([viva, apagada, excluida].sort());
+
+    expect(await limparEncaminhamentosOrfaos(p3)).toBe(3);
+    expect((await listaDaCia('1cia')).map((e) => e.numero)).toEqual([viva]);
+    expect((await listaDaCia('2cia')).map((e) => e.numero)).toEqual([viva]);
+    expect(await limparEncaminhamentosOrfaos(p3)).toBe(0);
+    await expect(limparEncaminhamentosOrfaos(cia('1cia'))).rejects.toThrow();
   });
 });
