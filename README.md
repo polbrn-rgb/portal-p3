@@ -60,6 +60,11 @@ deixam essa conta **mudar contador** (a P/3 só avança de 1 em 1 ao cadastrar) 
 
 - **Numeração**: mostra os contadores e define o último número usado de qualquer um (geral ou de um tipo no ano).
   Voltar para um número menor pede confirmação.
+- Sub-abas: **Numeração**, **Listas do numerador** e **Zerar portal** (trocar de sub-aba não pede a senha de novo).
+- **Listas do numerador**: as opções do cadastro de demanda (tipo de saída, categoria, responsável, origem e meio de
+  saída), em `config/listas`. Incluir, **retirar** (sai só das demandas novas; as antigas continuam com o item e dá para
+  **reativar**) e mudar a ordem (↑ ↓). Itens com 🔒 são usados pelo sistema e não saem (ex.: Operações Policiais,
+  ORDEM DE SERVIÇO, SEI). Sem nada gravado, valem as listas de `src/domain/listas.ts`.
 - **Zerar portal** (digite ZERAR): etapa 1 apaga os lançamentos e marca as demandas como excluídas, para o motor apagar
   os eventos nas agendas e mandar as pastas do CFP para a lixeira; quando o contador "faltam X" chega a zero, a etapa 2
   apaga as demandas e define o número inicial. Ficam efetivo, contas, configurações e agenda do CFP. O que já foi

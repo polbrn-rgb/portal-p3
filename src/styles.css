@@ -2301,3 +2301,61 @@ fieldset:has(> .erro-campo) > legend {
   background: var(--cor-fundo);
   overflow-wrap: anywhere;
 }
+
+.admin-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-topo .subabas {
+  margin: 0;
+}
+
+.lista-itens {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.lista-itens li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 8px;
+  background: var(--cor-fundo);
+}
+
+.lista-itens li.retirado .item-valor {
+  color: var(--cor-suave);
+  text-decoration: line-through;
+}
+
+.lista-itens .item-valor {
+  flex: 1 1 160px;
+  overflow-wrap: anywhere;
+}
+
+.lista-itens .item-acoes {
+  display: flex;
+  gap: 6px;
+}
+
+.lista-itens .item-acoes .botao {
+  min-width: 44px;
+  padding: 0 12px;
+}
+
+.admin-incluir {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
