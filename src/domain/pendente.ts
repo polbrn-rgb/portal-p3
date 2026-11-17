@@ -91,19 +91,35 @@ export function detalheDaPendente(p: Pendente): string {
   return p.quemOrdenou ? `Ordem de: ${p.quemOrdenou}` : '';
 }
 
+/**
+ * Nº da mensagem do CPA/M-11 no corpo do e-mail, ex.: "MENSAGEM Nº CPAM11-1364/30/26, de 12NOV26".
+ * Pega a primeira (a mais recente, num encaminhamento) e devolve nesse formato; sem mensagem, ''.
+ */
+export function numeroMensagemCpa(texto: string): string {
+  const m = /MENSAGEM\s+N\s*\.?\s*[º°o]?\s*\.?[\s*:]*(CPA\s*\/?\s*M\s*-?\s*11\s*-\s*[A-Z0-9]+(?:[/.-][A-Z0-9]+)*)(?:[\s*]*,?[\s*]*de\s+(\d{1,2}\s*[A-Z]{3}\s*\d{2,4}))?/i.exec(
+    texto ?? '',
+  );
+  if (!m) return '';
+  const numero = m[1].replace(/\s+/g, '').toUpperCase();
+  const data = m[2] ? `, de ${m[2].replace(/\s+/g, '').toUpperCase()}` : '';
+  return `MENSAGEM Nº ${numero}${data}`;
+}
+
+/** Nº da origem de um e-mail: a mensagem do CPA/M-11 (se vier no corpo) ou quem mandou. */
+export function numeroOrigemDoEmail(p: Pick<Pendente, 'texto' | 'remetente'>): string {
+  return numeroMensagemCpa(p.texto) || (p.remetente ?? '').trim();
+}
+
 /** "Dar destino": a demanda nova já vem com a entrada preenchida a partir da pendente. */
 export function demandaDaPendente(p: Pendente, base: DadosDemanda): DadosDemanda {
-  const observacao =
-    p.tipo === 'ordem_verbal' && p.quemOrdenou
-      ? `Ordem verbal de ${p.quemOrdenou}.`
-      : p.tipo === 'email' && p.remetente
-        ? `E-mail de ${p.remetente}.`
-        : base.observacao;
+  const observacao = p.tipo === 'ordem_verbal' && p.quemOrdenou ? `Ordem verbal de ${p.quemOrdenou}.` : base.observacao;
+  const numeroOrigem =
+    p.tipo === 'sei' ? (p.numeroSei ?? '') : p.tipo === 'email' ? numeroOrigemDoEmail(p) || base.numeroOrigem : base.numeroOrigem;
   return {
     ...base,
     dataEntrada: ehDataISO(p.dataEntrada) ? p.dataEntrada : base.dataEntrada,
     origem: ORIGEM_DO_TIPO[p.tipo],
-    numeroOrigem: p.tipo === 'sei' ? (p.numeroSei ?? '') : base.numeroOrigem,
+    numeroOrigem,
     saida: p.assunto === '(sem assunto)' ? '' : p.assunto,
     observacao,
   };

@@ -5,6 +5,7 @@ import {
   detalheDaPendente,
   filtrarPendentes,
   montarPendenteManual,
+  numeroMensagemCpa,
   ordenarPendentes,
   pendenteManualVazia,
   resumoDoTexto,
@@ -74,17 +75,49 @@ describe('pendente manual (SEI e Ordem Verbal)', () => {
 describe('dar destino', () => {
   const base = demandaVazia(HOJE);
 
-  test('e-mail: entrada, origem, resumo e quem mandou na observação', () => {
-    const d = demandaDaPendente(pendente({ remetente: 'CPA/M-11 <c@pm>' }), base);
+  test('e-mail: entrada, origem, resumo e quem mandou no nº da origem (observação fica livre)', () => {
+    const d = demandaDaPendente(pendente({ remetente: 'Fulano <fulano@pm>' }), base);
     expect(d).toMatchObject({
       dataEntrada: '2026-11-12',
       origem: 'E-mail',
-      numeroOrigem: '',
+      numeroOrigem: 'Fulano <fulano@pm>',
       saida: 'Pedido de policiamento',
-      observacao: 'E-mail de CPA/M-11 <c@pm>.',
+      observacao: '',
       categoria: 'Outras Demandas',
     });
     expect(validarDemanda(d)).toEqual({});
+  });
+
+  test('e-mail do CPA/M-11: nº da mensagem do corpo vai para o nº da origem', () => {
+    const d = demandaDaPendente(
+      pendente({
+        remetente: 'CPAM11 SECOP <cpam11secop@policiamilitar.sp.gov.br>',
+        texto: 'Senhor Comandante,\nMENSAGEM Nº CPAM11-1364/30/26, de 12NOV26\nAssunto: Operação',
+      }),
+      base,
+    );
+    expect(d.numeroOrigem).toBe('MENSAGEM Nº CPAM11-1364/30/26, de 12NOV26');
+    expect(d.observacao).toBe('');
+  });
+
+  test('e-mail do CPA/M-11 sem mensagem no corpo: vai quem mandou', () => {
+    const d = demandaDaPendente(
+      pendente({ remetente: 'cpam11secop@policiamilitar.sp.gov.br', texto: 'Segue anexo.' }),
+      base,
+    );
+    expect(d.numeroOrigem).toBe('cpam11secop@policiamilitar.sp.gov.br');
+  });
+
+  test('nº da mensagem do CPA/M-11 aceita variações de escrita', () => {
+    expect(numeroMensagemCpa('mensagem n° cpam11-1364/30/26 de 12 nov 26')).toBe('MENSAGEM Nº CPAM11-1364/30/26, de 12NOV26');
+    expect(numeroMensagemCpa('MENSAGEM Nº CPAM11-1364/30/26.')).toBe('MENSAGEM Nº CPAM11-1364/30/26');
+    expect(numeroMensagemCpa('MENSAGEM No: CPAM11-99/30/26, de 1DEZ26')).toBe('MENSAGEM Nº CPAM11-99/30/26, de 1DEZ26');
+    expect(numeroMensagemCpa('*MENSAGEM Nº CPAM11-1364/30/26*, de 12NOV26')).toBe('MENSAGEM Nº CPAM11-1364/30/26, de 12NOV26');
+    expect(numeroMensagemCpa('Segue a mensagem anexa.')).toBe('');
+  });
+
+  test('e-mail sem remetente nem mensagem: nº da origem fica em branco', () => {
+    expect(demandaDaPendente(pendente({}), base).numeroOrigem).toBe('');
   });
 
   test('SEI leva o número do processo; sem número o Numerador continua pedindo', () => {
