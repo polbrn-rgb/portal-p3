@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { criarEap, editarEap, encerrarEap, observarEaps, observarRespostasDaEap, pedirCompiladoEap } from '../../data/eap';
 import { formatarData, hojeISO } from '../../domain/datas';
 import {
+  planilhaAtrasada,
   eapVazia,
   MESES_EAP,
   rotuloTurma,
@@ -290,6 +291,11 @@ function DetalheEap({ eap }: { eap: Eap }) {
           </a>
         ) : eap.planilha?.status === 'erro' ? (
           <p className="mensagem erro">Erro ao criar a planilha: {eap.planilha.erro}</p>
+        ) : planilhaAtrasada(eap, new Date()) ? (
+          <p className="mensagem erro">
+            A planilha está demorando mais que o normal. No Apps Script, rode a função <strong>diagnostico</strong> e confira a linha
+            “Arquivos do script”. Assim que o motor voltar, a planilha é criada sozinha.
+          </p>
         ) : (
           <p className="mensagem aviso">Criando a cópia da planilha na pasta do Drive (até 5 minutos)…</p>
         )}
