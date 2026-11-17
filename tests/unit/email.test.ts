@@ -3,7 +3,10 @@ import {
   assuntoEap,
   corpoPadrao,
   dataPorExtenso,
-  erroDaAssinatura,
+  assinaturaChefe,
+  cargoDoPosto,
+  linhaCargo,
+  validarAssinatura,
   idAssinatura,
   listaEmails,
   montarHtmlEmail,
@@ -107,10 +110,27 @@ describe('assinaturas', () => {
     expect(idAssinatura('Cap Filipi')).toBe('cap-filipi');
   });
 
-  test('só PNG ou JPG, até 300 KB', () => {
-    expect(erroDaAssinatura({ name: 'a.png', size: 1000, type: 'image/png' })).toBe('');
-    expect(erroDaAssinatura({ name: 'a.jpg', size: 1000, type: 'image/jpeg' })).toBe('');
-    expect(erroDaAssinatura({ name: 'a.pdf', size: 1000, type: 'application/pdf' })).not.toBe('');
-    expect(erroDaAssinatura({ name: 'a.png', size: 301 * 1024, type: 'image/png' })).not.toBe('');
+  test('cargo pela graduação', () => {
+    expect(linhaCargo('Cap PM')).toBe('Cap PM - Chefe Seção Operacional');
+    expect(linhaCargo('2º SGT PM')).toBe('2º SGT PM - Encarregado Seção Operacional');
+    expect(linhaCargo('SD PM - 1C')).toBe('SD PM - 1C - Auxiliar de operações');
+    expect(linhaCargo('CB PM')).toBe('CB PM - Auxiliar de operações');
+    expect(cargoDoPosto('1º Ten PM')).toBe('');
+    expect(linhaCargo('1º Ten PM')).toBe('1º Ten PM');
   });
+
+  test('a do Capitão é a do chefe (vai em todos os e-mails)', () => {
+    const a = (nome: string, posto: string) => ({ id: nome, nome, re: '', nomeCompleto: `${nome} completo`, posto });
+    expect(assinaturaChefe([a('Sd Priscila', 'SD PM - 1C'), a('Cap Filipi', 'Cap PM')])?.nome).toBe('Cap Filipi');
+    expect(assinaturaChefe([a('Sd Priscila', 'SD PM - 1C')])).toBeUndefined();
+  });
+
+  test('nome completo e posto obrigatórios', () => {
+    expect(validarAssinatura({ nome: 'Sd Priscila', re: '', nomeCompleto: 'Priscila Santos', posto: 'SD PM - 1C' })).toEqual({});
+    expect(validarAssinatura({ nome: 'Sd Priscila', re: '', nomeCompleto: ' ', posto: '' })).toMatchObject({
+      nomeCompleto: expect.any(String),
+      posto: expect.any(String),
+    });
+  });
+});
 });

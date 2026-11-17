@@ -1,14 +1,18 @@
 import { MESES_EAP } from './eap';
+import { categoriaDoPosto } from './efetivo';
 import { NUMERO_SECAO, PREFIXO_DOCUMENTO } from './numeracao';
 
 // Atalho de e-mail do portal: a P/3 monta a mensagem eletrônica no padrão, o Numerador dá o número
 // e o motor (Apps Script) envia pelo Gmail da P/3 com as assinaturas e os anexos.
 
 export const EMAIL_FUNCIONAL = '8bpmmp3@policiamilitar.sp.gov.br';
-/** Assinatura que vai em todo e-mail (Ch Seç Op / Cmt da P/3). */
-export const ID_ASSINATURA_CHEFE = 'chefe';
 export const DE_PADRAO = 'Ch Seç Op do 8º BPM/M';
-export const TAMANHO_MAXIMO_ASSINATURA = 300 * 1024;
+
+// Assinatura padrão (imagem montada pelo portal sobre public/assinatura-modelo.png).
+export const FONES_ASSINATURA = 'Fones: 2295-6517';
+export const ENDERECO_ASSINATURA = 'RUA VILELA, 331 - TATUAPÉ - SÃO PAULO - SP';
+/** Largura em que a assinatura aparece no e-mail (a imagem tem o dobro, para ficar nítida). */
+export const LARGURA_ASSINATURA = 397;
 
 export type AtalhoEmail = 'eap';
 export type StatusEmail = 'pedido' | 'enviando' | 'enviado' | 'erro';
@@ -37,6 +41,8 @@ export type PedidoEmail = {
   transmissor: string;
   html: string;
   anexos: AnexoEmail[];
+  /** Assinaturas já desenhadas (PNG em data URL): a do Ch Seç Op e a de quem transmitiu. */
+  imagens: { chefe: string; transmissor: string };
   status: StatusEmail;
   erro?: string;
   enviadoEm?: string;
@@ -44,7 +50,36 @@ export type PedidoEmail = {
 
 export type EmailEnviado = PedidoEmail & { id: string; criadoEm?: { toDate: () => Date } | null };
 
-export type Assinatura = { id: string; nome: string; imagem: string };
+/** Dados da assinatura de cada Responsável do numerador (o Administrador preenche). */
+export type DadosAssinatura = { nome: string; re: string; nomeCompleto: string; posto: string };
+export type Assinatura = DadosAssinatura & { id: string };
+
+/** Cargo pela graduação: Cap = chefe; Sgt/Subten = encarregado; Cb/Sd = auxiliar. */
+export function cargoDoPosto(posto: string): string {
+  const c = categoriaDoPosto(posto);
+  if (c === 'cap') return 'Chefe Seção Operacional';
+  if (c === 'subsgt') return 'Encarregado Seção Operacional';
+  if (c === 'cbsd') return 'Auxiliar de operações';
+  return '';
+}
+
+/** "SD PM - 1C - Auxiliar de operações" */
+export function linhaCargo(posto: string): string {
+  const cargo = cargoDoPosto(posto);
+  return cargo ? `${posto.trim()} - ${cargo}` : posto.trim();
+}
+
+/** A assinatura do Capitão (chefe da seção) vai em todos os e-mails. */
+export function assinaturaChefe(lista: Assinatura[]): Assinatura | undefined {
+  return lista.find((a) => categoriaDoPosto(a.posto) === 'cap' && a.nomeCompleto.trim());
+}
+
+export function validarAssinatura(d: DadosAssinatura): Partial<Record<keyof DadosAssinatura, string>> {
+  const e: Partial<Record<keyof DadosAssinatura, string>> = {};
+  if (!d.nomeCompleto.trim()) e.nomeCompleto = 'Informe o nome completo.';
+  if (!d.posto.trim()) e.posto = 'Informe o posto/graduação (ex.: SD PM - 1C).';
+  return e;
+}
 
 export type ErrosEmail = Partial<Record<keyof DadosEmail, string>>;
 
@@ -109,13 +144,6 @@ export function idAssinatura(nome: string): string {
   );
 }
 
-/** Assinatura: imagem PNG ou JPG pequena (vai dentro do banco). */
-export function erroDaAssinatura(arquivo: { name: string; size: number; type: string }): string {
-  if (!/^image\/(png|jpe?g)$/.test(arquivo.type) && !/\.(png|jpe?g)$/i.test(arquivo.name)) return 'A assinatura precisa ser imagem PNG ou JPG.';
-  if (arquivo.size > TAMANHO_MAXIMO_ASSINATURA) return 'A imagem pode ter no máximo 300 KB.';
-  return '';
-}
-
 function esc(t: string): string {
   return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -136,7 +164,9 @@ export function montarHtmlEmail(c: ConteudoEmail, img: { chefe: string; transmis
     .map((t) => p('text-indent:48px;text-align:justify;margin-bottom:12px;', esc(t).replace(/\n/g, '<br>')))
     .join('');
   const imagem = (src: string, alt: string) =>
-    src ? `<img src="${esc(src)}" alt="${esc(alt)}" style="display:block;max-width:100%;height:auto;border:0;">` : '';
+    src
+      ? `<img src="${esc(src)}" alt="${esc(alt)}" width="${LARGURA_ASSINATURA}" style="display:block;width:${LARGURA_ASSINATURA}px;max-width:100%;height:auto;border:0;">`
+      : '';
   return [
     `<div style="${fonte}line-height:1.4;max-width:640px;">`,
     p('text-align:center;font-weight:bold;', 'SECRETARIA DA SEGURANÇA PÚBLICA'),

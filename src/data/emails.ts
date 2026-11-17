@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -22,6 +21,7 @@ import {
   numeroMensagem,
   type AnexoEmail,
   type Assinatura,
+  type DadosAssinatura,
   type AtalhoEmail,
   type DadosEmail,
   type EmailEnviado,
@@ -42,13 +42,15 @@ export function observarAssinaturas(db: Firestore, ok: (l: Assinatura[]) => void
   );
 }
 
-/** Grava (ou troca) a assinatura; id fixo para o Ch Seç Op, id do nome para quem transmite. */
-export async function salvarAssinatura(db: Firestore, id: string, nome: string, imagem: string): Promise<void> {
-  await setDoc(doc(db, 'assinaturas', id), { nome, imagem, atualizadoEm: serverTimestamp() });
-}
-
-export async function apagarAssinatura(db: Firestore, id: string): Promise<void> {
-  await deleteDoc(doc(db, 'assinaturas', id));
+/** Grava os dados da assinatura de um Responsável (a imagem é desenhada pelo portal na hora do e-mail). */
+export async function salvarAssinatura(db: Firestore, id: string, d: DadosAssinatura): Promise<void> {
+  await setDoc(doc(db, 'assinaturas', id), {
+    nome: d.nome,
+    re: d.re.trim(),
+    nomeCompleto: d.nomeCompleto.trim(),
+    posto: d.posto.trim(),
+    atualizadoEm: serverTimestamp(),
+  });
 }
 
 export const assinaturaDe = (lista: Assinatura[], nome: string) => lista.find((a) => a.id === idAssinatura(nome));
@@ -86,6 +88,8 @@ export type PedidoAtalho = {
   /** Linha que entra no Numerador (dá o nº da mensagem). */
   demanda: DadosDemanda;
   anexos: AnexoEmail[];
+  /** Assinaturas já desenhadas (data URL PNG). */
+  imagens: { chefe: string; transmissor: string };
   pdf?: File | null;
 };
 
@@ -112,6 +116,7 @@ export async function enviarEmailAtalho(db: Firestore, p: PedidoAtalho, aoProgre
       { chefe: `cid:${CID_CHEFE}`, transmissor: `cid:${CID_TRANSMISSOR}` },
     ),
     anexos,
+    imagens: p.imagens,
     status: 'pedido',
   };
   await addDoc(collection(db, 'emails'), { ...pedido, criadoEm: serverTimestamp() });

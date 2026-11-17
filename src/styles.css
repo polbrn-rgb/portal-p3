@@ -2510,8 +2510,7 @@ fieldset:has(> .erro-campo) > legend {
 .assinatura-imagem {
   max-width: 100%;
   height: auto;
-  max-height: 140px;
-  object-fit: contain;
+  width: 397px;
   justify-self: start;
   border: 1px solid var(--cor-borda, #d0d7e2);
   border-radius: 4px;
@@ -2525,8 +2524,22 @@ fieldset:has(> .erro-campo) > legend {
   flex-wrap: wrap;
 }
 
-.botao-arquivo {
-  display: inline-flex;
-  align-items: center;
+.form-assinatura {
+  display: grid;
+  gap: 10px;
+}
+
+.linha-re {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.linha-re .campo {
+  flex: 1;
+  min-width: 0;
+}
+
+.linha-re .botao {
   padding: 0 16px;
 }
