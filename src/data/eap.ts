@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   limit,
   onSnapshot,
@@ -56,9 +57,12 @@ export async function editarEap(db: Firestore, eap: Eap, d: DadosEap): Promise<v
   await lote.commit();
 }
 
-/** Planilha travada ou com erro: pede de novo ao motor (o portal também cutuca o motor na hora). */
+/**
+ * Planilha travada ou com erro: pede de novo ao motor (o portal também cutuca o motor na hora).
+ * Mantém o id da cópia já feita, para o motor terminar nela em vez de copiar outra.
+ */
 export async function pedirPlanilhaEapDeNovo(db: Firestore, id: string): Promise<void> {
-  await updateDoc(doc(db, 'eap', id), { planilha: { status: 'pedida', pedidaEm: serverTimestamp() } });
+  await updateDoc(doc(db, 'eap', id), { 'planilha.status': 'pedida', 'planilha.pedidaEm': serverTimestamp(), 'planilha.erro': deleteField() });
 }
 
 /** Excluir: some do portal (P/3 e Cias). A planilha no Drive não é apagada. */

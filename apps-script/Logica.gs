@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-17';
+var VERSAO_LOGICA = '2026-11-18';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -725,5 +725,50 @@ function ordenarPendentes(lista) {
   var quando = function (p) { return (p.dados && p.dados.automacao && p.dados.automacao.processadoEm) || ''; };
   return lista.slice().sort(function (a, b) {
     return erro(a) - erro(b) || (quando(a) < quando(b) ? -1 : quando(a) > quando(b) ? 1 : 0);
+  });
+}
+
+/** 1 -> A, 26 -> Z, 27 -> AA */
+function letraDaColuna(n) {
+  var s = '';
+  while (n > 0) {
+    var r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+/**
+ * Células brancas (#ffffff) de um bloco de fundos em poucos retângulos A1 ("B9:F40"), para limpar
+ * a aba do EAP de uma vez só (célula por célula estourava o tempo do Apps Script).
+ * Junta as brancas seguidas de cada linha e as linhas seguidas com o mesmo trecho.
+ */
+function intervalosBrancos(fundos, linhaInicial, colunaInicial) {
+  var col0 = colunaInicial || 1;
+  var abertos = {};
+  var saida = [];
+  var branca = function (v) { return String(v).toLowerCase() === '#ffffff'; };
+  for (var i = 0; i <= fundos.length; i++) {
+    var trechos = {};
+    var linha = i < fundos.length ? fundos[i] : [];
+    for (var j = 0; j < linha.length; j++) {
+      if (!branca(linha[j])) continue;
+      var k = j;
+      while (k + 1 < linha.length && branca(linha[k + 1])) k++;
+      trechos[j + ':' + k] = [j, k];
+      j = k;
+    }
+    Object.keys(abertos).forEach(function (ch) {
+      if (!trechos[ch]) { saida.push(abertos[ch]); delete abertos[ch]; }
+    });
+    Object.keys(trechos).forEach(function (ch) {
+      if (abertos[ch]) abertos[ch].l2 = i;
+      else abertos[ch] = { c1: trechos[ch][0], c2: trechos[ch][1], l1: i, l2: i };
+    });
+  }
+  saida.sort(function (a, b) { return a.l1 - b.l1 || a.c1 - b.c1; });
+  return saida.map(function (r) {
+    return letraDaColuna(r.c1 + col0) + (r.l1 + linhaInicial) + ':' + letraDaColuna(r.c2 + col0) + (r.l2 + linhaInicial);
   });
 }
