@@ -3,6 +3,9 @@
  * Este arquivo também é testado automaticamente no projeto (tests/unit/motor.test.ts).
  */
 
+/** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
+var VERSAO_LOGICA = '2026-11-17';
+
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
   '6cia': '6ª CIA', ft: 'CIA FT', secop: 'Sec Op M11', gt: 'GT M11', spjmd: 'SPJMD', cfp: 'CFP', p1: 'P/1',

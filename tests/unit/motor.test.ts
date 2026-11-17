@@ -371,3 +371,13 @@ describe('fila do motor', () => {
     expect(fila.map((x) => x.nome)).toEqual(['b', 'd', 'c', 'a']);
   });
 });
+
+describe('versão dos arquivos do Apps Script', () => {
+  test('Motor.gs e Logica.gs com a mesma versão (o diagnóstico acusa quando só um foi colado)', () => {
+    const versao = (arquivo: string, nome: string) =>
+      new RegExp(`var ${nome} = '([^']+)'`).exec(readFileSync(`apps-script/${arquivo}`, 'utf8'))?.[1];
+    const motor = versao('Motor.gs', 'VERSAO_MOTOR');
+    expect(motor).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(versao('Logica.gs', 'VERSAO_LOGICA')).toBe(motor);
+  });
+});

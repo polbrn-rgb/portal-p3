@@ -11,6 +11,9 @@
  * e copia a agenda do CFP para a página do CFP no portal.
  * Instalação: veja LEIAME.md nesta pasta.
  */
+
+/** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
+var VERSAO_MOTOR = '2026-11-17';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -78,6 +81,15 @@ function diagnostico() {
   var ok = function (rotulo, fn) {
     try { linhas.push('✅ ' + rotulo + ': ' + fn()); } catch (e) { linhas.push('❌ ' + rotulo + ': ' + e.message); }
   };
+  ok('Arquivos do script (Motor.gs + Logica.gs)', function () {
+    if (typeof VERSAO_LOGICA === 'undefined' || typeof camposParaJs !== 'function') {
+      throw new Error('falta o Logica.gs ou ele está antigo: crie/abra o arquivo "Logica" e cole o Logica.gs do GitHub inteiro');
+    }
+    if (VERSAO_LOGICA !== VERSAO_MOTOR) {
+      throw new Error('versões diferentes (Motor ' + VERSAO_MOTOR + ', Logica ' + VERSAO_LOGICA + '): cole os dois arquivos do GitHub');
+    }
+    return 'versão ' + VERSAO_MOTOR;
+  });
   ok('Agenda dos prazos (principal)', function () { var c = CalendarApp.getDefaultCalendar(); return c.getName() + ' (' + c.getId() + ')'; });
   ok('Agenda do CFP', function () { var c = CalendarApp.getCalendarById(CONFIG_P3.AGENDA_CFP); if (!c) throw new Error('sem acesso ou ID errado'); return c.getName(); });
   ok('Pasta do CFP', function () { return DriveApp.getFolderById(CONFIG_P3.PASTA_CFP).getName(); });
@@ -115,6 +127,11 @@ function diagnostico() {
     var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_ICC_MODELO);
     abaIcc_(ss);
     return ss.getName();
+  });
+  ok('EAP (modelo e pasta)', function () {
+    var pedidos = consultar_('eap', 'planilha.status', 'pedida').length;
+    return DriveApp.getFileById(CONFIG_P3.PLANILHA_EAP_MODELO).getName() + ' → ' + DriveApp.getFolderById(CONFIG_P3.PASTA_EAP).getName() +
+      (pedidos ? ' (' + pedidos + ' planilha(s) esperando)' : '');
   });
   ok('Planilha de indicadores', function () {
     var ss = SpreadsheetApp.openById(CONFIG_P3.PLANILHA_INDICADORES);
