@@ -107,6 +107,19 @@ service cloud.firestore {
       allow read, write: if ehP3();
     }
 
+    // Atalho de e-mail: o Administrador grava as assinaturas; a P/3 lê e põe pedidos na fila;
+    // o motor (Apps Script) envia pelo Gmail e grava o resultado. Pedido com erro: a P/3 só pode pedir de novo.
+    match /assinaturas/{id} {
+      allow read: if ehP3();
+    }
+
+    match /emails/{id} {
+      allow read, create: if ehP3();
+      allow update: if ehP3()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'erro'])
+        && request.resource.data.status == 'pedido';
+    }
+
     function respostaEapValida() {
       let novo = request.resource.data;
       return resource.data.encerrada == false

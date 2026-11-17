@@ -18,6 +18,10 @@ import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo, Obrigatorio } from '../Campo';
+import { AtalhoEmail } from './AtalhoEmail';
+import { assuntoEap, corpoPadrao } from '../../domain/email';
+import { demandaVazia } from '../../domain/demanda';
+import type { Responsavel } from '../../domain/listas';
 import { observarIccs } from '../../data/icc';
 import type { Icc } from '../../domain/icc';
 import { DetalheIcc, FormIcc, ListaIccP3 } from './IccP3';
@@ -361,6 +365,22 @@ function DetalheEap({ eap }: { eap: Eap }) {
         </p>
       )}
       {eap.compilado?.status === 'erro' && <p className="mensagem erro">Erro no compilado: {eap.compilado.erro}</p>}
+
+      <AtalhoEmail
+        atalho="eap"
+        refId={eap.id}
+        inicial={{ ao: 'Ao Sr. Cmt CPA M-11', assunto: assuntoEap(eap), corpo: corpoPadrao }}
+        planilha={eap.planilha?.status === 'pronta' && eap.planilha.id ? { id: eap.planilha.id, nome: tituloEap(eap) } : undefined}
+        demanda={(assunto, transmissor, hoje) => ({
+          ...demandaVazia(hoje),
+          tipoSaida: 'MSG ELETRÔNICA',
+          saida: assunto,
+          meioSaida: 'E-mail',
+          destinos: ['secop'],
+          categoria: 'Aperfeiçoamento',
+          responsavel: transmissor as Responsavel,
+        })}
+      />
     </section>
   );
 }

@@ -2409,3 +2409,124 @@ fieldset:has(> .erro-campo) > legend {
   text-align: left;
   overflow-wrap: anywhere;
 }
+
+/* Atalho de e-mail (EAP e próximos): formulário, prévia e histórico; no celular tudo em uma coluna. */
+.atalho-email-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-atalho-email {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.form-atalho-email textarea {
+  resize: vertical;
+}
+
+.grupo-anexos {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--cor-borda, #d0d7e2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.previa-email summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+.previa-email-corpo {
+  background: #fff;
+  border: 1px solid var(--cor-borda, #d0d7e2);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.previa-email-corpo img {
+  max-width: 100%;
+  height: auto;
+}
+
+.confirmar-envio {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--cor-destaque);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.historico-emails {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.historico-emails li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-left: 4px solid #9aa5b5;
+  background: rgb(0 0 0 / 0.03);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+.historico-emails li.email-enviado {
+  border-left-color: #2e7d32;
+}
+
+.historico-emails li.email-erro {
+  border-left-color: #c62828;
+}
+
+/* Administrador → Assinaturas de e-mail */
+.lista-assinaturas {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.assinatura-item {
+  display: grid;
+  gap: 6px;
+}
+
+.assinatura-imagem {
+  max-width: 100%;
+  height: auto;
+  max-height: 140px;
+  object-fit: contain;
+  justify-self: start;
+  border: 1px solid var(--cor-borda, #d0d7e2);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.acoes-assinatura {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.botao-arquivo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+}

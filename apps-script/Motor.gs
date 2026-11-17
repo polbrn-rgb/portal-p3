@@ -268,6 +268,11 @@ function rodarMotor_(esperaMs) {
     } catch (e9) {
       console.error('Efetivo manual: ' + e9.message);
     }
+    try {
+      processarEmails_();
+    } catch (e10) {
+      console.error('E-mails do portal: ' + e10.message);
+    }
   } finally {
     trava.releaseLock();
   }
@@ -1303,4 +1308,100 @@ function criarPlanilhaIcc_(numero) {
   aba.getRange('B5').setValue(Number(numero) || numero);
   aba.setName(nome);
   return ss;
+}
+
+// ---------- Atalho de e-mail do portal (fila emails/{id}) -> envio pelo Gmail da P/3 ----------
+// O portal já grava o HTML pronto (com o nº do Numerador). Aqui entram as assinaturas como imagens no corpo
+// (cid:assinaturaChefe e cid:assinaturaTransmissor) e os anexos. Marca "enviando" antes de mandar:
+// se o Apps Script cair no meio, o e-mail não sai duas vezes.
+
+function processarEmails_() {
+  consultar_('emails', 'status', 'pedido', 10).forEach(function (e) {
+    gravarCampos_('emails/' + e.id, { status: 'enviando' });
+    var pdfs = [];
+    try {
+      pdfs = enviarEmailPortal_(e.dados);
+      gravarCampos_('emails/' + e.id, { status: 'enviado', enviadoEm: new Date().toISOString(), erro: '' });
+    } catch (err) {
+      gravarCampos_('emails/' + e.id, { status: 'erro', erro: err.message });
+      return;
+    }
+    // Mensagem enviada: a MSG ELETRÔNICA fica finalizada no Numerador e o PDF enviado sai do banco.
+    try {
+      gravarCampos_('demandas/' + e.dados.demandaNumero, { status: 'concluido' });
+    } catch (err2) {
+      console.error('E-mail ' + e.id + ' (finalizar demanda): ' + err2.message);
+    }
+    pdfs.forEach(function (a) {
+      try {
+        apagarArquivo_(a);
+      } catch (err3) {
+        console.error('E-mail ' + e.id + ' (apagar PDF): ' + err3.message);
+      }
+    });
+  });
+}
+
+/** Envia e devolve os ids dos PDFs anexados (para apagar do banco depois). */
+function enviarEmailPortal_(d) {
+  var chefe = obterDoc_('assinaturas/chefe');
+  var transmissor = obterDoc_('assinaturas/' + d.transmissor);
+  if (!chefe) throw new Error('Falta a assinatura do Ch Seç Op (Administrador -> Assinaturas de e-mail).');
+  if (!transmissor) throw new Error('Falta a assinatura de quem transmitiu (Administrador -> Assinaturas de e-mail).');
+  var anexos = (d.anexos || []).map(anexoEmail_);
+  GmailApp.sendEmail((d.para || []).join(','), d.assunto, htmlParaTexto_(d.html), {
+    htmlBody: d.html,
+    cc: (d.cc || []).join(','),
+    name: 'P/3 - 8º BPM/M',
+    inlineImages: {
+      assinaturaChefe: imagemDeDataUrl_(chefe.imagem, 'assinatura-chefe'),
+      assinaturaTransmissor: imagemDeDataUrl_(transmissor.imagem, 'assinatura-transmissor')
+    },
+    attachments: anexos
+  });
+  return (d.anexos || []).filter(function (a) { return a.tipo === 'pdf'; }).map(function (a) { return a.id; });
+}
+
+function anexoEmail_(a) {
+  if (a.tipo === 'planilha') {
+    var resp = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + a.id + '/export?format=xlsx', {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    if (resp.getResponseCode() !== 200) throw new Error('Não foi possível exportar a planilha (' + resp.getResponseCode() + ').');
+    return resp.getBlob().setName(String(a.nome).replace(/[\\/:*?"<>|·]+/g, '-') + '.xlsx');
+  }
+  var cab = obterDoc_('arquivos/' + a.id);
+  if (!cab) throw new Error('O PDF ' + a.nome + ' não está mais no portal.');
+  var b64 = '';
+  for (var i = 0; i < cab.partes; i++) {
+    var parte = obterDoc_('arquivos/' + a.id + '/partes/' + i);
+    if (!parte) throw new Error('O PDF ' + a.nome + ' está incompleto.');
+    b64 += parte.dados;
+  }
+  return Utilities.newBlob(Utilities.base64Decode(b64), 'application/pdf', a.nome);
+}
+
+function apagarArquivo_(id) {
+  var cab = obterDoc_('arquivos/' + id);
+  firestore_('delete', caminhoDocs_() + '/arquivos/' + id);
+  for (var i = 0; cab && i < cab.partes; i++) firestore_('delete', caminhoDocs_() + '/arquivos/' + id + '/partes/' + i);
+}
+
+function imagemDeDataUrl_(dataUrl, nome) {
+  var m = /^data:([^;]+);base64,(.*)$/.exec(String(dataUrl || ''));
+  if (!m) throw new Error('A imagem da assinatura (' + nome + ') está inválida.');
+  return Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], nome);
+}
+
+/** Versão em texto (para quem lê e-mail sem HTML). */
+function htmlParaTexto_(html) {
+  return String(html || '')
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
