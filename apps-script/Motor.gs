@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-17';
+var VERSAO_MOTOR = '2026-11-18';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -583,6 +583,15 @@ function gravarCampos_(caminho, obj) {
   if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
 }
 
+/** Grava só alguns campos de um mapa (ex.: planilha.id), sem apagar os outros (planilha.status). */
+function gravarSubcampos_(caminho, mapa, obj) {
+  var mascara = Object.keys(obj).map(function (k) { return 'updateMask.fieldPaths=' + encodeURIComponent(mapa + '.' + k); }).join('&');
+  var corpo = {};
+  corpo[mapa] = obj;
+  var r = firestore_('patch', caminhoDocs_() + '/' + caminho + '?' + mascara, { fields: jsParaValor(corpo).mapValue.fields });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+}
+
 // ---------- Planilha de resultados (Checklist Operações) ----------
 
 function idDaPasta_(url) {
@@ -834,10 +843,28 @@ function nomeArquivoEap_(eap) {
   return 'EAP ' + eap.ano + ' - EAD ' + MESES_EXTENSO[eap.mesEad - 1] + ' - PRESENCIAL ' + MESES_EXTENSO[eap.mesPresencial - 1];
 }
 
+/**
+ * Copia o modelo e prepara as abas. O id da cópia é gravado logo depois de copiar: se a rodada cair
+ * no meio do preparo, a próxima reaproveita a mesma cópia em vez de fazer outra.
+ */
 function criarPlanilhaEap_(e) {
-  var copia = DriveApp.getFileById(CONFIG_P3.PLANILHA_EAP_MODELO).makeCopy(nomeArquivoEap_(e.dados), DriveApp.getFolderById(CONFIG_P3.PASTA_EAP));
+  var copia = copiaExistenteEap_(e.dados.planilha);
+  if (!copia) {
+    copia = DriveApp.getFileById(CONFIG_P3.PLANILHA_EAP_MODELO).makeCopy(nomeArquivoEap_(e.dados), DriveApp.getFolderById(CONFIG_P3.PASTA_EAP));
+    gravarSubcampos_('eap/' + e.id, 'planilha', { id: copia.getId(), url: copia.getUrl() });
+  }
   prepararAbasEap_(SpreadsheetApp.openById(copia.getId()), e.dados, true);
   gravarCampos_('eap/' + e.id, { planilha: { status: 'pronta', id: copia.getId(), url: copia.getUrl() }, planilhaDesatualizada: false });
+}
+
+function copiaExistenteEap_(planilha) {
+  if (!planilha || !planilha.id) return null;
+  try {
+    var f = DriveApp.getFileById(planilha.id);
+    return f.isTrashed() ? null : f;
+  } catch (err) {
+    return null;
+  }
 }
 
 function abaEap_(ss, nome) {
@@ -857,13 +884,7 @@ function zerarAbaEap_(aba) {
   var linhas = aba.getMaxRows();
   var colunas = aba.getMaxColumns();
   if (linhas > 8) {
-    var fundos = aba.getRange(9, 1, linhas - 8, colunas).getBackgrounds();
-    var limpar = [];
-    for (var i = 0; i < fundos.length; i++) {
-      for (var j = 0; j < fundos[i].length; j++) {
-        if (String(fundos[i][j]).toLowerCase() === '#ffffff') limpar.push(aba.getRange(i + 9, j + 1).getA1Notation());
-      }
-    }
+    var limpar = intervalosBrancos(aba.getRange(9, 1, linhas - 8, colunas).getBackgrounds(), 9, 1);
     if (limpar.length) aba.getRangeList(limpar).clearContent();
   }
   try {

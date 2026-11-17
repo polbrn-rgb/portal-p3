@@ -48,11 +48,12 @@ describe('EAP', () => {
   test('planilha travada: Tentar de novo volta a pedir; excluir apaga a EAP e as respostas das Cias (a Cia não exclui)', async () => {
     const id = await criarEap(p3, dados());
     await env.withSecurityRulesDisabled((ctx) =>
-      updateDoc(doc(ctx.firestore() as unknown as Firestore, 'eap', id), { planilha: { status: 'erro', erro: 'camposParaJs is not defined' } }),
+      updateDoc(doc(ctx.firestore() as unknown as Firestore, 'eap', id), { planilha: { status: 'erro', erro: 'camposParaJs is not defined', id: 'copia1', url: 'https://x' } }),
     );
     await pedirPlanilhaEapDeNovo(p3, id);
     const planilha = (await getDoc(doc(p3, 'eap', id))).data()?.planilha;
-    expect(planilha).toMatchObject({ status: 'pedida' });
+    // A cópia já feita fica: o motor termina nela em vez de copiar outra.
+    expect(planilha).toMatchObject({ status: 'pedida', id: 'copia1' });
     expect(planilha.pedidaEm).toBeTruthy();
     expect(planilha).not.toHaveProperty('erro');
 

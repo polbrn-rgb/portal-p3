@@ -24,6 +24,8 @@ type Motor = {
   missaoDaAgenda: (ev: Record<string, string>) => Record<string, unknown>;
   ordenarMissoes: (lista: { id: string; titulo: string; inicio: string }[]) => { id: string }[];
   ordenarPendentes: (lista: { nome: string; dados: Record<string, unknown> }[]) => { nome: string }[];
+  letraDaColuna: (n: number) => string;
+  intervalosBrancos: (fundos: string[][], linhaInicial: number, colunaInicial?: number) => string[];
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -379,5 +381,45 @@ describe('versão dos arquivos do Apps Script', () => {
     const motor = versao('Motor.gs', 'VERSAO_MOTOR');
     expect(motor).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(versao('Logica.gs', 'VERSAO_LOGICA')).toBe(motor);
+  });
+});
+
+describe('EAP: limpar as células brancas em poucos intervalos', () => {
+  const B = '#FFFFFF';
+  const C = '#d9d9d9';
+
+  test('colunas em letras', () => {
+    expect([1, 2, 26, 27, 52, 53].map(motor.letraDaColuna)).toEqual(['A', 'B', 'Z', 'AA', 'AZ', 'BA']);
+  });
+
+  test('junta brancas seguidas na linha e linhas iguais seguidas', () => {
+    const fundos = [
+      [C, B, B, C, B],
+      [C, B, B, C, B],
+      [C, C, C, C, B],
+      [B, B, B, B, B],
+    ];
+    expect(motor.intervalosBrancos(fundos, 9)).toEqual(['B9:C10', 'E9:E11', 'A12:E12']);
+  });
+
+  test('cobre exatamente as brancas', () => {
+    const fundos = Array.from({ length: 40 }, (_, i) => Array.from({ length: 12 }, (_, j) => ((i * 7 + j * 3) % 5 === 0 ? C : B)));
+    const cobertas = new Set<string>();
+    for (const r of motor.intervalosBrancos(fundos, 9)) {
+      const [a, b] = r.split(':');
+      const [, c1, l1] = /([A-Z]+)(\d+)/.exec(a)!;
+      const [, c2, l2] = /([A-Z]+)(\d+)/.exec(b)!;
+      const col = (s: string) => [...s].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+      for (let l = Number(l1); l <= Number(l2); l++) for (let c = col(c1); c <= col(c2); c++) cobertas.add(`${l}:${c}`);
+    }
+    const esperadas = new Set<string>();
+    fundos.forEach((linha, i) => linha.forEach((f, j) => f === B && esperadas.add(`${i + 9}:${j + 1}`)));
+    expect(cobertas).toEqual(esperadas);
+  });
+
+  test('aba grande (1000 linhas x 26 colunas) sai em poucos intervalos', () => {
+    const fundos = Array.from({ length: 992 }, (_, i) => Array.from({ length: 26 }, (_, j) => (j === 0 || i % 10 === 0 ? C : B)));
+    const r = motor.intervalosBrancos(fundos, 9);
+    expect(r.length).toBeLessThan(200);
   });
 });
