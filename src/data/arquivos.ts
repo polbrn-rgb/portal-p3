@@ -1,8 +1,8 @@
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
 import { dividirEmPartes, type ArquivoRef } from '../domain/icc';
 
 // Arquivos (PDF) guardados no próprio banco, em partes de até ~700 KB: arquivos/{id} e arquivos/{id}/partes/{n}.
-// Só a P/3 envia; a P/3 e as Cias baixam.
+// Só a P/3 envia e apaga; a P/3 e as Cias baixam.
 
 function paraBase64(arquivo: Blob): Promise<string> {
   return new Promise((ok, falha) => {
@@ -23,6 +23,14 @@ export async function enviarArquivo(db: Firestore, arquivo: File, aoProgredir?: 
   // O "cabeçalho" por último: só existe quando todas as partes já estão lá.
   await setDoc(ref, { nome: arquivo.name, tipo: 'application/pdf', tamanho: arquivo.size, partes: partes.length, criadoEm: serverTimestamp() });
   return { id: ref.id, nome: arquivo.name, tamanho: arquivo.size };
+}
+
+/** Apaga o PDF (partes e cabeçalho). Usado quando a demanda é finalizada ou excluída. */
+export async function apagarArquivo(db: Firestore, id: string): Promise<void> {
+  // O cabeçalho primeiro: sem ele o arquivo já não aparece como pronto para baixar.
+  await deleteDoc(doc(db, 'arquivos', id));
+  const partes = await getDocs(collection(db, 'arquivos', id, 'partes'));
+  await Promise.all(partes.docs.map((p) => deleteDoc(p.ref)));
 }
 
 export async function baixarArquivo(db: Firestore, id: string): Promise<{ nome: string; blob: Blob }> {

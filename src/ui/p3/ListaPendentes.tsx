@@ -5,6 +5,7 @@ import { detalheDaPendente, filtrarPendentes, ORIGEM_DO_TIPO, type Pendente } fr
 import { db } from '../../lib/firebase';
 import { cutucarMotor, URL_MOTOR } from '../../lib/motor';
 import type { AoVivo } from '../../lib/useAoVivo';
+import { BaixarPdf } from '../BaixarPdf';
 
 export function ListaPendentes({ pendentes }: { pendentes: AoVivo<Pendente[]> }) {
   const [texto, setTexto] = useState('');
@@ -141,6 +142,8 @@ function CartaoPendente({ pendente: p, aoDescartar }: { pendente: Pendente; aoDe
           <p className="texto-resposta">{p.texto}</p>
         </details>
       )}
+
+      {p.arquivo && <BaixarPdf id={p.arquivo.id} nome={p.arquivo.nome} />}
 
       {(Boolean(p.anexos?.length) || Boolean(p.linkGmail)) && (
         <ul className="pendente-links">

@@ -19,6 +19,7 @@ import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { irPara, useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { BaixarPdf } from '../BaixarPdf';
 import { Campo } from '../Campo';
 import { MenuLateral } from '../MenuLateral';
 import { observarEnviosDaUnidade } from '../../data/documentosMensais';
@@ -325,6 +326,7 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
             </>
           )}
         </dl>
+        {enc.arquivoId && <BaixarPdf id={enc.arquivoId} nome={enc.arquivoNome || 'documento.pdf'} />}
       </div>
 
       {enc.status === 'devolvido' && enc.motivoDevolucao && (

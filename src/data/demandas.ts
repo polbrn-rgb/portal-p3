@@ -1,6 +1,7 @@
 import {
   arrayRemove,
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -28,6 +29,7 @@ import {
 } from '../domain/encaminhamento';
 import { formatarNumeroDocumento, idContadorTipo, anoDe, ID_CONTADOR_GERAL, usaNumeracaoPorTipo } from '../domain/numeracao';
 import { UNIDADES, unidadesParaEncaminhar } from '../domain/unidades';
+import { apagarArquivo } from './arquivos';
 import { COLECAO_PENDENTES } from './pendentes';
 
 // Acesso ao banco. Recebe o Firestore por parâmetro para poder ser testado no emulador.
@@ -80,6 +82,9 @@ export async function criarDemandaNumerada(
 
     const sequencia = contadorTipo ? (contadorTipo.exists() ? Number(contadorTipo.data().ultimo) : 0) + 1 : 0;
     const numeroDocumento = refTipo ? formatarNumeroDocumento(dados.tipoSaida, sequencia, dados.dataEntrada) : undefined;
+    // O PDF da pendente (SEI / Ordem Verbal) passa para a demanda e para as Cias.
+    const arq = pendente?.data()?.arquivo as { id?: string; nome?: string } | undefined;
+    const arquivo = arq?.id ? { arquivoId: arq.id, arquivoNome: arq.nome || 'documento.pdf' } : {};
 
     tx.set(refContador, { ultimo: numero });
     if (refTipo) tx.set(refTipo, { ultimo: sequencia });
@@ -87,6 +92,7 @@ export async function criarDemandaNumerada(
       ...dados,
       numero,
       ...(numeroDocumento ? { numeroDocumento } : {}),
+      ...arquivo,
       status: 'em_aberto',
       automacaoPendente: precisaAutomacao(dados),
       criadoEm: serverTimestamp(),
@@ -102,7 +108,7 @@ export async function criarDemandaNumerada(
     }
 
     // Cada Cia marcada recebe o seu encaminhamento na mesma gravação.
-    const resumo = resumoDaDemanda({ ...dados, numero, numeroDocumento });
+    const resumo = resumoDaDemanda({ ...dados, numero, numeroDocumento, ...arquivo });
     for (const unidade of unidadesParaEncaminhar(dados.destinos)) {
       tx.set(doc(db, 'encaminhamentos', idEncaminhamento(String(numero), unidade)), {
         ...novoEncaminhamento(String(numero), unidade, resumo),
@@ -163,8 +169,8 @@ export async function atualizarDemanda(
         .map((e) => ({ ...(e.data() as Omit<Encaminhamento, 'id'>), id: e.id }));
 
       // O nº do documento é dado na criação e não muda (nem trocando o tipo de saída).
-      const numeroDocumento = (snap.data() as Partial<Demanda>).numeroDocumento;
-      const final = { ...atual, ...mudancas, numero, numeroDocumento };
+      const { numeroDocumento, arquivoId, arquivoNome } = snap.data() as Partial<Demanda>;
+      const final = { ...atual, ...mudancas, numero, numeroDocumento, arquivoId, arquivoNome };
       const plano = planejarEncaminhamentos(final, existentes);
       const resumo = resumoDaDemanda(final);
       const agora = serverTimestamp();
@@ -206,42 +212,67 @@ export async function atualizarDemanda(
   return meus;
 }
 
+/** PDF da demanda, se ainda houver (para apagar ao finalizar ou excluir). */
+async function arquivoDaDemanda(db: Firestore, id: string): Promise<string | undefined> {
+  const s = await getDoc(doc(db, 'demandas', id));
+  return s.exists() ? (s.data() as Partial<Demanda>).arquivoId : undefined;
+}
+
+const SEM_ARQUIVO = { arquivoId: deleteField(), arquivoNome: deleteField() };
+
 /**
  * Concluir: o que a Cia ainda devia é cancelado e o que ela já respondeu é aceito.
+ * O PDF da demanda (se houver) é apagado do banco e sai da demanda e das Cias.
  * Reabrir: só a demanda volta a ficar aberta.
  */
 export async function alterarStatus(db: Firestore, id: string, status: StatusDemanda): Promise<void> {
   const ref = doc(db, 'demandas', id);
   const agora = serverTimestamp();
+  const arquivoId = status === 'concluido' ? await arquivoDaDemanda(db, id) : undefined;
   const lote = writeBatch(db);
-  lote.update(ref, { status, atualizadoEm: agora });
+  lote.update(ref, { status, atualizadoEm: agora, ...(arquivoId ? SEM_ARQUIVO : {}) });
   lote.set(doc(collection(ref, 'historico')), {
     acao: status === 'concluido' ? 'concluida' : 'reaberta',
     em: agora,
   });
   if (status === 'concluido') {
     for (const e of await encaminhamentosDaDemanda(db, id)) {
-      if (STATUS_PENDENTES.includes(e.status)) lote.update(doc(db, 'encaminhamentos', e.id), { status: 'cancelado', atualizadoEm: agora });
-      if (e.status === 'respondido') lote.update(doc(db, 'encaminhamentos', e.id), { status: 'aceito', atualizadoEm: agora });
+      const novo = STATUS_PENDENTES.includes(e.status) ? 'cancelado' : e.status === 'respondido' ? 'aceito' : null;
+      if (novo || (arquivoId && e.arquivoId)) {
+        lote.update(doc(db, 'encaminhamentos', e.id), {
+          ...(novo ? { status: novo } : {}),
+          ...(arquivoId && e.arquivoId ? SEM_ARQUIVO : {}),
+          atualizadoEm: agora,
+        });
+      }
     }
   }
   await lote.commit();
+  if (arquivoId) await apagarArquivo(db, arquivoId);
 }
 
 /**
  * Exclui a demanda: sai do Numerador, das Cias (os encaminhamentos são apagados) e do Checklist Operações.
- * O número não é reaproveitado. O motor apaga os eventos dela nas agendas (a pasta do Drive fica).
+ * O número não é reaproveitado; o PDF da demanda (se houver) é apagado. O motor apaga os eventos dela nas agendas (a pasta do Drive fica).
  */
 export async function excluirDemanda(db: Firestore, id: string): Promise<void> {
   const ref = doc(db, 'demandas', id);
   const agora = serverTimestamp();
   const encs = await encaminhamentosDaDemanda(db, id);
+  const arquivoId = await arquivoDaDemanda(db, id);
   const lote = writeBatch(db);
-  lote.update(ref, { status: 'excluido', excluidoEm: agora, automacaoPendente: true, atualizadoEm: agora });
+  lote.update(ref, {
+    status: 'excluido',
+    excluidoEm: agora,
+    automacaoPendente: true,
+    atualizadoEm: agora,
+    ...(arquivoId ? SEM_ARQUIVO : {}),
+  });
   lote.set(doc(collection(ref, 'historico')), { acao: 'excluida', em: agora });
   for (const e of encs) lote.delete(doc(db, 'encaminhamentos', e.id));
   lote.delete(doc(db, 'operacoes', id));
   await lote.commit();
+  if (arquivoId) await apagarArquivo(db, arquivoId);
 }
 
 /** Uma demanda em tempo real (para ver o motor terminar a agenda/pasta). */

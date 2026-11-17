@@ -1,5 +1,6 @@
 import { ehDataISO } from './datas';
 import type { DadosDemanda } from './demanda';
+import { TAMANHO_MAXIMO_PDF, type ArquivoRef } from './icc';
 import type { Origem } from './listas';
 
 // Aba "Demandas Pendentes": o que chegou para a P/3 e ainda não ganhou número no Numerador.
@@ -27,6 +28,8 @@ export type Pendente = {
   numeroSei?: string;
   /** Ordem Verbal */
   quemOrdenou?: string;
+  /** SEI / Ordem Verbal: PDF do ofício ou da demanda (guardado no banco; apagado ao finalizar a demanda). */
+  arquivo?: ArquivoRef;
   /** Preenchido ao dar destino. */
   numeroDemanda?: number;
   motivoDescarte?: string;
@@ -63,6 +66,14 @@ export function validarPendente(d: DadosPendenteManual): ErrosPendente {
   return erros;
 }
 
+/** PDF opcional da pendente: só PDF, até 10 MB. Sem arquivo, sem erro. */
+export function erroDoPdf(arquivo?: { name: string; size: number; type: string } | null): string {
+  if (!arquivo) return '';
+  if (arquivo.type !== 'application/pdf' && !arquivo.name.toLowerCase().endsWith('.pdf')) return 'O arquivo precisa ser PDF.';
+  if (arquivo.size > TAMANHO_MAXIMO_PDF) return 'O PDF pode ter no máximo 10 MB.';
+  return '';
+}
+
 const LIMITE_ASSUNTO = 120;
 
 /** Primeira linha com texto, cortada: vira o assunto da pendente e o resumo da demanda. */
@@ -72,7 +83,11 @@ export function resumoDoTexto(texto: string): string {
 }
 
 /** O que é gravado no banco para SEI / Ordem Verbal (sem status e datas do servidor). */
-export function montarPendenteManual(d: DadosPendenteManual, agora: Date): Omit<Pendente, 'id' | 'status'> {
+export function montarPendenteManual(
+  d: DadosPendenteManual,
+  agora: Date,
+  arquivo?: ArquivoRef,
+): Omit<Pendente, 'id' | 'status'> {
   const texto = d.texto.trim();
   return {
     tipo: d.tipo,
@@ -81,6 +96,7 @@ export function montarPendenteManual(d: DadosPendenteManual, agora: Date): Omit<
     assunto: resumoDoTexto(texto),
     texto,
     ...(d.tipo === 'sei' ? { numeroSei: d.numeroSei.trim() } : { quemOrdenou: d.quemOrdenou.trim() }),
+    ...(arquivo ? { arquivo } : {}),
   };
 }
 

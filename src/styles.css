@@ -2394,3 +2394,18 @@ fieldset:has(> .erro-campo) > legend {
   padding-left: 18px;
   overflow-wrap: anywhere;
 }
+
+/* PDF da pendente / demanda: nome longo quebra a linha no celular. */
+.baixar-pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.baixar-pdf .botao-link {
+  padding: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}

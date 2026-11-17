@@ -51,6 +51,9 @@ export type Demanda = DadosDemanda & {
   automacaoPendente?: boolean;
   /** Cias cuja resposta a P/3 aceitou (gravado pela P/3 ao aceitar). */
   ciasAceitas?: UnidadeId[];
+  /** PDF que veio da pendente (SEI / Ordem Verbal); some quando a demanda é finalizada. */
+  arquivoId?: string;
+  arquivoNome?: string;
 };
 
 export type ErrosDemanda = Partial<Record<keyof DadosDemanda, string>>;
