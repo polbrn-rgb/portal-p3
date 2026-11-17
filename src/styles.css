@@ -52,6 +52,37 @@ body {
   opacity: 0.85;
 }
 
+/* Brasão ao lado do título; no celular fica menor para caber com o botão do menu. */
+.topo-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topo-brasao {
+  height: 40px;
+  width: auto;
+  max-width: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.topo-brasao[hidden] {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .topo-marca {
+    gap: 14px;
+  }
+
+  .topo-brasao {
+    height: 56px;
+    max-width: 56px;
+  }
+}
+
 .cartao {
   background: var(--cor-cartao);
   border-radius: var(--raio);
