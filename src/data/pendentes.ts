@@ -10,6 +10,7 @@ import {
   where,
   type Firestore,
 } from 'firebase/firestore';
+import { enviarArquivo } from './arquivos';
 import { montarPendenteManual, ordenarPendentes, type DadosPendenteManual, type Pendente } from '../domain/pendente';
 
 // Aba Demandas Pendentes (coleção "caixaEntrada", só a P/3 acessa).
@@ -17,9 +18,16 @@ import { montarPendenteManual, ordenarPendentes, type DadosPendenteManual, type 
 
 export const COLECAO_PENDENTES = 'caixaEntrada';
 
-export async function criarPendente(db: Firestore, dados: DadosPendenteManual): Promise<string> {
+/** SEI / Ordem Verbal; com PDF, o arquivo vai antes e a pendente guarda a referência. */
+export async function criarPendente(
+  db: Firestore,
+  dados: DadosPendenteManual,
+  pdf?: File | null,
+  aoProgredir?: (feito: number) => void,
+): Promise<string> {
+  const arquivo = pdf ? await enviarArquivo(db, pdf, aoProgredir) : undefined;
   const ref = await addDoc(collection(db, COLECAO_PENDENTES), {
-    ...montarPendenteManual(dados, new Date()),
+    ...montarPendenteManual(dados, new Date(), arquivo),
     status: 'pendente',
     criadoEm: serverTimestamp(),
   });

@@ -38,6 +38,17 @@ describe('resumoDaDemanda', () => {
     expect(resumoDaDemanda(demanda({ prazoCPA: '2026-11-20' })).prazoCia).toBe('2026-11-20');
     expect(resumoDaDemanda(demanda({ prazoCPA: '2026-11-20', prazoCia: '2026-11-18' })).prazoCia).toBe('2026-11-18');
   });
+
+  test('PDF da demanda vai para a Cia; sem PDF, nada', () => {
+    expect(resumoDaDemanda(demanda({ arquivoId: 'a1', arquivoNome: 'Ofício.pdf' }))).toMatchObject({ arquivoId: 'a1', arquivoNome: 'Ofício.pdf' });
+    expect(resumoDaDemanda(demanda({}))).not.toHaveProperty('arquivoId');
+  });
+
+  test('demanda com PDF: editar sem mudar o resumo não reenvia para as Cias', () => {
+    const d = demanda({ destinos: ['1cia'], arquivoId: 'a1', arquivoNome: 'Ofício.pdf' });
+    const existentes = [enc('1cia', 'novo', d)];
+    expect(planejarEncaminhamentos(d, existentes).atualizarResumo).toEqual([]);
+  });
 });
 
 describe('planejarEncaminhamentos', () => {

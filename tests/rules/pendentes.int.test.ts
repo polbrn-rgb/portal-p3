@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, type Firestore } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { criarDemanda, obterDemanda, PendenteJaResolvida } from '../../src/data/demandas';
+import { apagarArquivo, baixarArquivo } from '../../src/data/arquivos';
+import { alterarStatus, criarDemanda, excluirDemanda, obterDemanda, PendenteJaResolvida } from '../../src/data/demandas';
 import {
   criarPendente,
   descartarPendente,
@@ -106,6 +107,64 @@ describe('Demandas Pendentes', () => {
       PendenteJaResolvida,
     );
     expect((await getDoc(doc(db, 'contadores/demandas'))).data()).toEqual({ ultimo: 1 });
+  });
+
+  describe('PDF da pendente (SEI / Ordem Verbal)', () => {
+    const dbCia = () => env.authenticatedContext('conta-1cia', { perfil: 'unidade', unidade: '1cia' }).firestore() as unknown as Firestore;
+
+    /** PDF já enviado em partes (o envio usa FileReader, que só existe no navegador). */
+    async function seiComPdf(pdf = 'arq1') {
+      await setDoc(doc(db, 'arquivos', pdf, 'partes', '0'), { dados: btoa('%PDF-1.4 ') });
+      await setDoc(doc(db, 'arquivos', pdf, 'partes', '1'), { dados: btoa('oficio') });
+      await setDoc(doc(db, 'arquivos', pdf), { nome: 'Ofício 12.pdf', tipo: 'application/pdf', tamanho: 15, partes: 2, criadoEm: serverTimestamp() });
+      const id = await novaSei();
+      await updateDoc(doc(db, 'caixaEntrada', id), { arquivo: { id: pdf, nome: 'Ofício 12.pdf', tamanho: 15 } });
+      const p = (await obterPendente(db, id))!;
+      const numero = await criarDemanda(db, { ...demandaDaPendente(p, demandaVazia('2026-11-14')), destinos: ['1cia'] }, id);
+      return String(numero);
+    }
+
+    const arquivoExiste = async (pdf = 'arq1') => (await getDoc(doc(db, 'arquivos', pdf))).exists();
+    const partesRestantes = async (pdf = 'arq1') => (await getDocs(collection(db, 'arquivos', pdf, 'partes'))).size;
+
+    test('dar destino leva o PDF para a demanda e para a Cia, que consegue baixar', async () => {
+      const id = await seiComPdf();
+      expect(await obterDemanda(db, id)).toMatchObject({ arquivoId: 'arq1', arquivoNome: 'Ofício 12.pdf' });
+      const enc = await getDoc(doc(dbCia(), 'encaminhamentos', `${id}_1cia`));
+      expect(enc.data()).toMatchObject({ arquivoId: 'arq1', arquivoNome: 'Ofício 12.pdf' });
+      const { nome, blob } = await baixarArquivo(dbCia(), 'arq1');
+      expect(nome).toBe('Ofício 12.pdf');
+      expect(await blob.text()).toBe('%PDF-1.4 oficio');
+    });
+
+    test('finalizar a demanda apaga o PDF e tira a referência da demanda e da Cia', async () => {
+      const id = await seiComPdf();
+      await alterarStatus(db, id, 'concluido');
+      expect(await arquivoExiste()).toBe(false);
+      expect(await partesRestantes()).toBe(0);
+      const d = await obterDemanda(db, id);
+      expect(d).toMatchObject({ status: 'concluido' });
+      expect(d).not.toHaveProperty('arquivoId');
+      const enc = (await getDoc(doc(db, 'encaminhamentos', `${id}_1cia`))).data();
+      expect(enc).toMatchObject({ status: 'cancelado' });
+      expect(enc).not.toHaveProperty('arquivoId');
+      // Reabrir não quebra nada (o PDF já não existe).
+      await alterarStatus(db, id, 'em_aberto');
+      expect(await obterDemanda(db, id)).toMatchObject({ status: 'em_aberto' });
+    });
+
+    test('excluir a demanda também apaga o PDF', async () => {
+      const id = await seiComPdf();
+      await excluirDemanda(db, id);
+      expect(await arquivoExiste()).toBe(false);
+      expect(await partesRestantes()).toBe(0);
+    });
+
+    test('a Cia não apaga o PDF', async () => {
+      await seiComPdf();
+      await assertFails(apagarArquivo(dbCia(), 'arq1'));
+      expect(await arquivoExiste()).toBe(true);
+    });
   });
 
   test('Cia não vê as pendentes', async () => {

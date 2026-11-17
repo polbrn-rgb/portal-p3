@@ -27,6 +27,9 @@ export type ResumoEnc = {
   prazoCia: string;
   observacao: string;
   numeroDocumento?: string;
+  /** PDF da demanda para a Cia baixar (enquanto a demanda não é finalizada). */
+  arquivoId?: string;
+  arquivoNome?: string;
 };
 
 export type Encaminhamento = ResumoEnc & {
@@ -44,7 +47,7 @@ export type Encaminhamento = ResumoEnc & {
 type BaseResumo = Pick<
   Demanda,
   'numero' | 'saida' | 'categoria' | 'tipoSaida' | 'origem' | 'numeroOrigem' | 'prazoCia' | 'prazoCPA' | 'observacao'
-> & { numeroDocumento?: string };
+> & { numeroDocumento?: string; arquivoId?: string; arquivoNome?: string };
 
 export function idEncaminhamento(demandaId: string, unidadeId: UnidadeId): string {
   return `${demandaId}_${unidadeId}`;
@@ -62,6 +65,7 @@ export function resumoDaDemanda(d: BaseResumo): ResumoEnc {
     prazoCia: d.prazoCia || d.prazoCPA,
     observacao: d.observacao,
     ...(d.numeroDocumento ? { numeroDocumento: d.numeroDocumento } : {}),
+    ...(d.arquivoId ? { arquivoId: d.arquivoId, arquivoNome: d.arquivoNome ?? 'documento.pdf' } : {}),
   };
 }
 

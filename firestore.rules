@@ -178,9 +178,11 @@ service cloud.firestore {
       allow write: if ehP3() && id != 'listas';
     }
 
-    // Arquivos (PDF) guardados em partes: a P/3 envia; a P/3 e as Cias baixam. Não se altera depois de enviado.
+    // Arquivos (PDF) guardados em partes: a P/3 envia; a P/3 e as Cias baixam. Não se altera depois de enviado;
+    // a P/3 apaga (PDF de demanda pendente some quando a demanda é finalizada ou excluída).
     match /arquivos/{id} {
       allow read: if ehP3() || ehPerfil('unidade');
+      allow delete: if ehP3();
       allow create: if ehP3()
         && request.resource.data.keys().hasOnly(['nome', 'tipo', 'tamanho', 'partes', 'criadoEm'])
         && request.resource.data.tipo == 'application/pdf'
@@ -189,6 +191,7 @@ service cloud.firestore {
       match /partes/{n} {
         allow read: if ehP3() || ehPerfil('unidade');
         allow create: if ehP3() && request.resource.data.keys().hasOnly(['dados']) && request.resource.data.dados is string;
+        allow delete: if ehP3();
       }
     }
 

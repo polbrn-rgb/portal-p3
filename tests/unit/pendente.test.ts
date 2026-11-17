@@ -3,6 +3,7 @@ import { demandaVazia, validarDemanda } from '../../src/domain/demanda';
 import {
   demandaDaPendente,
   detalheDaPendente,
+  erroDoPdf,
   filtrarPendentes,
   montarPendenteManual,
   numeroMensagemCpa,
@@ -135,6 +136,26 @@ describe('dar destino', () => {
 
   test('e-mail sem assunto deixa o resumo para a P/3 escrever', () => {
     expect(demandaDaPendente(pendente({ assunto: '(sem assunto)' }), base).saida).toBe('');
+  });
+});
+
+describe('PDF da pendente', () => {
+  const pdf = (extra: Partial<{ name: string; size: number; type: string }> = {}) => ({ name: 'oficio.pdf', size: 1000, type: 'application/pdf', ...extra });
+
+  test('é opcional; só PDF e até 10 MB', () => {
+    expect(erroDoPdf(null)).toBe('');
+    expect(erroDoPdf(pdf())).toBe('');
+    expect(erroDoPdf(pdf({ type: '' }))).toBe('');
+    expect(erroDoPdf(pdf({ name: 'foto.jpg', type: 'image/jpeg' }))).toBe('O arquivo precisa ser PDF.');
+    expect(erroDoPdf(pdf({ size: 10 * 1024 * 1024 + 1 }))).toBe('O PDF pode ter no máximo 10 MB.');
+  });
+
+  test('a pendente guarda a referência do PDF enviado', () => {
+    const agora = new Date('2026-11-17T10:00:00.000Z');
+    const arquivo = { id: 'a1', nome: 'oficio.pdf', tamanho: 1000 };
+    const sei = { ...pendenteManualVazia('sei', HOJE), texto: 'Ofício 9' };
+    expect(montarPendenteManual(sei, agora, arquivo).arquivo).toEqual(arquivo);
+    expect(montarPendenteManual(sei, agora)).not.toHaveProperty('arquivo');
   });
 });
 
