@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, updateDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { criarEap, editarEap, encerrarEap, enviarRespostaEap, idRespostaEap, observarEapDaUnidade } from '../../src/data/eap';
+import { criarEap, editarEap, encerrarEap, enviarRespostaEap, excluirEap, idRespostaEap, observarEapDaUnidade, pedirPlanilhaEapDeNovo } from '../../src/data/eap';
 import { eapVazia, policialEapVazio, TURMAS_EAP, type DadosEap, type Eap, type RespostaEap } from '../../src/domain/eap';
 
 // EAP (Aperfeiçoamento) no emulador, com as regras ligadas.
@@ -45,6 +45,23 @@ function minhasQuando(db: Firestore, cond: (l: RespostaEap[]) => boolean): Promi
 }
 
 describe('EAP', () => {
+  test('planilha travada: Tentar de novo volta a pedir; excluir apaga a EAP e as respostas das Cias (a Cia não exclui)', async () => {
+    const id = await criarEap(p3, dados());
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore() as unknown as Firestore, 'eap', id), { planilha: { status: 'erro', erro: 'camposParaJs is not defined' } }),
+    );
+    await pedirPlanilhaEapDeNovo(p3, id);
+    const planilha = (await getDoc(doc(p3, 'eap', id))).data()?.planilha;
+    expect(planilha).toMatchObject({ status: 'pedida' });
+    expect(planilha.pedidaEm).toBeTruthy();
+    expect(planilha).not.toHaveProperty('erro');
+
+    await assertFails(excluirEap(cia1, id));
+    await assertSucceeds(excluirEap(p3, id));
+    expect((await getDoc(doc(p3, 'eap', id))).exists()).toBe(false);
+    expect((await getDocs(collection(p3, 'eapRespostas'))).size).toBe(0);
+  });
+
   test('abrir cria a EAP (planilha pedida) e uma resposta por Cia com as vagas dela', async () => {
     const id = await criarEap(p3, dados());
     const eap = (await getDoc(doc(p3, 'eap', id))).data();

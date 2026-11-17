@@ -82,3 +82,12 @@ describe('planilha atrasada', () => {
     expect(planilhaAtrasada({ planilha: { status: 'pedida' } }, agora)).toBe(false);
   });
 });
+
+describe('planilha atrasada depois de pedir de novo', () => {
+  test('conta a partir do último pedido', () => {
+    const agora = new Date(Date.UTC(2026, 10, 17, 12, 0));
+    const ha = (min: number) => ({ toDate: () => new Date(agora.getTime() - min * 60_000) });
+    expect(planilhaAtrasada({ planilha: { status: 'pedida', pedidaEm: ha(2) }, criadoEm: ha(120) }, agora)).toBe(false);
+    expect(planilhaAtrasada({ planilha: { status: 'pedida', pedidaEm: ha(20) }, criadoEm: ha(120) }, agora)).toBe(true);
+  });
+});

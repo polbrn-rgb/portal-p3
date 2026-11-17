@@ -56,6 +56,19 @@ export async function editarEap(db: Firestore, eap: Eap, d: DadosEap): Promise<v
   await lote.commit();
 }
 
+/** Planilha travada ou com erro: pede de novo ao motor (o portal também cutuca o motor na hora). */
+export async function pedirPlanilhaEapDeNovo(db: Firestore, id: string): Promise<void> {
+  await updateDoc(doc(db, 'eap', id), { planilha: { status: 'pedida', pedidaEm: serverTimestamp() } });
+}
+
+/** Excluir: some do portal (P/3 e Cias). A planilha no Drive não é apagada. */
+export async function excluirEap(db: Firestore, id: string): Promise<void> {
+  const lote = writeBatch(db);
+  lote.delete(doc(db, 'eap', id));
+  for (const u of UNIDADES) lote.delete(doc(db, 'eapRespostas', idRespostaEap(id, u.id)));
+  await lote.commit();
+}
+
 /** Encerrar: some da tela das Cias (a planilha fica). */
 export async function encerrarEap(db: Firestore, eap: Eap): Promise<void> {
   const lote = writeBatch(db);
