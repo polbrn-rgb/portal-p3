@@ -139,6 +139,16 @@ implantação e `npm run deploy:regras`.
 - O PDF fica guardado no próprio banco do portal (em partes), sem precisar do Drive nem de plano pago.
 - Rode **diagnostico**: a linha *Modelo da planilha da ICC* deve ficar ✅.
 
+## Atalho de e-mail (Aperfeiçoamento → EAP e próximos)
+
+- No portal, **Administrador → Assinaturas de e-mail**: envie a imagem da assinatura do Ch Seç Op (vai em todos)
+  e de cada Responsável do numerador (vai em "Transmitido por").
+- Na tela do EAP, **✉️ Montar e-mail** → confere a prévia → **Enviar e-mail**. O portal lança a MSG ELETRÔNICA no
+  Numerador (dá o nº), e o motor envia pelo Gmail da P/3 em até 5 minutos, com as assinaturas no corpo e os anexos
+  (planilha do EAP em Excel e/ou PDF). Enviado: a demanda fica finalizada e o PDF sai do banco.
+- Erro no envio aparece na tela com **Tentar de novo** (mesmo nº, não lança outra demanda).
+- Depois de colar o `Motor.gs` novo, faça **Nova versão** da implantação (veja acima).
+
 ## Se der erro
 
 - O erro aparece na própria demanda, no bloco **Agenda e pasta**, e em **Execuções** no Apps Script.

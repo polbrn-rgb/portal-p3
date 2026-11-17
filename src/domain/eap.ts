@@ -41,7 +41,7 @@ export type DadosEap = {
 export type Eap = DadosEap & {
   id: string;
   status: 'aberta' | 'encerrada';
-  planilha?: { status: 'pedida' | 'pronta' | 'erro'; url?: string; erro?: string };
+  planilha?: { status: 'pedida' | 'pronta' | 'erro'; id?: string; url?: string; erro?: string };
   compilado?: { status: 'pedido' | 'pronto' | 'erro'; registros?: number; erro?: string };
 };
 

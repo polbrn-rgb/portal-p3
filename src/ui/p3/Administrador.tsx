@@ -26,6 +26,8 @@ import {
   type ItemLista,
   type Listas,
 } from '../../domain/listasConfig';
+import { apagarAssinatura, observarAssinaturas, salvarAssinatura } from '../../data/emails';
+import { erroDaAssinatura, idAssinatura, ID_ASSINATURA_CHEFE, type Assinatura } from '../../domain/email';
 import { mensagemErroLogin } from '../../domain/mensagens';
 import {
   ANO_NUMERACAO_POR_TIPO,
@@ -49,16 +51,18 @@ function motivo(falha: unknown): string {
   return `Erro: ${codigo || (falha as Error)?.message || 'desconhecido'}.`;
 }
 
-type SubAbaAdmin = 'numeracao' | 'listas' | 'zerar';
+type SubAbaAdmin = 'numeracao' | 'listas' | 'assinaturas' | 'zerar';
 
 const SUBABAS: { id: SubAbaAdmin; href: string; rotulo: string }[] = [
   { id: 'numeracao', href: '#/admin', rotulo: 'Numeração' },
   { id: 'listas', href: '#/admin/listas', rotulo: 'Listas do numerador' },
+  { id: 'assinaturas', href: '#/admin/assinaturas', rotulo: 'Assinaturas de e-mail' },
   { id: 'zerar', href: '#/admin/zerar', rotulo: 'Zerar portal' },
 ];
 
 export function subAbaAdmin(rota: string): SubAbaAdmin {
   if (rota === '#/admin/listas') return 'listas';
+  if (rota === '#/admin/assinaturas') return 'assinaturas';
   if (rota === '#/admin/zerar') return 'zerar';
   return 'numeracao';
 }
@@ -95,6 +99,7 @@ function ConteudoAdmin({ db, ativa }: { db: Firestore; ativa: SubAbaAdmin }) {
   const tipos = conhecidos(listas.valor ?? listasPadrao(), 'tiposSaida');
   if (ativa === 'listas') return <ManutencaoListas db={db} listas={listas.valor} erro={listas.erro} />;
   if (ativa === 'zerar') return <Zerar db={db} />;
+  if (ativa === 'assinaturas') return <Assinaturas db={db} responsaveis={conhecidos(listas.valor ?? listasPadrao(), 'responsaveis')} />;
   return <Numeracao db={db} tipos={tipos} />;
 }
 
@@ -508,5 +513,87 @@ function ManutencaoListas({ db, listas, erro }: { db: Firestore; listas?: Listas
       </form>
       {aviso && <p className="mensagem aviso" role="status">{aviso}</p>}
     </section>
+  );
+}
+
+function lerImagem(arquivo: File): Promise<string> {
+  return new Promise((ok, falha) => {
+    const leitor = new FileReader();
+    leitor.onload = () => ok(String(leitor.result));
+    leitor.onerror = () => falha(leitor.error ?? new Error('Não foi possível ler a imagem.'));
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+/** Assinaturas (imagens) dos e-mails do portal: a do Ch Seç Op vai em todos; a de quem transmite, conforme quem envia. */
+function Assinaturas({ db, responsaveis }: { db: Firestore; responsaveis: readonly string[] }) {
+  const lista = useAoVivo<Assinatura[]>((ok, erro) => observarAssinaturas(db, ok, erro), [db], 'Não foi possível carregar as assinaturas.');
+  const linhas = [
+    { id: ID_ASSINATURA_CHEFE, nome: 'Ch Seç Op (Cmt da P/3)', ajuda: 'Vai em todos os e-mails, logo abaixo do texto.' },
+    ...responsaveis.map((r) => ({ id: idAssinatura(r), nome: r, ajuda: 'Vai em "Transmitido por" quando for esta pessoa que envia.' })),
+  ];
+  return (
+    <section className="painel admin-assinaturas" aria-label="Assinaturas de e-mail">
+      <h2>Assinaturas de e-mail</h2>
+      <p className="pendente-detalhe">Imagem PNG ou JPG de até 300 KB. A lista de quem transmite vem dos Responsáveis do numerador.</p>
+      {lista.erro && <p className="mensagem erro">{lista.erro}</p>}
+      <ul className="lista-assinaturas">
+        {linhas.map((l) => (
+          <LinhaAssinatura key={l.id} db={db} {...l} atual={lista.valor?.find((a) => a.id === l.id)} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function LinhaAssinatura(p: { db: Firestore; id: string; nome: string; ajuda: string; atual?: Assinatura }) {
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  async function escolher(arquivo: File | undefined) {
+    if (!arquivo) return;
+    const problema = erroDaAssinatura(arquivo);
+    setErro(problema);
+    if (problema) return;
+    setSalvando(true);
+    try {
+      await salvarAssinatura(p.db, p.id, p.nome, await lerImagem(arquivo));
+    } catch (falha) {
+      setErro(motivo(falha));
+    }
+    setSalvando(false);
+  }
+
+  return (
+    <li className="cartao assinatura-item">
+      <strong>{p.nome}</strong>
+      <span className="pendente-detalhe">{p.ajuda}</span>
+      {p.atual ? <img className="assinatura-imagem" src={p.atual.imagem} alt={`Assinatura de ${p.nome}`} /> : <span className="mensagem aviso">Sem assinatura.</span>}
+      <div className="acoes-assinatura">
+        <label className="botao secundario botao-arquivo">
+          {salvando ? 'Salvando…' : p.atual ? 'Trocar imagem' : 'Enviar imagem'}
+          <input
+            type="file"
+            accept="image/png,image/jpeg"
+            hidden
+            disabled={salvando}
+            onChange={(e) => {
+              void escolher(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        {p.atual && (
+          <button className="botao-link" type="button" onClick={() => void apagarAssinatura(p.db, p.id).catch((f) => setErro(motivo(f)))}>
+            Tirar
+          </button>
+        )}
+      </div>
+      {erro && (
+        <p className="mensagem erro" role="alert">
+          {erro}
+        </p>
+      )}
+    </li>
   );
 }

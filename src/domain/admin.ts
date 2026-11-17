@@ -19,13 +19,15 @@ export const COLECOES_ZERAR = [
   'fotosTdsDados',
   'recadosCfp',
   'recadosSala',
+  'emails',
 ] as const;
 
 /**
  * Ficam: banco de efetivo, configurações, a cópia da agenda do CFP (o motor mantém igual à agenda real)
- * e o estado das planilhas dos Documentos Mensais (acompanha as planilhas do Drive, que a zeragem não mexe).
+ * o estado das planilhas dos Documentos Mensais (acompanha as planilhas do Drive, que a zeragem não mexe)
+ * e as assinaturas dos e-mails.
  */
-export const COLECOES_MANTIDAS = ['efetivo', 'config', 'agendaCfp', 'estadoDocsMensais'] as const;
+export const COLECOES_MANTIDAS = ['efetivo', 'config', 'agendaCfp', 'estadoDocsMensais', 'assinaturas'] as const;
 
 export const PALAVRA_CONFIRMACAO = 'ZERAR';
 
