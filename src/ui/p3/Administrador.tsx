@@ -26,8 +26,10 @@ import {
   type ItemLista,
   type Listas,
 } from '../../domain/listasConfig';
-import { apagarAssinatura, observarAssinaturas, salvarAssinatura } from '../../data/emails';
-import { erroDaAssinatura, idAssinatura, ID_ASSINATURA_CHEFE, type Assinatura } from '../../domain/email';
+import { observarAssinaturas, salvarAssinatura } from '../../data/emails';
+import { assinaturaChefe, cargoDoPosto, idAssinatura, validarAssinatura, type Assinatura, type DadosAssinatura } from '../../domain/email';
+import { buscarPolicial } from '../../data/efetivo';
+import { desenharAssinatura } from '../../lib/assinatura';
 import { mensagemErroLogin } from '../../domain/mensagens';
 import {
   ANO_NUMERACAO_POR_TIPO,
@@ -516,84 +518,120 @@ function ManutencaoListas({ db, listas, erro }: { db: Firestore; listas?: Listas
   );
 }
 
-function lerImagem(arquivo: File): Promise<string> {
-  return new Promise((ok, falha) => {
-    const leitor = new FileReader();
-    leitor.onload = () => ok(String(leitor.result));
-    leitor.onerror = () => falha(leitor.error ?? new Error('Não foi possível ler a imagem.'));
-    leitor.readAsDataURL(arquivo);
-  });
-}
-
-/** Assinaturas (imagens) dos e-mails do portal: a do Ch Seç Op vai em todos; a de quem transmite, conforme quem envia. */
+/**
+ * Assinaturas dos e-mails: cada Responsável do numerador com nome completo e posto/graduação.
+ * O portal desenha a assinatura no modelo padrão; a do Capitão (chefe da seção) vai em todos os e-mails.
+ */
 function Assinaturas({ db, responsaveis }: { db: Firestore; responsaveis: readonly string[] }) {
   const lista = useAoVivo<Assinatura[]>((ok, erro) => observarAssinaturas(db, ok, erro), [db], 'Não foi possível carregar as assinaturas.');
-  const linhas = [
-    { id: ID_ASSINATURA_CHEFE, nome: 'Ch Seç Op (Cmt da P/3)', ajuda: 'Vai em todos os e-mails, logo abaixo do texto.' },
-    ...responsaveis.map((r) => ({ id: idAssinatura(r), nome: r, ajuda: 'Vai em "Transmitido por" quando for esta pessoa que envia.' })),
-  ];
+  const chefe = assinaturaChefe(lista.valor ?? []);
   return (
     <section className="painel admin-assinaturas" aria-label="Assinaturas de e-mail">
       <h2>Assinaturas de e-mail</h2>
-      <p className="pendente-detalhe">Imagem PNG ou JPG de até 300 KB. A lista de quem transmite vem dos Responsáveis do numerador.</p>
+      <p className="pendente-detalhe">
+        Preencha cada Responsável do numerador (digite o RE para buscar no banco de efetivo). O cargo sai da graduação: Cap = Chefe Seção
+        Operacional, Sgt = Encarregado Seção Operacional, Cb/Sd = Auxiliar de operações. A do Capitão vai em todos os e-mails.
+      </p>
+      {lista.valor && !chefe && <p className="mensagem aviso">Falta a assinatura do Capitão (chefe da seção): os e-mails só saem com ela.</p>}
       {lista.erro && <p className="mensagem erro">{lista.erro}</p>}
       <ul className="lista-assinaturas">
-        {linhas.map((l) => (
-          <LinhaAssinatura key={l.id} db={db} {...l} atual={lista.valor?.find((a) => a.id === l.id)} />
+        {responsaveis.map((r) => (
+          <LinhaAssinatura key={r} db={db} nome={r} atual={lista.valor?.find((a) => a.id === idAssinatura(r))} />
         ))}
       </ul>
     </section>
   );
 }
 
-function LinhaAssinatura(p: { db: Firestore; id: string; nome: string; ajuda: string; atual?: Assinatura }) {
-  const [erro, setErro] = useState('');
+function LinhaAssinatura({ db, nome, atual }: { db: Firestore; nome: string; atual?: Assinatura }) {
+  const [dados, setDados] = useState<DadosAssinatura>({ nome, re: '', nomeCompleto: '', posto: '' });
+  const [erros, setErros] = useState<Partial<Record<keyof DadosAssinatura, string>>>({});
+  const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [imagem, setImagem] = useState('');
 
-  async function escolher(arquivo: File | undefined) {
-    if (!arquivo) return;
-    const problema = erroDaAssinatura(arquivo);
-    setErro(problema);
-    if (problema) return;
+  // O que está salvo vem para o formulário (e quando outra tela salvar).
+  useEffect(() => {
+    if (atual) setDados({ nome, re: atual.re ?? '', nomeCompleto: atual.nomeCompleto ?? '', posto: atual.posto ?? '' });
+  }, [atual, nome]);
+
+  // Prévia da assinatura conforme digita.
+  useEffect(() => {
+    let vivo = true;
+    if (!dados.nomeCompleto.trim() || !dados.posto.trim()) {
+      setImagem('');
+      return;
+    }
+    const t = setTimeout(() => {
+      void desenharAssinatura(dados)
+        .then((url) => vivo && setImagem(url))
+        .catch(() => vivo && setImagem(''));
+    }, 250);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [dados]);
+
+  const mudar = (k: keyof DadosAssinatura, v: string) => {
+    setDados((d) => ({ ...d, [k]: v }));
+    setMensagem('');
+  };
+
+  async function buscar() {
+    setMensagem('');
+    const p = await buscarPolicial(db, dados.re).catch(() => null);
+    if (!p) {
+      setMensagem('RE não encontrado no banco de efetivo: preencha à mão.');
+      return;
+    }
+    setDados((d) => ({ ...d, nomeCompleto: p.nomeCompleto || d.nomeCompleto, posto: p.posto || d.posto }));
+    if (!p.nomeCompleto) setMensagem('O banco de efetivo não tem o nome completo: preencha à mão.');
+  }
+
+  async function salvar(e: FormEvent) {
+    e.preventDefault();
+    const encontrados = validarAssinatura(dados);
+    setErros(encontrados);
+    if (Object.keys(encontrados).length > 0) return;
     setSalvando(true);
     try {
-      await salvarAssinatura(p.db, p.id, p.nome, await lerImagem(arquivo));
+      await salvarAssinatura(db, idAssinatura(nome), dados);
+      setMensagem('Salvo.');
     } catch (falha) {
-      setErro(motivo(falha));
+      setMensagem(motivo(falha));
     }
     setSalvando(false);
   }
 
+  const cargo = cargoDoPosto(dados.posto);
   return (
     <li className="cartao assinatura-item">
-      <strong>{p.nome}</strong>
-      <span className="pendente-detalhe">{p.ajuda}</span>
-      {p.atual ? <img className="assinatura-imagem" src={p.atual.imagem} alt={`Assinatura de ${p.nome}`} /> : <span className="mensagem aviso">Sem assinatura.</span>}
-      <div className="acoes-assinatura">
-        <label className="botao secundario botao-arquivo">
-          {salvando ? 'Salvando…' : p.atual ? 'Trocar imagem' : 'Enviar imagem'}
-          <input
-            type="file"
-            accept="image/png,image/jpeg"
-            hidden
-            disabled={salvando}
-            onChange={(e) => {
-              void escolher(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-        </label>
-        {p.atual && (
-          <button className="botao-link" type="button" onClick={() => void apagarAssinatura(p.db, p.id).catch((f) => setErro(motivo(f)))}>
-            Tirar
+      <form onSubmit={salvar} noValidate className="form-assinatura">
+        <strong>{nome}</strong>
+        <div className="linha-re">
+          <Campo rotulo="RE">
+            <input type="text" inputMode="numeric" value={dados.re} onChange={(e) => mudar('re', e.target.value)} />
+          </Campo>
+          <button className="botao secundario" type="button" onClick={() => void buscar()} disabled={dados.re.trim().length < 5}>
+            Buscar
           </button>
-        )}
-      </div>
-      {erro && (
-        <p className="mensagem erro" role="alert">
-          {erro}
-        </p>
-      )}
+        </div>
+        <Campo rotulo="Nome completo" obrigatorio erro={erros.nomeCompleto}>
+          <input type="text" value={dados.nomeCompleto} onChange={(e) => mudar('nomeCompleto', e.target.value)} />
+        </Campo>
+        <Campo rotulo="Posto/graduação" obrigatorio erro={erros.posto}>
+          <input type="text" value={dados.posto} placeholder="ex.: SD PM - 1C" onChange={(e) => mudar('posto', e.target.value)} />
+        </Campo>
+        <span className="pendente-detalhe">Cargo: {cargo || '— (só o posto aparece)'}</span>
+        {imagem && <img className="assinatura-imagem" src={imagem} alt={`Assinatura de ${nome}`} />}
+        <div className="acoes-assinatura">
+          <button className="botao" type="submit" disabled={salvando}>
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+          {mensagem && <span className={mensagem === 'Salvo.' ? 'mensagem aviso' : 'mensagem erro'}>{mensagem}</span>}
+        </div>
+      </form>
     </li>
   );
 }

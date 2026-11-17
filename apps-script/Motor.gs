@@ -1311,7 +1311,7 @@ function criarPlanilhaIcc_(numero) {
 }
 
 // ---------- Atalho de e-mail do portal (fila emails/{id}) -> envio pelo Gmail da P/3 ----------
-// O portal já grava o HTML pronto (com o nº do Numerador). Aqui entram as assinaturas como imagens no corpo
+// O portal já grava o HTML pronto (com o nº do Numerador) e as assinaturas desenhadas. Aqui elas entram como imagens no corpo
 // (cid:assinaturaChefe e cid:assinaturaTransmissor) e os anexos. Marca "enviando" antes de mandar:
 // se o Apps Script cair no meio, o e-mail não sai duas vezes.
 
@@ -1344,18 +1344,16 @@ function processarEmails_() {
 
 /** Envia e devolve os ids dos PDFs anexados (para apagar do banco depois). */
 function enviarEmailPortal_(d) {
-  var chefe = obterDoc_('assinaturas/chefe');
-  var transmissor = obterDoc_('assinaturas/' + d.transmissor);
-  if (!chefe) throw new Error('Falta a assinatura do Ch Seç Op (Administrador -> Assinaturas de e-mail).');
-  if (!transmissor) throw new Error('Falta a assinatura de quem transmitiu (Administrador -> Assinaturas de e-mail).');
+  var imagens = d.imagens || {};
+  if (!imagens.chefe || !imagens.transmissor) throw new Error('O e-mail veio sem as assinaturas. Monte de novo pelo portal.');
   var anexos = (d.anexos || []).map(anexoEmail_);
   GmailApp.sendEmail((d.para || []).join(','), d.assunto, htmlParaTexto_(d.html), {
     htmlBody: d.html,
     cc: (d.cc || []).join(','),
     name: 'P/3 - 8º BPM/M',
     inlineImages: {
-      assinaturaChefe: imagemDeDataUrl_(chefe.imagem, 'assinatura-chefe'),
-      assinaturaTransmissor: imagemDeDataUrl_(transmissor.imagem, 'assinatura-transmissor')
+      assinaturaChefe: imagemDeDataUrl_(imagens.chefe, 'assinatura-chefe'),
+      assinaturaTransmissor: imagemDeDataUrl_(imagens.transmissor, 'assinatura-transmissor')
     },
     attachments: anexos
   });

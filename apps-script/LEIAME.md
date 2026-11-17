@@ -141,8 +141,10 @@ implantação e `npm run deploy:regras`.
 
 ## Atalho de e-mail (Aperfeiçoamento → EAP e próximos)
 
-- No portal, **Administrador → Assinaturas de e-mail**: envie a imagem da assinatura do Ch Seç Op (vai em todos)
-  e de cada Responsável do numerador (vai em "Transmitido por").
+- No portal, **Administrador → Assinaturas de e-mail**: para cada Responsável do numerador, RE (busca no banco de
+  efetivo), nome completo e posto/graduação. O portal desenha a assinatura no modelo padrão (cargo pela graduação:
+  Cap = Chefe Seção Operacional, Sgt = Encarregado, Cb/Sd = Auxiliar de operações). A do Capitão vai em todos os
+  e-mails; a de quem envia, em "Transmitido por".
 - Na tela do EAP, **✉️ Montar e-mail** → confere a prévia → **Enviar e-mail**. O portal lança a MSG ELETRÔNICA no
   Numerador (dá o nº), e o motor envia pelo Gmail da P/3 em até 5 minutos, com as assinaturas no corpo e os anexos
   (planilha do EAP em Excel e/ou PDF). Enviado: a demanda fica finalizada e o PDF sai do banco.

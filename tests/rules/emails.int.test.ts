@@ -52,6 +52,7 @@ async function enviar() {
       responsavel: 'Sd Priscila',
     },
     anexos: [{ tipo: 'planilha', id: 'planilha1', nome: 'EAP 2026' }],
+    imagens: { chefe: 'data:image/png;base64,AAAA', transmissor: 'data:image/png;base64,BBBB' },
   });
 }
 
@@ -71,6 +72,7 @@ describe('Atalho de e-mail', () => {
       transmissor: 'sd-priscila',
       assunto: 'MENSAGEM ELETRÔNICA Nº 8BPMM-2101/03/26 - EAP - EAD novembro com Presencial em dezembro',
       anexos: [{ tipo: 'planilha', id: 'planilha1', nome: 'EAP 2026' }],
+      imagens: { chefe: 'data:image/png;base64,AAAA', transmissor: 'data:image/png;base64,BBBB' },
     });
     expect(fila[0].html).toContain('MENSAGEM ELETRÔNICA Nº 8BPMM-2101/03/26');
     expect(fila[0].html).toContain('cid:assinaturaChefe');
@@ -90,11 +92,12 @@ describe('Atalho de e-mail', () => {
   });
 
   test('assinaturas: o Administrador grava; a P/3 só lê; a Cia nem lê', async () => {
-    await assertSucceeds(salvarAssinatura(admin, 'chefe', 'Ch Seç Op', 'data:image/png;base64,AAAA'));
-    expect((await getDoc(doc(p3, 'assinaturas', 'chefe'))).data()).toMatchObject({ nome: 'Ch Seç Op' });
-    await assertFails(salvarAssinatura(p3, 'sd-priscila', 'Sd Priscila', 'data:image/png;base64,AAAA'));
+    const filipi = { nome: 'Cap Filipi', re: '123456', nomeCompleto: 'Filipi da Silva Cassavara', posto: 'Cap PM' };
+    await assertSucceeds(salvarAssinatura(admin, 'cap-filipi', filipi));
+    expect((await getDoc(doc(p3, 'assinaturas', 'cap-filipi'))).data()).toMatchObject(filipi);
+    await assertFails(salvarAssinatura(p3, 'sd-priscila', { nome: 'Sd Priscila', re: '', nomeCompleto: 'Priscila Santos', posto: 'SD PM - 1C' }));
     const cia = como('conta-1cia', { perfil: 'unidade', unidade: '1cia' });
-    await assertFails(getDoc(doc(cia, 'assinaturas', 'chefe')));
+    await assertFails(getDoc(doc(cia, 'assinaturas', 'cap-filipi')));
     await assertFails(getDocs(collection(cia, 'emails')));
   });
 });

@@ -3,8 +3,8 @@ import { assinaturaDe, enviarEmailAtalho, observarAssinaturas, observarEmails, r
 import { hojeISO } from '../../domain/datas';
 import type { DadosDemanda } from '../../domain/demanda';
 import {
+  assinaturaChefe,
   EMAIL_FUNCIONAL,
-  ID_ASSINATURA_CHEFE,
   montarHtmlEmail,
   validarEmail,
   type AnexoEmail,
@@ -16,6 +16,7 @@ import {
 } from '../../domain/email';
 import { erroDoPdf } from '../../domain/pendente';
 import { db } from '../../lib/firebase';
+import { desenharAssinatura } from '../../lib/assinatura';
 import { cutucarMotor } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { useListas } from '../../lib/useListas';
@@ -94,21 +95,32 @@ function FormAtalho(
     void ultimosEnderecos(db, p.atalho).then((u) => u && setDados((d) => ({ ...d, para: d.para || u.para, cc: u.cc })));
   }, [p.atalho]);
 
-  const chefe = p.assinaturas.find((a) => a.id === ID_ASSINATURA_CHEFE);
+  const chefe = assinaturaChefe(p.assinaturas);
   const transmissor = dados.transmissor ? assinaturaDe(p.assinaturas, dados.transmissor) : undefined;
   const faltaAssinatura = !chefe
-    ? 'Falta a assinatura do Ch Seç Op (Administrador → Assinaturas de e-mail).'
-    : dados.transmissor && !transmissor
+    ? 'Falta a assinatura do Capitão, chefe da seção (Administrador → Assinaturas de e-mail).'
+    : dados.transmissor && !transmissor?.nomeCompleto
       ? `Falta a assinatura de ${dados.transmissor} (Administrador → Assinaturas de e-mail).`
       : '';
+
+  // As assinaturas são desenhadas no modelo padrão, com os dados de cada um.
+  const [imagens, setImagens] = useState({ chefe: '', transmissor: '' });
+  useEffect(() => {
+    let vivo = true;
+    const desenhar = (a?: { nomeCompleto: string; posto: string }) => (a?.nomeCompleto ? desenharAssinatura(a).catch(() => '') : Promise.resolve(''));
+    void Promise.all([desenhar(chefe), desenhar(transmissor)]).then(([c, t]) => vivo && setImagens({ chefe: c, transmissor: t }));
+    return () => {
+      vivo = false;
+    };
+  }, [chefe, transmissor]);
 
   const previa = useMemo(
     () =>
       montarHtmlEmail(
         { data: hoje, numeroMensagem: `8BPMM-____/03/${hoje.slice(2, 4)}`, ao: dados.ao, assunto: dados.assunto, corpo: dados.corpo },
-        { chefe: chefe?.imagem ?? '', transmissor: transmissor?.imagem ?? '' },
+        imagens,
       ),
-    [hoje, dados.ao, dados.assunto, dados.corpo, chefe, transmissor],
+    [hoje, dados.ao, dados.assunto, dados.corpo, imagens],
   );
 
   const mudar = <K extends keyof DadosEmail>(k: K, v: DadosEmail[K]) => {
@@ -122,8 +134,9 @@ function FormAtalho(
     const problemaPdf = erroDoPdf(pdf);
     setErros(encontrados);
     setErroPdf(problemaPdf);
-    setErroGeral(faltaAssinatura);
-    if (Object.keys(encontrados).length > 0 || problemaPdf || faltaAssinatura) return;
+    const semImagem = !faltaAssinatura && (!imagens.chefe || !imagens.transmissor) ? 'Aguarde: desenhando as assinaturas…' : '';
+    setErroGeral(faltaAssinatura || semImagem);
+    if (Object.keys(encontrados).length > 0 || problemaPdf || faltaAssinatura || semImagem) return;
     setConfirmar(true);
   }
 
@@ -138,6 +151,7 @@ function FormAtalho(
         email: dados,
         demanda: p.demanda(dados.assunto.trim(), dados.transmissor, hoje),
         anexos,
+        imagens,
         pdf,
       });
       cutucarMotor();
