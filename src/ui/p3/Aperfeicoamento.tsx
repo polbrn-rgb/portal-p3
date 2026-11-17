@@ -1,5 +1,15 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { criarEap, editarEap, encerrarEap, observarEaps, observarRespostasDaEap, pedirCompiladoEap } from '../../data/eap';
+import {
+  criarEap,
+  editarEap,
+  encerrarEap,
+  excluirEap,
+  observarEaps,
+  observarRespostasDaEap,
+  pedirCompiladoEap,
+  pedirPlanilhaEapDeNovo,
+} from '../../data/eap';
+import { cutucarMotor } from '../../lib/motor';
 import { formatarData, hojeISO } from '../../domain/datas';
 import {
   planilhaAtrasada,
@@ -289,15 +299,20 @@ function DetalheEap({ eap }: { eap: Eap }) {
           <a className="botao secundario" href={eap.planilha.url} target="_blank" rel="noreferrer">
             📄 Abrir planilha
           </a>
-        ) : eap.planilha?.status === 'erro' ? (
-          <p className="mensagem erro">Erro ao criar a planilha: {eap.planilha.erro}</p>
-        ) : planilhaAtrasada(eap, new Date()) ? (
-          <p className="mensagem erro">
-            A planilha está demorando mais que o normal. No Apps Script, rode a função <strong>diagnostico</strong> e confira a linha
-            “Arquivos do script”. Assim que o motor voltar, a planilha é criada sozinha.
-          </p>
         ) : (
-          <p className="mensagem aviso">Criando a cópia da planilha na pasta do Drive (até 5 minutos)…</p>
+          <>
+            {eap.planilha?.status === 'erro' ? (
+              <p className="mensagem erro">Erro ao criar a planilha: {eap.planilha.erro}</p>
+            ) : planilhaAtrasada(eap, new Date()) ? (
+              <p className="mensagem erro">
+                A planilha está demorando mais que o normal. Toque em Tentar de novo; se continuar, no Apps Script rode a função{' '}
+                <strong>diagnostico</strong> e confira a linha “Arquivos do script”.
+              </p>
+            ) : (
+              <p className="mensagem aviso">Criando a cópia da planilha na pasta do Drive (até 5 minutos)…</p>
+            )}
+            <BotaoTentarPlanilha id={eap.id} />
+          </>
         )}
       </div>
 
@@ -365,6 +380,7 @@ function DetalheEap({ eap }: { eap: Eap }) {
           )}
         </div>
       )}
+      <ExcluirEap id={eap.id} titulo={tituloEap(eap)} />
       {eap.compilado?.status === 'pronto' && (
         <p className="mensagem aviso" role="status">
           Compilado gerado na aba COMPILADO TURMAS ({eap.compilado.registros} policiais).
@@ -388,5 +404,75 @@ function DetalheEap({ eap }: { eap: Eap }) {
         })}
       />
     </section>
+  );
+}
+
+/** Planilha travada/com erro: pede de novo e acorda o motor na hora. */
+function BotaoTentarPlanilha({ id }: { id: string }) {
+  const [ocupado, setOcupado] = useState(false);
+  const [aviso, setAviso] = useState('');
+  async function tentar() {
+    setOcupado(true);
+    setAviso('');
+    try {
+      await pedirPlanilhaEapDeNovo(db, id);
+      cutucarMotor();
+      setAviso('Pedido de novo. Se o motor estiver funcionando, a planilha aparece em instantes.');
+    } catch {
+      setAviso('Não foi possível pedir de novo. Confira a internet.');
+    }
+    setOcupado(false);
+  }
+  return (
+    <div className="acoes-linha">
+      <button className="botao secundario" type="button" onClick={() => void tentar()} disabled={ocupado}>
+        {ocupado ? 'Pedindo…' : '🔄 Tentar de novo'}
+      </button>
+      {aviso && <span className="pendente-detalhe">{aviso}</span>}
+    </div>
+  );
+}
+
+/** Excluir o EAP (sempre com confirmação): some do portal para a P/3 e as Cias; a planilha do Drive fica. */
+function ExcluirEap({ id, titulo }: { id: string; titulo: string }) {
+  const [confirmar, setConfirmar] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState('');
+  async function excluir() {
+    setOcupado(true);
+    setErro('');
+    try {
+      await excluirEap(db, id);
+      window.location.hash = '#/aperfeicoamento';
+    } catch {
+      setErro('Não foi possível excluir. Confira a internet e tente de novo.');
+      setOcupado(false);
+    }
+  }
+  return (
+    <div className="acoes-linha excluir-eap">
+      {confirmar ? (
+        <>
+          <span className="pendente-detalhe">
+            Excluir <strong>{titulo}</strong>? Some do portal (P/3 e Cias), com o que as Cias enviaram. A planilha no Drive não é apagada.
+          </span>
+          <button className="botao perigo" type="button" onClick={() => void excluir()} disabled={ocupado}>
+            {ocupado ? 'Excluindo…' : 'Sim, excluir'}
+          </button>
+          <button className="botao secundario" type="button" onClick={() => setConfirmar(false)} disabled={ocupado}>
+            Cancelar
+          </button>
+        </>
+      ) : (
+        <button className="botao-link perigo-link" type="button" onClick={() => setConfirmar(true)}>
+          🗑️ Excluir EAP
+        </button>
+      )}
+      {erro && (
+        <p className="mensagem erro" role="alert">
+          {erro}
+        </p>
+      )}
+    </div>
   );
 }

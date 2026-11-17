@@ -2543,3 +2543,12 @@ fieldset:has(> .erro-campo) > legend {
 .linha-re .botao {
   padding: 0 16px;
 }
+
+/* Ação destrutiva discreta (ex.: Excluir EAP); a confirmação usa o botão vermelho. */
+.perigo-link {
+  color: #c62828;
+}
+
+.excluir-eap {
+  margin-top: 8px;
+}

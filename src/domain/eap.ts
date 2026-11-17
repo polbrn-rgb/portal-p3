@@ -41,14 +41,14 @@ export type DadosEap = {
 export type Eap = DadosEap & {
   id: string;
   status: 'aberta' | 'encerrada';
-  planilha?: { status: 'pedida' | 'pronta' | 'erro'; id?: string; url?: string; erro?: string };
+  planilha?: { status: 'pedida' | 'pronta' | 'erro'; id?: string; url?: string; erro?: string; pedidaEm?: { toDate: () => Date } | null };
   compilado?: { status: 'pedido' | 'pronto' | 'erro'; registros?: number; erro?: string };
   criadoEm?: { toDate: () => Date } | null;
 };
 
-/** A cópia da planilha sai em até 5 minutos; passou de 15, o motor provavelmente está com problema. */
+/** A cópia da planilha sai em até 5 minutos; passou de 15 (desde o último pedido), o motor provavelmente está com problema. */
 export function planilhaAtrasada(e: Pick<Eap, 'planilha' | 'criadoEm'>, agora: Date): boolean {
-  const criado = e.criadoEm?.toDate?.();
+  const criado = (e.planilha?.pedidaEm ?? e.criadoEm)?.toDate?.();
   return e.planilha?.status === 'pedida' && Boolean(criado) && agora.getTime() - criado!.getTime() > 15 * 60 * 1000;
 }
 
