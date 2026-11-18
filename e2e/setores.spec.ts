@@ -159,7 +159,7 @@ test('tela da Cia: respondida com prazo vencido há um dia sai; atrasada sem res
       .set({ ...base, numero, demandaId: String(numero), saida: c.saida, status: c.status, prazoCia: c.prazoCia, atualizadoEm: FieldValue.serverTimestamp() });
   }
   await entrar(page, '6cia', SENHA_TESTE);
-  await expect(page.getByText(`Atrasada sem resposta ${marca}`)).toBeVisible();
+  await expect(page.getByText(`Atrasada sem resposta ${marca}`)).toBeVisible({ timeout: 15000 }); // 1ª carga depois do login
   await irParaAbaCia(page, 'Respondidas');
   await expect(page.getByText(`Respondida no prazo ${marca}`)).toBeVisible();
   await irParaAbaCia(page, 'Finalizadas');

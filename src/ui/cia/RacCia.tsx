@@ -171,14 +171,16 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
     setOcupado(true);
     try {
       const envio = salvarRac(db, d, status, nome);
-      envio.catch(() => undefined);
-      await Promise.race([envio, new Promise((ok) => setTimeout(ok, 3000))]);
+      const pronto = status === 'enviado' ? 'RAC enviado para a P/3.' : 'Rascunho salvo.';
+      envio.then(() => setAviso(pronto)).catch(() => undefined);
+      // O banco confirma em instantes; sem conexão, fica gravado no aparelho e termina sozinho depois.
+      const confirmou = await Promise.race([envio.then(() => true), new Promise<boolean>((ok) => setTimeout(() => ok(false), 3000))]);
       try {
         if (nome.trim()) localStorage.setItem(CHAVE_NOME, nome.trim());
       } catch {
         /* sem armazenamento: segue */
       }
-      setAviso(status === 'enviado' ? 'RAC enviado para a P/3.' : 'Rascunho salvo.');
+      setAviso(confirmou ? pronto : 'Gravado no aparelho. O envio termina sozinho quando a conexão voltar (não saia do portal).');
     } catch {
       setErro('Não foi possível gravar. Verifique a conexão e tente de novo.');
     }

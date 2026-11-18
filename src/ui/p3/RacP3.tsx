@@ -38,16 +38,19 @@ function AbrirRac({ jaAbertos }: { jaAbertos: string[] }) {
   const [prazo, setPrazo] = useState('');
   const [erros, setErros] = useState<Partial<Record<'mes' | 'prazo', string>>>({});
   const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
 
   async function abrir() {
     const e = validarAberturaRac(mes, prazo, jaAbertos);
     setErros(e);
     setErro('');
+    setAviso('');
     if (Object.keys(e).length) return;
     setOcupado(true);
     try {
-      await abrirRac(db, mes, prazo, jaAbertos);
+      await abrirRac(db, mes, prazo, jaAbertos); // resolve quando o banco confirma
+      setAviso(`RAC de ${rotuloMesLongo(mes)} aberto para as Cias.`);
       setPrazo('');
     } catch {
       setErro('Não foi possível abrir o RAC. Tente de novo.');
@@ -69,6 +72,11 @@ function AbrirRac({ jaAbertos }: { jaAbertos: string[] }) {
       {erro && (
         <p className="mensagem erro" role="alert">
           {erro}
+        </p>
+      )}
+      {aviso && (
+        <p className="mensagem aviso" role="status">
+          {aviso}
         </p>
       )}
       <div className="acoes-linha">

@@ -31,6 +31,7 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   await expect(abrir.getByText('Informe o prazo das Cias.')).toBeVisible();
   await abrir.getByLabel('Prazo das Cias').fill(`${ano}-06-10`);
   await abrir.getByRole('button', { name: 'Abrir RAC' }).click();
+  await expect(abrir.getByText(`RAC de MAIO/${ano} aberto para as Cias.`)).toBeVisible({ timeout: 15000 }); // banco confirmou
   await expect(page.getByRole('article', { name: titulo })).toBeVisible({ timeout: 15000 });
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await sair(page);
@@ -72,6 +73,7 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   for (const [i, rotulo] of PRINTS.entries())
     await page.getByLabel(new RegExp(`^${rotulo}`)).setInputFiles({ name: `print${i}.png`, mimeType: 'image/png', buffer: PNG });
   for (const rotulo of PRINTS) await expect(page.getByRole('img', { name: `Print enviado: ${rotulo}` })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Enviado.', { exact: true })).toHaveCount(PRINTS.length, { timeout: 15000 }); // banco confirmou os 7
 
   await page.getByRole('button', { name: 'Enviar à P/3' }).click();
   await expect(page.getByText('RAC enviado para a P/3.')).toBeVisible({ timeout: 15000 });
