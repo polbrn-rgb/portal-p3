@@ -1,0 +1,67 @@
+# Publica o motor (Apps Script) sozinho a cada merge na main que mexer em apps-script/:
+# envia Motor.gs, Logica.gs e appsscript.json para o projeto e atualiza a implantação do app da Web
+# (a mesma URL que o portal usa). Substitui o copiar-e-colar no editor.
+#
+# Precisa de dois segredos no GitHub (Settings → Secrets and variables → Actions):
+#   CLASPRC_JSON  conteúdo do arquivo .clasprc.json criado pelo "clasp login" com a conta 8bpmmp3@gmail.com
+#   SCRIPT_ID     ID do script (Apps Script → Configurações do projeto → ID do script)
+# Sem os segredos, o passo de publicar é pulado (não quebra nada).
+name: publicar Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/**']
+  workflow_dispatch:
+
+concurrency:
+  group: apps-script
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+      # ID da implantação do app da Web (é o mesmo que aparece na URL usada pelo portal, src/lib/motor.ts).
+      DEPLOYMENT_ID: AKfycbwDzHy0XviM9Lg0Jh0SK3qsNmUW9-paBHxgSL7AYcGpfIp5jHF5VW76Gl7_KHZ5CKj3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Segredos configurados?
+        id: segredos
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then
+            echo "::warning::Faltam os segredos CLASPRC_JSON e/ou SCRIPT_ID: o Apps Script NÃO foi publicado (veja apps-script/LEIAME.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.segredos.outputs.ok == 'true'
+        with:
+          node-version: 20
+
+      - name: Conferir sintaxe e versões (Motor.gs e Logica.gs iguais)
+        if: steps.segredos.outputs.ok == 'true'
+        run: |
+          node -e "for (const f of ['Motor','Logica']) new Function(require('fs').readFileSync('apps-script/'+f+'.gs','utf8'))"
+          m=$(grep -oP "var VERSAO_MOTOR = '\K[^']+" apps-script/Motor.gs)
+          l=$(grep -oP "var VERSAO_LOGICA = '\K[^']+" apps-script/Logica.gs)
+          [ "$m" = "$l" ] || { echo "::error::Versões diferentes: Motor $m, Logica $l"; exit 1; }
+          echo "VERSAO=$m" >> "$GITHUB_ENV"
+
+      - name: Enviar o código para o projeto do Apps Script
+        if: steps.segredos.outputs.ok == 'true'
+        working-directory: apps-script
+        run: |
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > .clasp.json
+          npx --yes @google/clasp@2.4.2 push --force
+
+      - name: Atualizar a implantação do app da Web (mesma URL)
+        if: steps.segredos.outputs.ok == 'true'
+        working-directory: apps-script
+        run: npx --yes @google/clasp@2.4.2 deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7} · versão $VERSAO"
