@@ -1,5 +1,5 @@
-import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Firestore, type WriteBatch } from 'firebase/firestore';
-import { idRac, normalizarRac, UNIDADES_RAC, validarAberturaRac, type RacDados, type RacMes, type RacSalvo } from '../domain/rac';
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Firestore, type WriteBatch } from 'firebase/firestore';
+import { idRac, normalizarRac, UNIDADES_RAC, validarAberturaRac, type LinhaRpm, type RacDados, type RacMes, type RacSalvo, type RpmId, type UnidadeRac } from '../domain/rac';
 import { IDS_SLOTS } from '../domain/racPrints';
 import type { UnidadeId } from '../domain/unidades';
 
@@ -10,7 +10,7 @@ function paraMes(id: string, x: Partial<RacMes>): RacMes {
 }
 
 function paraRac(id: string, x: Record<string, unknown>): RacSalvo {
-  const unidade = x.unidadeId as UnidadeId;
+  const unidade = x.unidadeId as UnidadeRac;
   const mes = String(x.mes ?? '');
   return {
     ...normalizarRac(unidade, mes, x),
@@ -73,7 +73,7 @@ export async function salvarRac(db: Firestore, d: RacDados, status: 'rascunho' |
   });
 }
 
-function apagarDaUnidade(lote: WriteBatch, db: Firestore, mes: string, u: UnidadeId): void {
+function apagarDaUnidade(lote: WriteBatch, db: Firestore, mes: string, u: UnidadeRac): void {
   const id = idRac(mes, u);
   lote.delete(doc(db, 'racs', id));
   for (const slot of IDS_SLOTS) {
@@ -89,10 +89,21 @@ export async function excluirRacDaUnidade(db: Firestore, mes: string, u: Unidade
   await lote.commit();
 }
 
-/** P/3: apaga do banco o RAC do mês inteiro (abertura, RAC de todas as unidades e prints). */
+/** P/3: apaga do banco o RAC do mês inteiro (abertura, RAC de todas as unidades, do Batalhão e prints). */
 export async function excluirRacDoMes(db: Firestore, mes: string): Promise<void> {
   const lote = writeBatch(db);
-  for (const u of UNIDADES_RAC) apagarDaUnidade(lote, db, mes, u);
+  for (const u of [...UNIDADES_RAC, 'btl' as const]) apagarDaUnidade(lote, db, mes, u);
   lote.delete(doc(db, 'racMeses', mes));
   await lote.commit();
+}
+
+/** P/3: grava a Produtividade RPM do RAC do Batalhão (o resto do Batalhão é a soma das Cias). */
+export async function salvarRpm(db: Firestore, mes: string, rpm: Record<RpmId, LinhaRpm>, preenchidoPor: string): Promise<void> {
+  await setDoc(doc(db, 'racs', idRac(mes, 'btl')), { mes, unidadeId: 'btl', rpm, status: 'rascunho', preenchidoPor: preenchidoPor.trim(), salvoEm: serverTimestamp() });
+}
+
+/** RAC do Batalhão de um mês (para a Produtividade RPM do mês anterior). */
+export async function lerRacBtl(db: Firestore, mes: string): Promise<RacSalvo | null> {
+  const s = await getDoc(doc(db, 'racs', idRac(mes, 'btl')));
+  return s.exists() ? paraRac(s.id, s.data()) : null;
 }

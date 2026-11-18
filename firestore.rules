@@ -266,11 +266,21 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/racMeses/$(r.mes)).data.status == 'aberto';
     }
 
+    // RAC do Batalhão (id = mes_btl): só a Produtividade RPM, gravada pela P/3 (o resto é a soma das Cias).
+    function racBtlValido(id) {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['mes', 'unidadeId', 'rpm', 'status', 'preenchidoPor', 'salvoEm'])
+        && r.unidadeId == 'btl' && id == r.mes + '_btl' && r.rpm is map && r.preenchidoPor is string
+        && r.salvoEm == request.time
+        && exists(/databases/$(database)/documents/racMeses/$(r.mes));
+    }
+
     match /racs/{id} {
       allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
-      allow create: if ehDaMinhaUnidade(request.resource.data) && racValido(id);
-      allow update: if ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && racValido(id)
-        && !(resource.data.status == 'enviado' && request.resource.data.status == 'rascunho');
+      allow create: if (ehDaMinhaUnidade(request.resource.data) && racValido(id)) || (ehP3() && racBtlValido(id));
+      allow update: if (ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && racValido(id)
+        && !(resource.data.status == 'enviado' && request.resource.data.status == 'rascunho'))
+        || (ehP3() && resource.data.unidadeId == 'btl' && racBtlValido(id));
       allow delete: if ehP3();
     }
 
@@ -283,11 +293,21 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/racMeses/$(r.mes)).data.status == 'aberto';
     }
 
+    // Prints do Batalhão (só os 4 painéis): a P/3 grava, com o mês existindo (aberto ou encerrado).
+    function printBtlValido(id, campos) {
+      let r = request.resource.data;
+      return ehP3() && r.unidadeId == 'btl' && r.keys().hasOnly(campos)
+        && r.slot in ['rvPainel', 'fvPainel', 'roPainel', 'foPainel']
+        && id == r.mes + '_btl_' + r.slot
+        && exists(/databases/$(database)/documents/racMeses/$(r.mes));
+    }
+
     match /racPrints/{id} {
       allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
-      allow create, update: if ehDaMinhaUnidade(request.resource.data)
+      allow create, update: if ((ehDaMinhaUnidade(request.resource.data)
         && (resource == null || ehDaMinhaUnidade(resource.data))
-        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm'])
+        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm']))
+        || printBtlValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm']))
         && request.resource.data.miniatura is string && request.resource.data.miniatura.size() <= 60000
         && request.resource.data.enviadoEm == request.time;
       allow delete: if ehP3();
@@ -295,9 +315,10 @@ service cloud.firestore {
 
     match /racPrintsDados/{id} {
       allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
-      allow create, update: if ehDaMinhaUnidade(request.resource.data)
+      allow create, update: if ((ehDaMinhaUnidade(request.resource.data)
         && (resource == null || ehDaMinhaUnidade(resource.data))
-        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'dados'])
+        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'dados']))
+        || printBtlValido(id, ['mes', 'unidadeId', 'slot', 'dados']))
         && request.resource.data.dados is string && request.resource.data.dados.size() <= 900000;
       allow delete: if ehP3();
     }

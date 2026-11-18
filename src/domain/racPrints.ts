@@ -1,4 +1,3 @@
-import type { UnidadeId } from './unidades';
 import { DELITOS, idRac, mesesDoRac, rotuloCurto, temCrimes, type Alerta, type DelitoId, type LinhaCrime, type RacDados, type UnidadeRac } from './rac';
 
 // RAC → prints do painel da Coordenadoria Operacional (Fase 3).
@@ -18,8 +17,12 @@ export const SLOTS_PRINT = [
 export type SlotPrint = (typeof SLOTS_PRINT)[number]['id'];
 export const IDS_SLOTS: readonly string[] = SLOTS_PRINT.map((s) => s.id);
 
-export const slotsDaUnidade = (u: UnidadeRac) => (temCrimes(u) && u !== 'btl' ? SLOTS_PRINT : []);
-export const idPrint = (mes: string, u: UnidadeId, slot: SlotPrint) => `${idRac(mes, u)}_${slot}`;
+/** Cia: os 7 prints. Batalhão: só os 4 painéis (como no RAC BTL). Força Tática: nenhum. */
+export function slotsDaUnidade(u: UnidadeRac): readonly (typeof SLOTS_PRINT)[number][] {
+  if (!temCrimes(u)) return [];
+  return u === 'btl' ? SLOTS_PRINT.filter((s) => s.tipo === 'painel') : SLOTS_PRINT;
+}
+export const idPrint = (mes: string, u: UnidadeRac, slot: SlotPrint) => `${idRac(mes, u)}_${slot}`;
 
 // ---------- leitura ----------
 
@@ -257,7 +260,8 @@ export function conferirPrints(d: RacDados, prints: readonly PrintSalvo[]): Aler
       const lido = l.valores[c];
       const digitado = d.crimes[s.delito][c];
       if (!lido || digitado === null || digitado === lido.valor) continue;
-      diferentes.push(`${rotuloDelito(s.delito)} ${mesDaColuna(d.mes, c)}: digitado ${digitado}, no print ${lido.valor}${lido.confira ? ' (leitura incerta)' : ''}`);
+      const nosso = d.unidade === 'btl' ? 'soma das Cias' : 'digitado';
+      diferentes.push(`${rotuloDelito(s.delito)} ${mesDaColuna(d.mes, c)}: ${nosso} ${digitado}, no print ${lido.valor}${lido.confira ? ' (leitura incerta)' : ''}`);
       if (!campoDif) campoDif = `crimes.${s.delito}.${c}`;
     }
   }

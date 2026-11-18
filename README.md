@@ -126,6 +126,11 @@ histórico das demandas.
   (`public/rac/modelo-rac.pptx`, o "Modelo RAC - MES26"): título, tabelas com as cores de Var %, prints encaixados sem
   deformar ("Print não enviado" quando falta). A FT sai com capa e os 4 slides de produtividade. **Excluir**: a P/3
   exclui o RAC de uma unidade (🗑️ na linha) ou do mês inteiro, com confirmação; números e prints saem do banco.
+- **RAC — Batalhão e RAC GERAL** (Operações → RAC, em cada mês): o Batalhão é a **soma** dos RAC enviados (crimes das 6
+  Cias; produtividade das Cias + FT) — no formato do RAC BTL oficial (sem inconsistências, 4 painéis, Produtividade RPM).
+  A P/3 envia os 4 painéis do Batalhão (a leitura confere com a soma das Cias) e digita a **Produtividade RPM** (mês
+  anterior vem do RAC do Batalhão anterior; TOTAL GERAL em branco = TOTAL anterior + mês). **⬇️ Compilar RAC GERAL**
+  gera um .pptx só: 1ª a 6ª Cia, FT (as que enviaram) e o Batalhão; avisa quem ainda não enviou.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de

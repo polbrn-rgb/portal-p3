@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
-import { corVariacao, nomeUnidadeRac, rotuloMesLongo, tabelasDoRac, textoVariacao, type RacDados, type Tabela } from '../domain/rac';
+import { corVariacao, nomeUnidadeRac, rotuloMesLongo, tabelasDoRac, textoVariacao, type LinhaRpm, type RacDados, type RpmId, type Tabela } from '../domain/rac';
 import { planoDeSlides, TITULO_DO_SLIDE } from '../domain/racPptx';
 import { idPrint, type SlotPrint } from '../domain/racPrints';
-import type { UnidadeId } from '../domain/unidades';
 import { lerImagemPrint } from '../data/racPrints';
 import { db } from '../lib/firebase';
 
 /** Pré-visualização na tela, slide a slide, na mesma ordem e com o mesmo conteúdo do .pptx. */
-export function PreviaRac({ d }: { d: RacDados }) {
-  const tabelas = tabelasDoRac(d);
+export function PreviaRac({ d, rpmAnterior }: { d: RacDados; rpmAnterior?: Record<RpmId, LinhaRpm> }) {
+  const tabelas = tabelasDoRac(d, rpmAnterior);
   const [imagens, setImagens] = useState<Partial<Record<SlotPrint, string>>>({});
   const plano = planoDeSlides(d);
 
   useEffect(() => {
     let vivo = true;
-    if (d.unidade === 'btl') return;
-    const u = d.unidade as UnidadeId;
+    const u = d.unidade;
     for (const p of plano)
       if (p.print) {
         const slot = p.print;

@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { abrirRac, alterarRac, excluirRacDaUnidade, excluirRacDoMes, salvarRac } from '../../src/data/rac';
+import { abrirRac, alterarRac, excluirRacDaUnidade, excluirRacDoMes, lerRacBtl, salvarRac, salvarRpm } from '../../src/data/rac';
 import { lerImagemPrint, salvarPrintRac } from '../../src/data/racPrints';
-import { racVazio } from '../../src/domain/rac';
+import { racVazio, rpmVazio } from '../../src/domain/rac';
 
 // RAC: a P/3 abre o mês; cada Cia grava só o dela, só com o mês aberto. No emulador, com as regras ligadas.
 let env: RulesTestEnvironment;
@@ -107,5 +107,31 @@ describe('excluir RAC', () => {
     await excluirRacDoMes(p3, '2026-09');
     for (const [col, id] of [['racMeses', '2026-09'], ['racs', '2026-09_2cia'], ['racPrints', '2026-09_2cia_rvPainel'], ['racPrintsDados', '2026-09_2cia_rvPainel']])
       expect(await existe(col, id)).toBe(false);
+  });
+});
+
+describe('Batalhão (P/3)', () => {
+  const foto = { dados: btoa('jpeg'), miniatura: btoa('mini') };
+
+  test('a P/3 grava a RPM e os 4 painéis do Batalhão (mesmo com o mês encerrado); a Cia não', async () => {
+    const rpm = rpmVazio();
+    await assertFails(salvarRpm(p3, '2026-09', rpm, 'Cap Teste')); // mês não existe
+    await abrirRac(p3, '2026-09', '2026-10-10', []);
+    rpm.pessoasAbordadas = { mesAnterior: 1462, atual: 1936, totalGeral: null };
+    await salvarRpm(p3, '2026-09', rpm, 'Cap Teste');
+    expect((await lerRacBtl(p3, '2026-09'))?.rpm?.pessoasAbordadas.atual).toBe(1936);
+    await salvarPrintRac(p3, '2026-09', 'btl', 'foPainel', foto, null);
+    await alterarRac(p3, '2026-09', { status: 'encerrado' });
+    await salvarRpm(p3, '2026-09', rpm, 'Cap Teste');
+    await salvarPrintRac(p3, '2026-09', 'btl', 'rvPainel', foto, null);
+
+    await assertFails(salvarPrintRac(p3, '2026-09', 'btl', 'rvMapa', foto, null)); // Batalhão não tem mapa
+    await assertFails(salvarRpm(cia('1cia'), '2026-09', rpm, 'X'));
+    await assertFails(salvarPrintRac(cia('1cia'), '2026-09', 'btl', 'fvPainel', foto, null));
+    await assertFails(getDoc(doc(cia('1cia'), 'racs', '2026-09_btl')));
+
+    await excluirRacDoMes(p3, '2026-09');
+    expect(await lerRacBtl(p3, '2026-09')).toBeNull();
+    expect((await getDoc(doc(p3, 'racPrintsDados', '2026-09_btl_foPainel'))).exists()).toBe(false);
   });
 });

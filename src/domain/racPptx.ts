@@ -1,4 +1,4 @@
-import { corVariacao, nomeUnidadeRac, rotuloMesLongo, tabelasDoRac, textoVariacao, type RacDados, type Tabela } from './rac';
+import { corVariacao, nomeUnidadeRac, rotuloMesLongo, tabelasDoRac, textoVariacao, type LinhaRpm, type RacDados, type RpmId, type Tabela } from './rac';
 import type { SlotPrint } from './racPrints';
 
 // RAC → apresentação (.pptx) a partir do "Modelo RAC - MES26.pptx" da P/3 (public/rac/modelo-rac.pptx).
@@ -7,7 +7,7 @@ import type { SlotPrint } from './racPrints';
 
 export type Arquivos = Map<string, Uint8Array>;
 export type ImagemPrint = { jpeg: Uint8Array; largura: number; altura: number };
-export type RacParaSlides = { dados: RacDados; prints: Partial<Record<SlotPrint, ImagemPrint>> };
+export type RacParaSlides = { dados: RacDados; prints: Partial<Record<SlotPrint, ImagemPrint>>; rpmAnterior?: Record<RpmId, LinhaRpm> };
 
 type PlanoSlide = { base: number; titulo?: true; tabela?: Tabela['id']; print?: SlotPrint; trocarTitulo?: [string, string] };
 
@@ -15,6 +15,22 @@ type PlanoSlide = { base: number; titulo?: true; tabela?: Tabela['id']; print?: 
 export function planoDeSlides(d: RacDados): PlanoSlide[] {
   const producao: PlanoSlide[] = [{ base: 13 }, { base: 14, tabela: 'pelotao' }, { base: 15, tabela: 'prodMensal' }, { base: 16, tabela: 'prodAnual' }];
   // Força Tática: a tabela por pelotão tem as 14 linhas, então usa o slide de 14 linhas do modelo.
+  // Batalhão: como o RAC BTL (sem inconsistências, só os 4 painéis, Produtividade RPM no lugar da por pelotão).
+  if (d.unidade === 'btl')
+    return [
+      { base: 1, titulo: true },
+      { base: 2, tabela: 'anual' },
+      { base: 4, tabela: 'trimestral' },
+      { base: 5 },
+      { base: 6, print: 'rvPainel' },
+      { base: 8, print: 'fvPainel' },
+      { base: 10, print: 'roPainel' },
+      { base: 12, print: 'foPainel' },
+      { base: 13 },
+      { base: 14, tabela: 'rpm', trocarTitulo: ['PRODUTIVIDADE MENSAL', 'PRODUTIVIDADE RPM'] },
+      { base: 15, tabela: 'prodMensal' },
+      { base: 16, tabela: 'prodAnual' },
+    ];
   if (d.unidade === 'ft')
     return [
       { base: 1, titulo: true },
@@ -206,7 +222,7 @@ const TIPO_SLIDE = 'application/vnd.openxmlformats-officedocument.presentationml
 const REL_SLIDE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide';
 const REL_IMAGEM = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
 
-/** Nome do arquivo baixado: "RAC 1ª Cia - SETEMBRO-2026.pptx". */
+/** Nome do arquivo baixado: "RAC 1ª Cia - SETEMBRO-2026.pptx" (compilado: "RAC GERAL - SETEMBRO-2026.pptx"). */
 export const nomeArquivoRac = (titulo: string, mes: string) => `RAC ${titulo} - ${rotuloMesLongo(mes).replace('/', '-')}.pptx`;
 
 /**
@@ -218,7 +234,7 @@ export function montarApresentacao(modelo: Arquivos, unidades: readonly RacParaS
   const slides: string[] = [];
   let img = 0;
   for (const u of unidades) {
-    const tabelas = tabelasDoRac(u.dados);
+    const tabelas = tabelasDoRac(u.dados, u.rpmAnterior);
     for (const plano of planoDeSlides(u.dados)) {
       let xml = ler(modelo, `ppt/slides/slide${plano.base}.xml`);
       let rels = ler(modelo, `ppt/slides/_rels/slide${plano.base}.xml.rels`).replace(/<Relationship [^>]*notesSlide[^>]*\/>/g, '');
