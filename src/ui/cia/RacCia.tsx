@@ -43,6 +43,8 @@ import { lerPainel, OCR_LIGADO } from '../../lib/ocrRac';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
+import { PreviaRac } from '../PreviaRac';
+import { baixarRacDaUnidade } from '../../lib/racApresentacao';
 
 export const ROTULO_SITUACAO_RAC: Record<SituacaoRac, string> = { enviado: '✅ Enviado', rascunho: '📝 Rascunho', pendente: 'Pendente', atrasado: 'Atrasado' };
 const CLASSE_SITUACAO: Record<SituacaoRac, string> = { enviado: 'gravado', rascunho: 'enviado', pendente: 'pendente', atrasado: 'atrasado' };
@@ -100,6 +102,8 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
+  const [previa, setPrevia] = useState(false);
+  const [baixando, setBaixando] = useState(false);
   const enviado = salvo?.status === 'enviado';
   const m = mesesDoRac(d.mes);
   const [ano, ret, ant, atu] = [m.anoAnterior, m.mesRetrasado, m.mesAnterior, m.atual].map(rotuloCurto);
@@ -145,6 +149,18 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
     );
   };
 
+  async function baixar() {
+    setBaixando(true);
+    setErro('');
+    try {
+      await baixarRacDaUnidade(db, d, nomeUnidadeRac(p.unidade));
+    } catch (e) {
+      console.error('Apresentação do RAC:', e);
+      setErro('Não foi possível gerar a apresentação. Tente de novo.');
+    }
+    setBaixando(false);
+  }
+
   async function gravar(status: 'rascunho' | 'enviado') {
     setErro('');
     setAviso('');
@@ -180,6 +196,15 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
       <p className="pendente-detalhe">
         Prazo {formatarData(p.mes.prazo)}. Real, TOTAL e Var % são calculados pelo portal.
       </p>
+      <div className="acoes-linha acoes-quebra">
+        <button className="botao secundario" type="button" aria-expanded={previa} onClick={() => setPrevia(!previa)}>
+          {previa ? 'Fechar pré-visualização' : '👁️ Pré-visualizar'}
+        </button>
+        <button className="botao secundario" type="button" disabled={baixando} onClick={() => void baixar()}>
+          {baixando ? 'Gerando…' : '⬇️ Baixar apresentação (.pptx)'}
+        </button>
+      </div>
+      {previa && <PreviaRac d={d} />}
 
       {tentou && faltam > 0 && (
         <p className="mensagem erro" role="alert">

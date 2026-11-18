@@ -250,6 +250,7 @@ service cloud.firestore {
         && request.resource.data.prazo is string && request.resource.data.status == 'aberto';
       allow update: if ehP3() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prazo', 'status'])
         && request.resource.data.status in ['aberto', 'encerrado'];
+      allow delete: if ehP3();
     }
 
     // RAC da Cia/FT (id = mes_unidade): só o dela, só com o mês aberto; enviado não volta a rascunho.
@@ -270,6 +271,7 @@ service cloud.firestore {
       allow create: if ehDaMinhaUnidade(request.resource.data) && racValido(id);
       allow update: if ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && racValido(id)
         && !(resource.data.status == 'enviado' && request.resource.data.status == 'rascunho');
+      allow delete: if ehP3();
     }
 
     // Prints do RAC (id = mes_unidade_slot): a Cia grava/troca os dela com o mês aberto; a P/3 lê.
@@ -288,6 +290,7 @@ service cloud.firestore {
         && printRacValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm'])
         && request.resource.data.miniatura is string && request.resource.data.miniatura.size() <= 60000
         && request.resource.data.enviadoEm == request.time;
+      allow delete: if ehP3();
     }
 
     match /racPrintsDados/{id} {
@@ -296,6 +299,7 @@ service cloud.firestore {
         && (resource == null || ehDaMinhaUnidade(resource.data))
         && printRacValido(id, ['mes', 'unidadeId', 'slot', 'dados'])
         && request.resource.data.dados is string && request.resource.data.dados.size() <= 900000;
+      allow delete: if ehP3();
     }
 
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.

@@ -2755,3 +2755,113 @@ fieldset:has(> .erro-campo) > legend {
   min-height: 0;
   padding: 8px;
 }
+
+/* ---------- RAC: ações na tabela da P/3 e pré-visualização dos slides ---------- */
+.acoes-tabela {
+  white-space: nowrap;
+}
+
+.botao-icone {
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid #c8cdd6;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.botao-icone + .botao-icone {
+  margin-left: 4px;
+}
+
+.previa-rac {
+  display: grid;
+  gap: 12px;
+}
+
+.slide-rac {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #d6dbe3;
+  border-top: 6px solid #c40000;
+  border-radius: 8px;
+}
+
+.slide-num {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 0.75rem;
+  color: var(--cor-suave);
+}
+
+.slide-capa {
+  justify-content: center;
+}
+
+.slide-capa-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.slide-capa-texto strong {
+  font-size: clamp(1rem, 3.5vw, 1.6rem);
+}
+
+.slide-titulo {
+  margin: 0;
+  text-align: center;
+  color: #e00000;
+  font-size: clamp(0.85rem, 2.6vw, 1.2rem);
+}
+
+.slide-print {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+}
+
+.slide-sem-print {
+  margin: auto;
+  color: #c40000;
+  font-weight: 700;
+}
+
+.tabela-slide {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: clamp(0.55rem, 1.6vw, 0.75rem);
+}
+
+.tabela-slide th,
+.tabela-slide td {
+  padding: 1px 6px;
+  border: 1px solid #d9d9d9;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tabela-slide thead th {
+  background: #666;
+  color: #fff;
+}
+
+.tabela-slide tbody tr:nth-child(even) {
+  background: #eee;
+}
+
+.var-slide {
+  color: #fff;
+  font-weight: 600;
+}

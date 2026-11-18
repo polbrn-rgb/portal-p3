@@ -1,5 +1,6 @@
-import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
-import { idRac, normalizarRac, validarAberturaRac, type RacDados, type RacMes, type RacSalvo } from '../domain/rac';
+import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Firestore, type WriteBatch } from 'firebase/firestore';
+import { idRac, normalizarRac, UNIDADES_RAC, validarAberturaRac, type RacDados, type RacMes, type RacSalvo } from '../domain/rac';
+import { IDS_SLOTS } from '../domain/racPrints';
 import type { UnidadeId } from '../domain/unidades';
 
 // RAC mensal: "racMeses" (id = mês de referência, aberto pela P/3) e "racs" (id = mes_unidade, das Cias e da FT).
@@ -70,4 +71,28 @@ export async function salvarRac(db: Firestore, d: RacDados, status: 'rascunho' |
     salvoEm: serverTimestamp(),
     ...(status === 'enviado' ? { enviadoEm: serverTimestamp() } : {}),
   });
+}
+
+function apagarDaUnidade(lote: WriteBatch, db: Firestore, mes: string, u: UnidadeId): void {
+  const id = idRac(mes, u);
+  lote.delete(doc(db, 'racs', id));
+  for (const slot of IDS_SLOTS) {
+    lote.delete(doc(db, 'racPrints', `${id}_${slot}`));
+    lote.delete(doc(db, 'racPrintsDados', `${id}_${slot}`));
+  }
+}
+
+/** P/3: apaga do banco o RAC de uma unidade no mês (números e prints). Com o mês aberto, a Cia pode refazer. */
+export async function excluirRacDaUnidade(db: Firestore, mes: string, u: UnidadeId): Promise<void> {
+  const lote = writeBatch(db);
+  apagarDaUnidade(lote, db, mes, u);
+  await lote.commit();
+}
+
+/** P/3: apaga do banco o RAC do mês inteiro (abertura, RAC de todas as unidades e prints). */
+export async function excluirRacDoMes(db: Firestore, mes: string): Promise<void> {
+  const lote = writeBatch(db);
+  for (const u of UNIDADES_RAC) apagarDaUnidade(lote, db, mes, u);
+  lote.delete(doc(db, 'racMeses', mes));
+  await lote.commit();
 }

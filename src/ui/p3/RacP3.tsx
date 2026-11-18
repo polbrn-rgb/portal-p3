@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { abrirRac, alterarRac, observarRacMeses, observarRacsDoMes } from '../../data/rac';
+import { abrirRac, alterarRac, excluirRacDaUnidade, excluirRacDoMes, observarRacMeses, observarRacsDoMes } from '../../data/rac';
 import { formatarData, hojeISO } from '../../domain/datas';
 import { mesReferenciaPadrao, nomeUnidadeRac, rotuloMesLongo, situacaoRac, UNIDADES_RAC, validarAberturaRac, type RacMes, type RacSalvo } from '../../domain/rac';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
 import { ROTULO_SITUACAO_RAC } from '../cia/RacCia';
+import { PreviaRac } from '../PreviaRac';
+import { baixarRacDaUnidade } from '../../lib/racApresentacao';
+import type { UnidadeId } from '../../domain/unidades';
 
 /** Operações → RAC: a P/3 abre o mês de referência com o prazo e acompanha o envio das Cias e da FT. */
 export function RacP3() {
@@ -77,13 +80,21 @@ function AbrirRac({ jaAbertos }: { jaAbertos: string[] }) {
   );
 }
 
+type Confirmar = { tipo: 'mes' } | { tipo: 'unidade'; u: UnidadeId };
+
 function CartaoRacP3({ m }: { m: RacMes }) {
   const racs = useAoVivo<RacSalvo[]>((ok, erro) => observarRacsDoMes(db, m.mes, ok, erro), [m.mes]);
   const [prazo, setPrazo] = useState(m.prazo);
   const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
+  const [previa, setPrevia] = useState<UnidadeId | null>(null);
+  const [baixando, setBaixando] = useState<UnidadeId | null>(null);
+  const [confirmar, setConfirmar] = useState<Confirmar | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
   const hoje = hojeISO();
   const titulo = `RAC ${rotuloMesLongo(m.mes)}`;
   const enviados = (racs.valor ?? []).filter((r) => r.status === 'enviado').length;
+  const racDe = (u: UnidadeId) => racs.valor?.find((x) => x.unidade === u);
 
   async function mudar(mudanca: Partial<Pick<RacMes, 'prazo' | 'status'>>) {
     setErro('');
@@ -93,6 +104,40 @@ function CartaoRacP3({ m }: { m: RacMes }) {
       setErro('Não foi possível gravar. Tente de novo.');
     }
   }
+
+  async function baixar(u: UnidadeId) {
+    const r = racDe(u);
+    if (!r) return;
+    setBaixando(u);
+    setErro('');
+    try {
+      await baixarRacDaUnidade(db, r, nomeUnidadeRac(u));
+    } catch (e) {
+      console.error('Apresentação do RAC:', e);
+      setErro('Não foi possível gerar a apresentação. Tente de novo.');
+    }
+    setBaixando(null);
+  }
+
+  async function excluir() {
+    if (!confirmar) return;
+    setExcluindo(true);
+    setErro('');
+    try {
+      if (confirmar.tipo === 'mes') await excluirRacDoMes(db, m.mes);
+      else {
+        await excluirRacDaUnidade(db, m.mes, confirmar.u);
+        if (previa === confirmar.u) setPrevia(null);
+        setAviso(`RAC da ${nomeUnidadeRac(confirmar.u)} excluído.`);
+      }
+      setConfirmar(null);
+    } catch {
+      setErro('Não foi possível excluir. Tente de novo.');
+    }
+    setExcluindo(false);
+  }
+
+  const rPrevia = previa ? racDe(previa) : undefined;
 
   return (
     <article className="cartao grupo" aria-label={titulo}>
@@ -110,23 +155,61 @@ function CartaoRacP3({ m }: { m: RacMes }) {
               <th>Unidade</th>
               <th>Situação</th>
               <th>Preenchido por</th>
+              <th>Apresentação</th>
             </tr>
           </thead>
           <tbody>
             {UNIDADES_RAC.map((u) => {
-              const r = racs.valor?.find((x) => x.unidade === u);
+              const r = racDe(u);
               const s = situacaoRac(r, m.prazo, hoje);
+              const nome = nomeUnidadeRac(u);
               return (
                 <tr key={u} className={s === 'atrasado' ? 'linha-atrasado' : undefined}>
-                  <th scope="row">{nomeUnidadeRac(u)}</th>
+                  <th scope="row">{nome}</th>
                   <td>{ROTULO_SITUACAO_RAC[s]}</td>
                   <td>{r?.preenchidoPor || '—'}</td>
+                  <td className="acoes-tabela">
+                    {r ? (
+                      <>
+                        <button className="botao-icone" type="button" title="Pré-visualizar" aria-label={`Pré-visualizar RAC da ${nome}`} onClick={() => setPrevia(previa === u ? null : u)}>
+                          👁️
+                        </button>
+                        <button className="botao-icone" type="button" title="Baixar .pptx" aria-label={`Baixar RAC da ${nome}`} disabled={baixando === u} onClick={() => void baixar(u)}>
+                          {baixando === u ? '…' : '⬇️'}
+                        </button>
+                        <button className="botao-icone" type="button" title="Excluir" aria-label={`Excluir RAC da ${nome}`} onClick={() => setConfirmar({ tipo: 'unidade', u })}>
+                          🗑️
+                        </button>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {confirmar && (
+        <div className="confirmar-linha" role="alertdialog" aria-label="Confirmar exclusão do RAC">
+          <p>
+            {confirmar.tipo === 'mes'
+              ? `Excluir o ${titulo} inteiro? Some para todas as unidades, com os números e os prints, e é apagado do banco. Não dá para desfazer.`
+              : `Excluir o RAC da ${nomeUnidadeRac(confirmar.u)} de ${rotuloMesLongo(m.mes)} (números e prints)? É apagado do banco; ${m.status === 'aberto' ? 'a Cia pode preencher de novo.' : 'reabra o mês para a Cia preencher de novo.'} Não dá para desfazer.`}
+          </p>
+          <div className="acoes-linha">
+            <button className="botao secundario" type="button" onClick={() => setConfirmar(null)}>
+              Cancelar
+            </button>
+            <button className="botao perigo" type="button" disabled={excluindo} onClick={() => void excluir()}>
+              {excluindo ? 'Excluindo…' : 'Sim, excluir'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {m.status === 'aberto' && (
         <div className="acoes-linha">
           <Campo rotulo="Novo prazo">
@@ -142,7 +225,12 @@ function CartaoRacP3({ m }: { m: RacMes }) {
           {erro}
         </p>
       )}
-      <div className="acoes-linha">
+      {aviso && (
+        <p className="mensagem aviso" role="status">
+          {aviso}
+        </p>
+      )}
+      <div className="acoes-linha acoes-quebra">
         {m.status === 'aberto' ? (
           <button className="botao secundario" type="button" onClick={() => mudar({ status: 'encerrado' })}>
             Encerrar (as Cias não alteram mais)
@@ -152,7 +240,17 @@ function CartaoRacP3({ m }: { m: RacMes }) {
             Reabrir
           </button>
         )}
+        <button className="botao perigo" type="button" onClick={() => setConfirmar({ tipo: 'mes' })}>
+          🗑️ Excluir RAC do mês
+        </button>
       </div>
+
+      {rPrevia && (
+        <>
+          <h4 className="titulo-secao">Pré-visualização — {nomeUnidadeRac(rPrevia.unidade)}</h4>
+          <PreviaRac d={rPrevia} />
+        </>
+      )}
     </article>
   );
 }

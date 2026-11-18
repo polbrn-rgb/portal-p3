@@ -121,6 +121,11 @@ histórico das demandas.
   `src/domain/racPrints.ts` (24 prints reais de set/2026: 95 de 96 números certos no recorte e na tela cheia, 92 de 96
   com zoom, 93 de 96 no tamanho de notebook, 84 de 96 a 60%; nenhum errado sem ⚠️; painel com menos de ~1000 px de
   largura não é lido).
+- **RAC — apresentação**: a Cia (na tela do RAC) e a P/3 (Operações → RAC, em cada unidade) têm **👁️ Pré-visualizar**
+  (os slides na tela) e **⬇️ Baixar apresentação (.pptx)**, gerada no aparelho a partir do modelo da P/3
+  (`public/rac/modelo-rac.pptx`, o "Modelo RAC - MES26"): título, tabelas com as cores de Var %, prints encaixados sem
+  deformar ("Print não enviado" quando falta). A FT sai com capa e os 4 slides de produtividade. **Excluir**: a P/3
+  exclui o RAC de uma unidade (🗑️ na linha) ou do mês inteiro, com confirmação; números e prints saem do banco.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de

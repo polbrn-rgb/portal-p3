@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { abrirRac, alterarRac, salvarRac } from '../../src/data/rac';
+import { abrirRac, alterarRac, excluirRacDaUnidade, excluirRacDoMes, salvarRac } from '../../src/data/rac';
 import { lerImagemPrint, salvarPrintRac } from '../../src/data/racPrints';
 import { racVazio } from '../../src/domain/rac';
 
@@ -83,5 +83,29 @@ describe('prints do RAC', () => {
 
     await alterarRac(p3, '2026-09', { status: 'encerrado' });
     await assertFails(salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'fvPainel', foto, null)); // mês encerrado
+  });
+});
+
+describe('excluir RAC', () => {
+  const foto = { dados: btoa('jpeg'), miniatura: btoa('mini') };
+
+  test('só a P/3 exclui; a exclusão apaga do banco os números e os prints', async () => {
+    await abrirRac(p3, '2026-09', '2026-10-10', []);
+    for (const u of ['1cia', '2cia'] as const) {
+      await salvarRac(cia(u), racVazio(u, '2026-09'), 'rascunho', '');
+      await salvarPrintRac(cia(u), '2026-09', u, 'rvPainel', foto, null);
+    }
+    await assertFails(excluirRacDaUnidade(cia('1cia'), '2026-09', '1cia'));
+    await assertFails(excluirRacDoMes(cia('1cia'), '2026-09'));
+
+    await excluirRacDaUnidade(p3, '2026-09', '1cia');
+    const existe = async (col: string, id: string) => (await getDoc(doc(p3, col, id))).exists();
+    expect(await existe('racs', '2026-09_1cia')).toBe(false);
+    expect(await existe('racPrintsDados', '2026-09_1cia_rvPainel')).toBe(false);
+    expect(await existe('racs', '2026-09_2cia')).toBe(true);
+
+    await excluirRacDoMes(p3, '2026-09');
+    for (const [col, id] of [['racMeses', '2026-09'], ['racs', '2026-09_2cia'], ['racPrints', '2026-09_2cia_rvPainel'], ['racPrintsDados', '2026-09_2cia_rvPainel']])
+      expect(await existe(col, id)).toBe(false);
   });
 });

@@ -77,6 +77,15 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   await expect(page.getByText('RAC enviado para a P/3.')).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('✅ Enviado')).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole('button', { name: 'Atualizar envio' })).toBeVisible();
+
+  // A Cia vê os slides na tela e baixa o .pptx.
+  await page.getByRole('button', { name: '👁️ Pré-visualizar' }).click();
+  const previa = page.getByLabel(`Pré-visualização do RAC – ${nomeUnidade}`);
+  await expect(previa.getByText(`RAC – ${nomeUnidade} - MAIO/${ano}`)).toBeVisible();
+  await expect(previa.getByRole('img', { name: 'Print: ROUBO DE VEÍCULOS' }).first()).toBeVisible({ timeout: 15000 });
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '⬇️ Baixar apresentação (.pptx)' }).click();
+  expect((await download).suggestedFilename()).toBe(`RAC ${nomeUnidade} - MAIO-${ano}.pptx`);
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await sair(page);
 
@@ -86,4 +95,13 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   const tabela = page.getByRole('table', { name: `Situação do ${titulo}` });
   await expect(tabela.getByRole('row', { name: new RegExp(nomeUnidade) })).toContainText('✅ Enviado');
   await expect(tabela.getByRole('row', { name: new RegExp(nomeUnidade) })).toContainText('Sd PM Teste');
+
+  // A P/3 baixa o RAC da Cia e depois exclui o mês inteiro (sai do banco e da tela).
+  const baixou = page.waitForEvent('download');
+  await page.getByRole('button', { name: `Baixar RAC da ${nomeUnidade}` }).click();
+  expect((await baixou).suggestedFilename()).toBe(`RAC ${nomeUnidade} - MAIO-${ano}.pptx`);
+  const cartao = page.getByRole('article', { name: titulo });
+  await cartao.getByRole('button', { name: '🗑️ Excluir RAC do mês' }).click();
+  await cartao.getByRole('alertdialog').getByRole('button', { name: 'Sim, excluir' }).click();
+  await expect(page.getByRole('article', { name: titulo })).toHaveCount(0, { timeout: 15000 });
 });
