@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { DELITOS, racVazio, type RacDados } from '../../src/domain/rac';
+import { DELITOS, nomeRacGeral, racVazio, type RacDados } from '../../src/domain/rac';
 import { construirTabela, dimensoesJpeg, encaixarPrint, montarApresentacao, nomeArquivoRac, planoDeSlides, textoNaCelula } from '../../src/domain/racPptx';
+import { base64ParaBytes, bytesParaBase64 } from '../../src/lib/imagem';
 import { zip } from '../../src/lib/xlsx';
 import { deszipar } from '../../src/lib/zipLeitura';
 
@@ -105,5 +106,13 @@ describe('RAC GERAL', () => {
     const rpm = txt(a, 'ppt/slides/slide31.xml');
     for (const t of ['PRODUTIVIDADE RPM', 'Moto Abordada-(LÍCITO)', '<a:t>3398</a:t>', 'TOTAL GERAL']) expect(rpm).toContain(t);
     expect(txt(a, 'ppt/slides/slide29.xml')).toContain('r:embed="rIdPrint"'); // furto outros do Batalhão
+  });
+});
+
+describe('arquivar o RAC GERAL', () => {
+  test('nome do arquivo no Drive e base64 de arquivo grande (ida e volta)', () => {
+    expect(nomeRacGeral('2026-09')).toBe('RAC GERAL - SETEMBRO-2026.pptx');
+    const grande = new Uint8Array(300_000).map((_, i) => (i * 7919) % 256);
+    expect(base64ParaBytes(bytesParaBase64(grande))).toEqual(grande);
   });
 });

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { abrirRac, alterarRac, excluirRacDaUnidade, excluirRacDoMes, lerRacBtl, salvarRac, salvarRpm } from '../../src/data/rac';
+import { abrirRac, alterarRac, excluirRacDaUnidade, excluirRacDoMes, lerRacBtl, pedirArquivamento, salvarRac, salvarRpm } from '../../src/data/rac';
 import { lerImagemPrint, salvarPrintRac } from '../../src/data/racPrints';
 import { racVazio, rpmVazio } from '../../src/domain/rac';
 
@@ -133,5 +133,24 @@ describe('Batalhão (P/3)', () => {
     await excluirRacDoMes(p3, '2026-09');
     expect(await lerRacBtl(p3, '2026-09')).toBeNull();
     expect((await getDoc(doc(p3, 'racPrintsDados', '2026-09_btl_foPainel'))).exists()).toBe(false);
+  });
+});
+
+describe('fechar o mês e arquivar o RAC GERAL', () => {
+  test('a P/3 pede o arquivamento (encerra o mês); a Cia não; só o motor marca como pronto', async () => {
+    await abrirRac(p3, '2026-09', '2026-10-10', []);
+    const pptx = new Uint8Array(1_200_000).map((_, i) => i % 251); // vira 3 partes
+    await assertFails(pedirArquivamento(cia('1cia'), '2026-09', 'RAC GERAL - SETEMBRO-2026.pptx', pptx));
+    await pedirArquivamento(p3, '2026-09', 'RAC GERAL - SETEMBRO-2026.pptx', pptx);
+    const mes = (await getDoc(doc(p3, 'racMeses', '2026-09'))).data();
+    expect(mes).toMatchObject({ status: 'encerrado', arquivo: { status: 'pedido', nome: 'RAC GERAL - SETEMBRO-2026.pptx' } });
+    expect((await getDoc(doc(p3, 'racArquivo', '2026-09'))).data()).toMatchObject({ partes: 3, tamanho: 1_200_000 });
+    await assertFails(getDoc(doc(cia('1cia'), 'racArquivo', '2026-09')));
+    await assertFails(updateDoc(doc(p3, 'racMeses', '2026-09'), { arquivo: { status: 'pronto', nome: 'x', url: 'https://drive' } })); // só o motor
+    await assertFails(updateDoc(doc(p3, 'racMeses', '2026-09'), { status: 'aberto', arquivo: { status: 'pedido', nome: 'x' } })); // pedir exige encerrar
+
+    await excluirRacDoMes(p3, '2026-09'); // leva junto o que esperava o motor
+    expect((await getDoc(doc(p3, 'racArquivo', '2026-09'))).exists()).toBe(false);
+    expect((await getDoc(doc(p3, 'racArquivo', '2026-09', 'partes', '2'))).exists()).toBe(false);
   });
 });

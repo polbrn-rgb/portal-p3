@@ -3,6 +3,8 @@ import { runInNewContext } from 'node:vm';
 import { describe, expect, test } from 'vitest';
 import { edicaoPrecisaAutomacao, precisaAutomacao } from '../../src/domain/automacao';
 import { demandaVazia, validarDemanda } from '../../src/domain/demanda';
+import { UNIDADES_RAC } from '../../src/domain/rac';
+import { idPrint, slotsDaUnidade } from '../../src/domain/racPrints';
 
 // Carrega o Logica.gs do Apps Script exatamente como ele é, sem cópia.
 type Acao = { tipo: string; chave: string; agenda: string; inicio?: string; fim?: string; titulo?: string; eventoId?: string; nomePasta?: string; pastaId?: string };
@@ -26,6 +28,7 @@ type Motor = {
   ordenarPendentes: (lista: { nome: string; dados: Record<string, unknown> }[]) => { nome: string }[];
   letraDaColuna: (n: number) => string;
   intervalosBrancos: (fundos: string[][], linhaInicial: number, colunaInicial?: number) => string[];
+  idsPrintsDoRac: (mes: string) => string[];
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -421,5 +424,13 @@ describe('EAP: limpar as células brancas em poucos intervalos', () => {
     const fundos = Array.from({ length: 992 }, (_, i) => Array.from({ length: 26 }, (_, j) => (j === 0 || i % 10 === 0 ? C : B)));
     const r = motor.intervalosBrancos(fundos, 9);
     expect(r.length).toBeLessThan(200);
+  });
+});
+
+describe('RAC: prints apagados depois de arquivar o RAC GERAL', () => {
+  test('o motor apaga todos os prints possíveis do mês (Cias, FT e Batalhão)', () => {
+    const ids = new Set(motor.idsPrintsDoRac('2026-09'));
+    for (const u of [...UNIDADES_RAC, 'btl' as const]) for (const s of slotsDaUnidade(u)) expect(ids.has(idPrint('2026-09', u, s.id))).toBe(true);
+    expect([...ids].every((id) => id.startsWith('2026-09_'))).toBe(true);
   });
 });

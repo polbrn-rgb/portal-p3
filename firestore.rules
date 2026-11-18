@@ -248,9 +248,26 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['mes', 'prazo', 'status', 'criadoEm'])
         && request.resource.data.mes == mes && mes.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
         && request.resource.data.prazo is string && request.resource.data.status == 'aberto';
-      allow update: if ehP3() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prazo', 'status'])
-        && request.resource.data.status in ['aberto', 'encerrado'];
+      allow update: if ehP3() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prazo', 'status', 'arquivo'])
+        && request.resource.data.status in ['aberto', 'encerrado']
+        && (!('arquivo' in request.resource.data.diff(resource.data).affectedKeys())
+          || (request.resource.data.status == 'encerrado' && request.resource.data.arquivo.keys().hasOnly(['status', 'nome'])
+            && request.resource.data.arquivo.status == 'pedido' && request.resource.data.arquivo.nome is string));
       allow delete: if ehP3();
+    }
+
+    // RAC GERAL esperando o motor arquivar no Drive (em partes, como os PDFs). Só a P/3; o motor apaga depois.
+    match /racArquivo/{mes} {
+      allow read, delete: if ehP3();
+      allow create, update: if ehP3()
+        && request.resource.data.keys().hasOnly(['mes', 'nome', 'tamanho', 'partes', 'criadoEm'])
+        && request.resource.data.mes == mes
+        && request.resource.data.tamanho is int && request.resource.data.tamanho <= 41943040
+        && request.resource.data.partes is int && request.resource.data.partes > 0 && request.resource.data.partes <= 80;
+      match /partes/{n} {
+        allow read, delete: if ehP3();
+        allow create, update: if ehP3() && request.resource.data.keys().hasOnly(['dados']) && request.resource.data.dados is string;
+      }
     }
 
     // RAC da Cia/FT (id = mes_unidade): só o dela, só com o mês aberto; enviado não volta a rascunho.

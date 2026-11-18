@@ -192,3 +192,12 @@ Cole de novo o `Motor.gs` e o `Logica.gs` e faça **Implantar → Gerenciar impl
 O motor agora põe por último as demandas que já deram erro, para um erro repetido (ex.: limite do Google de apagar
 muitos eventos seguidos) não travar as outras. O erro de cada uma aparece em **Administrador → Zerar portal**.
 
+
+## Operações → RAC: arquivar o RAC GERAL
+
+Quando a P/3 clica em **📦 Fechar mês e arquivar no Drive**, o portal encerra o mês e manda o RAC GERAL (.pptx) em
+partes para o banco. Na rodada seguinte o motor monta o arquivo e cria na pasta **`PASTA_RAC_ARQUIVO`** do `CONFIG_P3`
+(se já existir um arquivo com o mesmo nome, o antigo vai para a lixeira), grava o link no mês e apaga do banco o
+arquivo e os prints daquele mês. Os números do RAC ficam no portal.
+
+A pasta tem de ser da conta **8bpmmp3@gmail.com** (ou compartilhada com ela como editora).

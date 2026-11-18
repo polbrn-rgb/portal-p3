@@ -1,7 +1,15 @@
 import { expect, test } from '@playwright/test';
+
+// Diagnóstico de falha intermitente no CI: mostra no log onde a tela estava.
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus) return;
+  const texto = await page.locator('body').innerText().catch(() => '(sem texto)');
+  console.log(`[diagnóstico ${info.project.name}] url=${page.url()}\n${texto.slice(0, 2500)}`);
+});
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
+import { demandaVazia } from '../src/domain/demanda';
 import { SENHA_TESTE } from './dados';
 
 // Os dados que o motor (Apps Script) gravaria são criados direto no emulador.
@@ -154,6 +162,11 @@ test('tela da Cia: respondida com prazo vencido há um dia sai; atrasada sem res
   ];
   for (const [i, c] of casos.entries()) {
     const numero = 900000 + Math.floor(Math.random() * 90000) + i;
+    // A demanda também existe: sem ela, a limpeza de "órfãos" (roda quando a P/3 abre o portal, em outro teste
+    // ao mesmo tempo) apagaria estes encaminhamentos no meio do teste.
+    await admin()
+      .doc(`demandas/${numero}`)
+      .set({ ...demandaVazia(dia(0)), numero, saida: c.saida, destinos: ['6cia'], status: 'concluido', criadoEm: FieldValue.serverTimestamp() });
     await admin()
       .doc(`encaminhamentos/${numero}_6cia`)
       .set({ ...base, numero, demandaId: String(numero), saida: c.saida, status: c.status, prazoCia: c.prazoCia, atualizadoEm: FieldValue.serverTimestamp() });

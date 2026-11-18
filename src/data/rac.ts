@@ -1,12 +1,19 @@
 import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Firestore, type WriteBatch } from 'firebase/firestore';
-import { idRac, normalizarRac, UNIDADES_RAC, validarAberturaRac, type LinhaRpm, type RacDados, type RacMes, type RacSalvo, type RpmId, type UnidadeRac } from '../domain/rac';
+import { dividirEmPartes } from '../domain/icc';
+import { bytesParaBase64 } from '../lib/imagem';
+import { idRac, normalizarRac, UNIDADES_RAC, validarAberturaRac, type ArquivoRac, type LinhaRpm, type RacDados, type RacMes, type RacSalvo, type RpmId, type UnidadeRac } from '../domain/rac';
 import { IDS_SLOTS } from '../domain/racPrints';
 import type { UnidadeId } from '../domain/unidades';
 
 // RAC mensal: "racMeses" (id = mês de referência, aberto pela P/3) e "racs" (id = mes_unidade, das Cias e da FT).
 
 function paraMes(id: string, x: Partial<RacMes>): RacMes {
-  return { mes: x.mes ?? id, prazo: x.prazo ?? '', status: x.status === 'encerrado' ? 'encerrado' : 'aberto' };
+  const a = x.arquivo as Partial<ArquivoRac> | undefined;
+  const arquivo: ArquivoRac | undefined =
+    a && (a.status === 'pedido' || a.status === 'pronto' || a.status === 'erro')
+      ? { status: a.status, nome: String(a.nome ?? ''), ...(a.url ? { url: String(a.url) } : {}), ...(a.erro ? { erro: String(a.erro) } : {}) }
+      : undefined;
+  return { mes: x.mes ?? id, prazo: x.prazo ?? '', status: x.status === 'encerrado' ? 'encerrado' : 'aberto', ...(arquivo ? { arquivo } : {}) };
 }
 
 function paraRac(id: string, x: Record<string, unknown>): RacSalvo {
@@ -94,6 +101,13 @@ export async function excluirRacDoMes(db: Firestore, mes: string): Promise<void>
   const lote = writeBatch(db);
   for (const u of [...UNIDADES_RAC, 'btl' as const]) apagarDaUnidade(lote, db, mes, u);
   lote.delete(doc(db, 'racMeses', mes));
+  // RAC GERAL que ainda esperava o motor (o motor apaga depois de arquivar).
+  const cab = await getDoc(doc(db, 'racArquivo', mes));
+  if (cab.exists()) {
+    const partes = Number(cab.data().partes ?? 0);
+    for (let i = 0; i < partes; i++) lote.delete(doc(db, 'racArquivo', mes, 'partes', String(i)));
+    lote.delete(cab.ref);
+  }
   await lote.commit();
 }
 
@@ -106,4 +120,19 @@ export async function salvarRpm(db: Firestore, mes: string, rpm: Record<RpmId, L
 export async function lerRacBtl(db: Firestore, mes: string): Promise<RacSalvo | null> {
   const s = await getDoc(doc(db, 'racs', idRac(mes, 'btl')));
   return s.exists() ? paraRac(s.id, s.data()) : null;
+}
+
+/**
+ * P/3: fecha o mês e pede ao motor para arquivar o RAC GERAL no Drive. O .pptx vai em partes para
+ * racArquivo/{mes} (cabeçalho por último); o motor cria o arquivo na pasta de arquivo, grava o link e apaga
+ * do banco o arquivo e os prints do mês. Os números ficam (histórico).
+ */
+export async function pedirArquivamento(db: Firestore, mes: string, nome: string, pptx: Uint8Array, aoProgredir?: (feito: number) => void): Promise<void> {
+  const partes = dividirEmPartes(bytesParaBase64(pptx));
+  for (let i = 0; i < partes.length; i++) {
+    await setDoc(doc(db, 'racArquivo', mes, 'partes', String(i)), { dados: partes[i] });
+    aoProgredir?.((i + 1) / partes.length);
+  }
+  await setDoc(doc(db, 'racArquivo', mes), { mes, nome, tamanho: pptx.length, partes: partes.length, criadoEm: serverTimestamp() });
+  await updateDoc(doc(db, 'racMeses', mes), { status: 'encerrado', arquivo: { status: 'pedido', nome } });
 }
