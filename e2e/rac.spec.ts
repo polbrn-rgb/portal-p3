@@ -19,7 +19,7 @@ function rascunhoComZeros(unidade: '1cia' | '3cia', mes: string, deixarVazios: s
   return d;
 }
 
-// Imagem PNG mínima (1×1) para os 7 prints; no emulador a leitura automática fica desligada.
+// Imagem PNG mínima (1×1) para os prints (só imagem nos slides).
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 const PRINTS = [
   'Roubo de veículo — Indicadores Criminais',

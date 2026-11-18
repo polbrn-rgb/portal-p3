@@ -1,11 +1,11 @@
 import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, where, writeBatch, type Firestore } from 'firebase/firestore';
-import { IDS_SLOTS, idPrint, type LeituraPainel, type SlotPrint } from '../domain/racPrints';
+import { IDS_SLOTS, idPrint, type SlotPrint } from '../domain/racPrints';
 import type { UnidadeRac } from '../domain/rac';
 import type { FotoReduzida } from '../lib/imagem';
 
-// Prints do RAC: "racPrints" (resumo + miniatura + leitura) e "racPrintsDados" (a imagem), id = mes_unidade_slot.
+// Prints do RAC (só imagem): "racPrints" (resumo + miniatura) e "racPrintsDados" (a imagem), id = mes_unidade_slot.
 
-export type PrintRac = { id: string; mes: string; unidadeId: UnidadeRac; slot: SlotPrint; miniatura: string; leitura: LeituraPainel | null };
+export type PrintRac = { id: string; mes: string; unidadeId: UnidadeRac; slot: SlotPrint; miniatura: string };
 
 function paraPrint(id: string, x: Record<string, unknown>): PrintRac | null {
   const slot = String(x.slot ?? '');
@@ -16,7 +16,6 @@ function paraPrint(id: string, x: Record<string, unknown>): PrintRac | null {
     unidadeId: x.unidadeId as UnidadeRac,
     slot: slot as SlotPrint,
     miniatura: String(x.miniatura ?? ''),
-    leitura: (x.leitura as LeituraPainel | null) ?? null,
   };
 }
 
@@ -30,11 +29,11 @@ export function observarPrintsDoRac(db: Firestore, mes: string, u: UnidadeRac, o
 }
 
 /** Grava (ou troca) o print do espaço: a imagem e o resumo vão juntos (tudo ou nada). */
-export async function salvarPrintRac(db: Firestore, mes: string, u: UnidadeRac, slot: SlotPrint, foto: FotoReduzida, leitura: LeituraPainel | null): Promise<void> {
+export async function salvarPrintRac(db: Firestore, mes: string, u: UnidadeRac, slot: SlotPrint, foto: FotoReduzida): Promise<void> {
   const id = idPrint(mes, u, slot);
   const lote = writeBatch(db);
   lote.set(doc(db, 'racPrintsDados', id), { mes, unidadeId: u, slot, dados: foto.dados });
-  lote.set(doc(db, 'racPrints', id), { mes, unidadeId: u, slot, miniatura: foto.miniatura, leitura, tamanho: foto.dados.length, enviadoEm: serverTimestamp() });
+  lote.set(doc(db, 'racPrints', id), { mes, unidadeId: u, slot, miniatura: foto.miniatura, tamanho: foto.dados.length, enviadoEm: serverTimestamp() });
   await lote.commit();
 }
 

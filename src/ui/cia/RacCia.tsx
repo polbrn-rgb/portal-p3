@@ -29,18 +29,16 @@ import {
   valorDoCampo,
   variacao,
   type Alerta,
-  type DelitoId,
   type RacDados,
   type RacMes,
   type RacSalvo,
   type SituacaoRac,
   type UnidadeRac,
 } from '../../domain/rac';
-import { conferirPrints, motivoDoErroDoPrint, preencherDoPrint, slotsDaUnidade, type ColunaLida, type LeituraPainel, type SlotPrint } from '../../domain/racPrints';
+import { conferirPrints, motivoDoErroDoPrint, slotsDaUnidade, type SlotPrint } from '../../domain/racPrints';
 import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { reduzirFoto } from '../../lib/imagem';
-import { lerPainel, OCR_LIGADO } from '../../lib/ocrRac';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
@@ -221,7 +219,6 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
           mes={d.mes}
           prints={prints.valor ?? []}
           erroDe={erroDe}
-          aoLer={(delito, l) => setD((x) => preencherDoPrint(x, delito, l))}
         />
       )}
 
@@ -394,42 +391,21 @@ function Avisos(p: { avisos: Alerta[]; d: RacDados; tentou: boolean; mudar: (id:
   );
 }
 
-const COLUNAS_LIDAS: ColunaLida[] = ['anoAnterior', 'mesRetrasado', 'mesAnterior', 'atual'];
-
-/** Os 7 prints do painel. Nos de "Indicadores Criminais" os números são lidos no próprio aparelho. */
-export function PrintsRac(p: {
-  unidade: UnidadeRac;
-  mes: string;
-  prints: PrintRac[];
-  erroDe: (campo: string) => string | undefined;
-  aoLer?: (delito: DelitoId, l: LeituraPainel) => void;
-}) {
+/** Os prints do painel: entram só como imagem nos slides (os números são sempre digitados). */
+export function PrintsRac(p: { unidade: UnidadeRac; mes: string; prints: PrintRac[]; erroDe: (campo: string) => string | undefined }) {
   const [estado, setEstado] = useState<Partial<Record<SlotPrint, string>>>({});
-  const m = mesesDoRac(p.mes);
   const marcar = (slot: SlotPrint, texto: string) => setEstado((e) => ({ ...e, [slot]: texto }));
 
-  async function escolher(slot: SlotPrint, delito: DelitoId, painel: boolean, arquivo: File | undefined) {
+  async function escolher(slot: SlotPrint, arquivo: File | undefined) {
     if (!arquivo) return;
     marcar(slot, 'Preparando…');
     let etapa: 'preparar' | 'enviar' = 'preparar';
     try {
       const foto = await reduzirFoto(arquivo);
       etapa = 'enviar';
-      let leitura: LeituraPainel | null = null;
-      let motivo = '';
-      if (painel && OCR_LIGADO) {
-        marcar(slot, 'Lendo os números do print… (pode levar alguns segundos)');
-        const r = await lerPainel(arquivo, p.mes).catch((e: unknown) => {
-          console.error('Leitura do print do RAC:', e);
-          return { leitura: null, motivo: 'Não foi possível ler os números deste print. Confira e digite os números.' };
-        });
-        leitura = r.leitura;
-        motivo = r.motivo ?? '';
-      }
       marcar(slot, 'Enviando…');
-      await salvarPrintRac(db, p.mes, p.unidade, slot, foto, leitura);
-      if (leitura) p.aoLer?.(delito, leitura);
-      marcar(slot, motivo ? `Enviado. ${motivo}` : 'Enviado.');
+      await salvarPrintRac(db, p.mes, p.unidade, slot, foto);
+      marcar(slot, 'Enviado.');
     } catch (e) {
       console.error('Print do RAC:', e);
       marcar(slot, motivoDoErroDoPrint(etapa, e));
@@ -439,30 +415,17 @@ export function PrintsRac(p: {
   return (
     <fieldset className="cartao grupo">
       <legend>Prints do painel (Coordenadoria Operacional)</legend>
-      <p className="pendente-detalhe">
-        Envie o print inteiro do painel. Nos de Indicadores Criminais o portal lê os números de {rotuloCurto(m.anoAnterior)}, {rotuloCurto(m.mesRetrasado)},{' '}
-        {rotuloCurto(m.mesAnterior)} e {rotuloCurto(m.atual)} e {p.unidade === 'btl' ? 'confere com a soma das Cias' : 'preenche os crimes que estiverem vazios'}.
-      </p>
+      <p className="pendente-detalhe">Envie o print inteiro de cada painel. Ele entra como imagem no slide; os números são digitados nas tabelas abaixo.</p>
       <div className="grade-prints">
         {slotsDaUnidade(p.unidade).map((s) => {
           const salvo = p.prints.find((x) => x.slot === s.id);
-          const l = salvo?.leitura;
           return (
             <div key={s.id} className="print-rac">
               <Campo rotulo={s.rotulo} obrigatorio erro={p.erroDe(`prints.${s.id}`)}>
-                <input type="file" accept="image/*" onChange={(e) => void escolher(s.id, s.delito, s.tipo === 'painel', e.target.files?.[0])} />
+                <input type="file" accept="image/*" onChange={(e) => void escolher(s.id, e.target.files?.[0])} />
               </Campo>
               {salvo?.miniatura && <img src={`data:image/jpeg;base64,${salvo.miniatura}`} alt={`Print enviado: ${s.rotulo}`} />}
               {estado[s.id] && <p className="rac-calculo">{estado[s.id]}</p>}
-              {l && Object.keys(l.valores).length > 0 && (
-                <p className="rac-calculo">
-                  Lido:{' '}
-                  {COLUNAS_LIDAS.filter((c) => l.valores[c])
-                    .map((c) => `${rotuloCurto(m[c])} ${l.valores[c]!.valor}${l.valores[c]!.confira ? ' ⚠️' : ''}`)
-                    .join(' · ')}
-                  {COLUNAS_LIDAS.some((c) => l.valores[c]?.confira) ? ' (⚠️ confira)' : ''}
-                </p>
-              )}
             </div>
           );
         })}
