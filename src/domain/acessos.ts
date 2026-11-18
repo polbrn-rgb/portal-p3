@@ -1,3 +1,4 @@
+import type { Assinatura } from './email';
 import { normalizarRE } from './efetivo';
 import { UNIDADES, type UnidadeId } from './unidades';
 
@@ -129,3 +130,24 @@ export function situacaoAcesso(a: Acesso): { texto: string; classe: string } {
   if (!a.ativo) return { texto: 'Bloqueado', classe: 'selo-atrasado' };
   return { texto: 'Ativo', classe: 'selo-concluido' };
 }
+
+/** RE de quem está logado com acesso individual (pela conta de login); conta antiga da unidade: null. */
+export function reDoLogin(email: string | null | undefined): string | null {
+  const m = /^re(\d+)@(.+)$/.exec(String(email ?? '').toLowerCase());
+  return m && m[2] === DOMINIO_LOGIN ? m[1] : null;
+}
+
+/** Como a pessoa logada aparece em "Respondido por", "Lançado por"…: "Sd PM ABDO (RE 194899)". */
+export function identificacaoDoLogin(email: string | null | undefined, nome: string | null | undefined): string | null {
+  const re = reDoLogin(email);
+  if (!re) return null;
+  const n = String(nome ?? '').trim();
+  return n ? `${n} (RE ${re})` : `RE ${re}`;
+}
+
+/** Nome na lista de Responsáveis de quem está logado (pela tabela de assinaturas, que guarda o RE de cada um). */
+export function responsavelDoRE(assinaturas: Pick<Assinatura, 'nome' | 're'>[], re: string | null): string | null {
+  if (!re) return null;
+  return assinaturas.find((a) => a.re && reBase(a.re) === re)?.nome ?? null;
+}
+

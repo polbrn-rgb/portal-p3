@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import {
   alterarStatus,
   atualizarDemanda,
@@ -32,6 +32,7 @@ import { useListas } from '../../lib/useListas';
 import { RespostasCias } from './RespostasCias';
 import { StatusAutomacao } from './StatusAutomacao';
 import { BaixarPdf } from '../BaixarPdf';
+import { useMeuResponsavel } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 export function NovaDemanda() {
@@ -196,6 +197,15 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
       d.responsavel && !opcoesDoCampo(listas, 'responsaveis').includes(d.responsavel) ? { ...d, responsavel: '' } : d,
     );
   }, [listas, existente]);
+  // Login individual: a demanda nova já vem com o Responsável de quem está logado (pode trocar).
+  const meuResponsavel = useMeuResponsavel();
+  const aplicouMeu = useRef(false);
+  useEffect(() => {
+    if (existente || aplicouMeu.current || !meuResponsavel) return;
+    if (!opcoesDoCampo(listas, 'responsaveis').includes(meuResponsavel)) return;
+    aplicouMeu.current = true;
+    setDados((d) => ({ ...d, responsavel: meuResponsavel as DadosDemanda['responsavel'] }));
+  }, [meuResponsavel, listas, existente]);
   const [destinosAbertos, setDestinosAbertos] = useState(false);
   const [registrada, setRegistrada] = useState<{ numero: number; numeroDocumento?: string } | null>(null);
   const [erros, setErros] = useState<ErrosDemanda>({});

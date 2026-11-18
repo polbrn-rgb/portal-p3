@@ -29,6 +29,7 @@ import { EapsDaCia, ResponderEap } from './EapCia';
 import { observarIccsAbertas, observarRespostasIccDaUnidade } from '../../data/icc';
 import type { Icc, RespostaIcc } from '../../domain/icc';
 import { AperfeicoamentoCia, contarPendentesIcc } from './IccCia';
+import { quemSou } from '../../lib/quemSou';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
@@ -253,7 +254,7 @@ function lerNome(): string {
 
 function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
   const [resposta, setResposta] = useState(enc.resposta);
-  const [nome, setNome] = useState(enc.respondidoPor || lerNome());
+  const [nome, setNome] = useState(quemSou() ?? (enc.respondidoPor || lerNome()));
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const [faltando, setFaltando] = useState<{ resposta?: string; nome?: string }>({});
@@ -341,8 +342,9 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
         </Campo>
         <Campo rotulo="Respondido por" erro={faltando.nome && !nome.trim() ? faltando.nome : undefined} obrigatorio={!finalizado}>
           <input
-            value={nome}
+            value={finalizado ? enc.respondidoPor || nome : nome}
             disabled={finalizado}
+            readOnly={Boolean(quemSou())}
             placeholder="Posto/graduação e nome"
             autoComplete="name"
             onChange={(e) => setNome(e.target.value)}

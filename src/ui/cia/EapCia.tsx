@@ -16,6 +16,7 @@ import {
 } from '../../domain/eap';
 import { normalizarRE } from '../../domain/efetivo';
 import { db } from '../../lib/firebase';
+import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.respondidoPor';
@@ -180,7 +181,7 @@ export function ResponderEap({ r }: { r: RespostaEap }) {
   const hoje = hojeISO();
   const [blocos, setBlocos] = useState<Record<string, ListaEap>>(() => structuredClone(r.blocos ?? {}));
   const [adicionandoEm, setAdicionandoEm] = useState<string | null>(null);
-  const [nome, setNome] = useState(() => r.respondidoPor || lerNome());
+  const [nome, setNome] = useState(() => quemSou() ?? (r.respondidoPor || lerNome()));
   const [erros, setErros] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState('');
@@ -285,7 +286,7 @@ export function ResponderEap({ r }: { r: RespostaEap }) {
 
       <div className="cartao grupo">
         <Campo rotulo="Enviado por" erro={erros.nome && !nome.trim() ? erros.nome : undefined} obrigatorio>
-          <input value={nome} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
+          <input value={nome} readOnly={Boolean(quemSou())} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
         </Campo>
         {aviso && (
           <p className="mensagem aviso" role="status">

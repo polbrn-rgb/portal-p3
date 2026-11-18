@@ -18,6 +18,7 @@ import { erroDoPdf } from '../../domain/pendente';
 import { db } from '../../lib/firebase';
 import { desenharAssinatura } from '../../lib/assinatura';
 import { cutucarMotor } from '../../lib/motor';
+import { meuRE, responsavelDoRE } from '../../lib/quemSou';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { useListas } from '../../lib/useListas';
 import { Campo } from '../Campo';
@@ -94,6 +95,12 @@ function FormAtalho(
   useEffect(() => {
     void ultimosEnderecos(db, p.atalho).then((u) => u && setDados((d) => ({ ...d, para: d.para || u.para, cc: u.cc })));
   }, [p.atalho]);
+
+  // Login individual: "Transmitido por" é quem está logado (travado).
+  const meu = responsavelDoRE(p.assinaturas, meuRE());
+  useEffect(() => {
+    if (meu) setDados((d) => (d.transmissor === meu ? d : { ...d, transmissor: meu }));
+  }, [meu]);
 
   const chefe = assinaturaChefe(p.assinaturas);
   const transmissor = dados.transmissor ? assinaturaDe(p.assinaturas, dados.transmissor) : undefined;
@@ -181,7 +188,7 @@ function FormAtalho(
         <textarea rows={4} value={dados.corpo} onChange={(e) => mudar('corpo', e.target.value)} />
       </Campo>
       <Campo rotulo="Transmitido por" obrigatorio erro={erros.transmissor}>
-        <select value={dados.transmissor} onChange={(e) => mudar('transmissor', e.target.value)}>
+        <select value={dados.transmissor} disabled={Boolean(meu)} onChange={(e) => mudar('transmissor', e.target.value)}>
           <option value="">Escolha…</option>
           {p.responsaveis.map((r) => (
             <option key={r} value={r}>

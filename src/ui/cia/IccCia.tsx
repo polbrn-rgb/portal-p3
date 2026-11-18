@@ -6,6 +6,7 @@ import { GRADUACOES_ICC, lerQuantidadesIcc, situacaoRespostaIcc, totalIcc, type 
 import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
+import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 const ROTULO = { gravado: '✅ Na planilha', enviado: '⏳ Enviado', erro: '❌ Erro ao gravar', pendente: 'Pendente', atrasado: 'Atrasado' } as const;
@@ -45,7 +46,7 @@ function CartaoIccCia(p: { icc: Icc; unidade: UnidadeId; resposta?: RespostaIcc 
   const [rascunho, setRascunho] = useState<Partial<Record<GraduacaoIcc, string>>>(() =>
     resposta ? Object.fromEntries(GRADUACOES_ICC.map((g) => [g.id, String(resposta[g.id])])) : {},
   );
-  const [nome, setNome] = useState(resposta?.respondidoPor || lerNome());
+  const [nome, setNome] = useState(quemSou() ?? (resposta?.respondidoPor || lerNome()));
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
@@ -110,7 +111,7 @@ function CartaoIccCia(p: { icc: Icc; unidade: UnidadeId; resposta?: RespostaIcc 
       </div>
       <p className="pendente-detalhe">Total: {totalIcc(valores)}</p>
       <Campo rotulo="Preenchido por" obrigatorio erro={erros.__nome}>
-        <input value={nome} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
+        <input value={nome} readOnly={Boolean(quemSou())} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
       </Campo>
       {resposta?.erro && !resposta.gravado && (
         <p className="mensagem erro" role="alert">

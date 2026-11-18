@@ -5,6 +5,7 @@ import { gruposDeCampos, operacoesDoDia, valoresPreenchidos, type Resultado } fr
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.sala.nome';
@@ -67,7 +68,7 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
   const salvo = useAoVivo<Resultado | null>((ok, erro) => observarResultado(db, numero, dia, ok, erro), [numero, dia]);
   const [protocolo, setProtocolo] = useState('');
   const [valores, setValores] = useState<Record<string, string>>({});
-  const [nome, setNome] = useState(lerNome);
+  const [nome, setNome] = useState(() => quemSou() ?? lerNome());
   const [erro, setErro] = useState('');
   const [faltando, setFaltando] = useState<{ protocolo?: string; nome?: string }>({});
   const [salvando, setSalvando] = useState(false);
@@ -148,7 +149,7 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
 
       <div className="cartao grupo">
         <Campo rotulo="Lançado por" erro={faltando.nome && !nome.trim() ? faltando.nome : undefined} obrigatorio>
-          <input value={nome} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
+          <input value={nome} readOnly={Boolean(quemSou())} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
         </Campo>
       </div>
 
