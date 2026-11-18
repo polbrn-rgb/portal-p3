@@ -241,6 +241,37 @@ service cloud.firestore {
       allow update: if ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && respostaIccValida(id);
     }
 
+    // Operações → RAC: a P/3 abre o mês de referência com o prazo; as Cias veem só os abertos.
+    match /racMeses/{mes} {
+      allow read: if ehP3() || (ehPerfil('unidade') && resource.data.status == 'aberto');
+      allow create: if ehP3()
+        && request.resource.data.keys().hasOnly(['mes', 'prazo', 'status', 'criadoEm'])
+        && request.resource.data.mes == mes && mes.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+        && request.resource.data.prazo is string && request.resource.data.status == 'aberto';
+      allow update: if ehP3() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prazo', 'status'])
+        && request.resource.data.status in ['aberto', 'encerrado'];
+    }
+
+    // RAC da Cia/FT (id = mes_unidade): só o dela, só com o mês aberto; enviado não volta a rascunho.
+    function racValido(id) {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['mes', 'unidadeId', 'crimes', 'pelotoes', 'producao', 'justificativas', 'status', 'preenchidoPor', 'salvoEm', 'enviadoEm'])
+        && id == r.mes + '_' + r.unidadeId
+        && r.crimes is map && r.pelotoes is map && r.producao is map && r.justificativas is map
+        && r.status in ['rascunho', 'enviado']
+        && r.preenchidoPor is string && r.preenchidoPor.size() <= 120
+        && (r.status == 'rascunho' || (r.preenchidoPor.size() > 0 && r.enviadoEm == request.time))
+        && r.salvoEm == request.time
+        && get(/databases/$(database)/documents/racMeses/$(r.mes)).data.status == 'aberto';
+    }
+
+    match /racs/{id} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create: if ehDaMinhaUnidade(request.resource.data) && racValido(id);
+      allow update: if ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && racValido(id)
+        && !(resource.data.status == 'enviado' && request.resource.data.status == 'rascunho');
+    }
+
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
     // O CFP (e a P/3) cadastram à mão quem não está no banco; o motor leva para a aba BD Efetivo.
     // Só cria: quem já está no banco não é alterado pelo portal.

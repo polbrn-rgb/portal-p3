@@ -459,3 +459,83 @@ export function tabelasDoRac(d: RacDados): Tabela[] {
   t.push(prod('COMPARATIVO PRODUTIVIDADE ANUAL', 'prodAnual', ano, 'anoAnterior'));
   return t;
 }
+
+// ---------- Fase 2: abertura pela P/3, envio das Cias e situação ----------
+
+/** Unidades que mandam RAC (o do Batalhão a P/3 monta). */
+export const UNIDADES_RAC: readonly UnidadeId[] = ['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft'];
+
+export type RacMes = { mes: string; prazo: string; status: 'aberto' | 'encerrado' };
+export type StatusRac = 'rascunho' | 'enviado';
+export type RacSalvo = RacDados & { id: string; status: StatusRac; preenchidoPor: string };
+
+export const idRac = (mes: string, u: UnidadeRac) => `${mes}_${u}`;
+export const ehMes = (m: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
+
+const MESES_LONGOS = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+/** '2026-09' -> 'SETEMBRO/2026' (título do RAC). */
+export function rotuloMesLongo(mes: string): string {
+  const [a, m] = mes.split('-');
+  return `${MESES_LONGOS[Number(m) - 1] ?? m}/${a}`;
+}
+/** Sugestão ao abrir: o mês anterior ao de hoje (o RAC de setembro é feito em outubro). */
+export const mesReferenciaPadrao = (hojeISO: string) => somarMeses(hojeISO.slice(0, 7), -1);
+
+export function validarAberturaRac(mes: string, prazo: string, jaAbertos: readonly string[]): Partial<Record<'mes' | 'prazo', string>> {
+  const e: Partial<Record<'mes' | 'prazo', string>> = {};
+  if (!ehMes(mes)) e.mes = 'Informe o mês de referência.';
+  else if (jaAbertos.includes(mes)) e.mes = `O RAC de ${rotuloMesLongo(mes)} já existe.`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(prazo)) e.prazo = 'Informe o prazo das Cias.';
+  return e;
+}
+
+export type SituacaoRac = 'enviado' | 'rascunho' | 'pendente' | 'atrasado';
+export function situacaoRac(r: Pick<RacSalvo, 'status'> | undefined, prazo: string, hoje: string): SituacaoRac {
+  if (r?.status === 'enviado') return 'enviado';
+  if (hoje > prazo) return 'atrasado';
+  return r ? 'rascunho' : 'pendente';
+}
+
+/** Os RAC já ENVIADOS pela unidade que servem de histórico para o mês. */
+export function historicoDoRac(lista: readonly RacSalvo[], mes: string): Historico {
+  const m = mesesDoRac(mes);
+  const enviado = (alvo: string) => lista.find((r) => r.mes === alvo && r.status === 'enviado');
+  return { mesAnterior: enviado(m.mesAnterior), anoAnterior: enviado(m.anoAnterior) };
+}
+
+/** Texto digitado -> número (só dígitos; vazio = null). */
+export function lerNumero(texto: string): Valor {
+  const d = texto.replace(/\D/g, '');
+  return d === '' ? null : Number(d);
+}
+
+const valorOuNull = (v: unknown): Valor => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** Documento do banco -> RacDados completo (campos que faltam ficam vazios; sobras são ignoradas). */
+export function normalizarRac(unidade: UnidadeRac, mes: string, x: Partial<Record<keyof RacDados, unknown>>): RacDados {
+  const d = racVazio(unidade, mes);
+  const crimes = (x.crimes ?? {}) as Record<string, Record<string, unknown>>;
+  for (const c of DELITOS) for (const k of Object.keys(d.crimes[c.id]) as (keyof LinhaCrime)[]) d.crimes[c.id][k] = valorOuNull(crimes[c.id]?.[k]);
+  const producao = (x.producao ?? {}) as Record<string, Record<string, unknown>>;
+  for (const p of PRODUTIVIDADE) for (const k of Object.keys(d.producao[p.id]) as (keyof LinhaProd)[]) d.producao[p.id][k] = valorOuNull(producao[p.id]?.[k]);
+  const pel = (x.pelotoes ?? {}) as Record<string, Record<string, unknown>>;
+  for (const l of Object.keys(d.pelotoes)) for (const c of Object.keys(d.pelotoes[l])) d.pelotoes[l][c] = valorOuNull(pel[l]?.[c]);
+  const j = (x.justificativas ?? {}) as Record<string, unknown>;
+  for (const [k, v] of Object.entries(j)) if (typeof v === 'string') d.justificativas[k] = v;
+  return d;
+}
+
+/** Valor de um campo pelo caminho usado nos alertas (ex.: 'crimes.furtoVeiculo.atual'). */
+export function valorDoCampo(d: RacDados, campo: string): Valor {
+  const [grupo, a, b] = campo.split('.');
+  const g = (d as unknown as Record<string, Record<string, Record<string, Valor>>>)[grupo];
+  return g?.[a]?.[b] ?? null;
+}
+/** Cópia do RAC com um campo alterado. */
+export function comCampo(d: RacDados, campo: string, valor: Valor): RacDados {
+  const n = structuredClone(d);
+  const [grupo, a, b] = campo.split('.');
+  const g = (n as unknown as Record<string, Record<string, Record<string, Valor>>>)[grupo];
+  if (g?.[a] && b in g[a]) g[a][b] = valor;
+  return n;
+}

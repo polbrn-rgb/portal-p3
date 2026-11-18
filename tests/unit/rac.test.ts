@@ -1,10 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
+  comCampo,
   conferirRac,
   corVariacao,
   CORES_VAR,
   DELITOS,
+  historicoDoRac,
+  lerNumero,
   mesesDoRac,
+  mesReferenciaPadrao,
+  normalizarRac,
   podeEnviar,
   preencherDoHistorico,
   producaoAtual,
@@ -12,11 +17,16 @@ import {
   prodDigitadaAParte,
   racVazio,
   rotuloCurto,
+  rotuloMesLongo,
+  situacaoRac,
   somarBatalhao,
   tabelasDoRac,
   textoVariacao,
+  validarAberturaRac,
+  valorDoCampo,
   variacao,
   type RacDados,
+  type RacSalvo,
   type UnidadeRac,
   type Valor,
 } from '../../src/domain/rac';
@@ -241,5 +251,51 @@ describe('Batalhão = soma das Cias (+ FT na produtividade)', () => {
     expect(somarBatalhao(semFt, '2026-09').producao.flagrante.mesAnterior).toBeNull();
     expect(somarBatalhao(semFt, '2026-09').crimes.rouboOutros.atual).toBe(246); // FT não entra nos crimes
     expect(somarBatalhao(todas(), '2026-10').crimes.rouboOutros.atual).toBeNull(); // nenhum RAC de outubro
+  });
+});
+
+describe('abertura pela P/3 e envio das Cias (Fase 2)', () => {
+  test('mês de referência: sugestão, título e validação', () => {
+    expect(mesReferenciaPadrao('2026-10-05')).toBe('2026-09');
+    expect(mesReferenciaPadrao('2027-01-10')).toBe('2026-12');
+    expect(rotuloMesLongo('2026-09')).toBe('SETEMBRO/2026');
+    expect(validarAberturaRac('2026-09', '2026-10-10', [])).toEqual({});
+    expect(validarAberturaRac('', '', [])).toEqual({ mes: 'Informe o mês de referência.', prazo: 'Informe o prazo das Cias.' });
+    expect(validarAberturaRac('2026-13', '2026-10-10', []).mes).toBe('Informe o mês de referência.');
+    expect(validarAberturaRac('2026-09', '2026-10-10', ['2026-09']).mes).toBe('O RAC de SETEMBRO/2026 já existe.');
+  });
+  test('situação: enviado, rascunho, pendente e atrasado pelo prazo da P/3', () => {
+    expect(situacaoRac({ status: 'enviado' }, '2026-10-10', '2026-10-20')).toBe('enviado');
+    expect(situacaoRac({ status: 'rascunho' }, '2026-10-10', '2026-10-10')).toBe('rascunho');
+    expect(situacaoRac(undefined, '2026-10-10', '2026-10-09')).toBe('pendente');
+    expect(situacaoRac({ status: 'rascunho' }, '2026-10-10', '2026-10-11')).toBe('atrasado');
+  });
+  test('histórico: só RAC enviados do mês anterior e do mesmo mês do ano anterior', () => {
+    const r = (mes: string, status: 'enviado' | 'rascunho'): RacSalvo => ({ ...racVazio('1cia', mes), id: `${mes}_1cia`, status, preenchidoPor: '' });
+    const lista = [r('2026-08', 'enviado'), r('2025-09', 'rascunho'), r('2026-07', 'enviado')];
+    const h = historicoDoRac(lista, '2026-09');
+    expect(h.mesAnterior?.mes).toBe('2026-08');
+    expect(h.anoAnterior).toBeUndefined();
+  });
+  test('digitação: só dígitos; vazio continua vazio', () => {
+    expect(lerNumero('1.270')).toBe(1270);
+    expect(lerNumero(' 42 ')).toBe(42);
+    expect(lerNumero('')).toBeNull();
+    expect(lerNumero('abc')).toBeNull();
+    expect(lerNumero('-5')).toBe(5);
+  });
+  test('campo pelo caminho e documento do banco completado', () => {
+    const d = comCampo(racVazio('ft', '2026-09'), 'pelotoes.flagrante.pelB', 4);
+    expect(valorDoCampo(d, 'pelotoes.flagrante.pelB')).toBe(4);
+    expect(valorDoCampo(comCampo(d, 'pelotoes.nada.pelB', 1), 'pelotoes.nada.pelB')).toBeNull(); // caminho que não existe: ignora
+    const n = normalizarRac('1cia', '2026-09', {
+      crimes: { furtoVeiculo: { atual: 62, inconsistencias: 'x' } },
+      pelotoes: { ai: { rpm: 165, sobra: 1 } },
+      justificativas: { copiaProducao: 'ok', ruim: 3 },
+    });
+    expect(n.crimes.furtoVeiculo).toEqual({ anoAnterior: null, mesRetrasado: null, mesAnterior: null, atual: 62, inconsistencias: null });
+    expect(n.pelotoes.ai).toEqual({ pelA: null, pelB: null, pelC: null, pelD: null, re: null, rpm: 165 });
+    expect(n.justificativas).toEqual({ copiaProducao: 'ok' });
+    expect(n.producao.bopm).toEqual({ anoAnterior: null, mesAnterior: null, atual: null });
   });
 });

@@ -15,6 +15,7 @@ import { Aperfeicoamento } from './Aperfeicoamento';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { ControleOperacoes } from './ControleOperacoes';
 import { DocumentosMensais } from './DocumentosMensais';
+import { RacP3 } from './RacP3';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
@@ -25,8 +26,8 @@ import { TdsP3 } from './TdsP3';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-/** Dentro de Operações: o Checklist Operações e o Controle de Operações (com o Relatório de Indicadores). */
-function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos'; operacoes?: number }) {
+/** Dentro de Operações: Checklist, Controle de Operações (Relatório de Indicadores), Documentos Mensais e RAC. */
+function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos' | 'rac'; operacoes?: number }) {
   return (
     <nav className="abas abas-p3 subabas" aria-label="Operações">
       <a href="#/operacoes" aria-current={ativa === 'checklist' ? 'page' : undefined}>
@@ -38,6 +39,9 @@ function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle
       </a>
       <a href="#/operacoes/documentos" aria-current={ativa === 'documentos' ? 'page' : undefined}>
         Documentos Mensais
+      </a>
+      <a href="#/operacoes/rac" aria-current={ativa === 'rac' ? 'page' : undefined}>
+        RAC
       </a>
     </nav>
   );
@@ -141,12 +145,20 @@ function ConteudoP3({
     );
   }
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
-  if (hash === '#/operacoes' || hash === '#/operacoes/controle' || hash === '#/operacoes/documentos') {
-    const ativa = hash === '#/operacoes/controle' ? 'controle' : hash === '#/operacoes/documentos' ? 'documentos' : 'checklist';
+  if (hash === '#/operacoes' || hash === '#/operacoes/controle' || hash === '#/operacoes/documentos' || hash === '#/operacoes/rac') {
+    const ativa = hash === '#/operacoes/controle' ? 'controle' : hash === '#/operacoes/documentos' ? 'documentos' : hash === '#/operacoes/rac' ? 'rac' : 'checklist';
     return (
       <>
         <SubAbasOperacoes ativa={ativa} operacoes={operacoes.valor?.length} />
-        {ativa === 'controle' ? <ControleOperacoes /> : ativa === 'documentos' ? <DocumentosMensais /> : <ChecklistOperacoes operacoes={operacoes} />}
+        {ativa === 'controle' ? (
+          <ControleOperacoes />
+        ) : ativa === 'documentos' ? (
+          <DocumentosMensais />
+        ) : ativa === 'rac' ? (
+          <RacP3 />
+        ) : (
+          <ChecklistOperacoes operacoes={operacoes} />
+        )}
       </>
     );
   }

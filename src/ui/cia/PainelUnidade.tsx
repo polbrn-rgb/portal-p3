@@ -31,6 +31,9 @@ import type { Icc, RespostaIcc } from '../../domain/icc';
 import { AperfeicoamentoCia, contarPendentesIcc } from './IccCia';
 import { quemSou } from '../../lib/quemSou';
 import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
+import { observarRacMesesAbertos, observarRacsDaUnidade } from '../../data/rac';
+import type { RacMes, RacSalvo } from '../../domain/rac';
+import { contarPendentesRac, FormRacCia, ListaRacCia } from './RacCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'pendentes', rotulo: 'Pendentes' },
@@ -38,11 +41,12 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento';
+type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac';
 
 function abaDaRota(hash: string): AbaCia | undefined {
   if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
+  if (hash === '#/rac' || hash.startsWith('#/rac/')) return 'rac';
   if (hash === '#/respondidas') return 'respondidas';
   if (hash === '#/finalizadas') return 'finalizadas';
   if (/^#\/(enc|efetivo|eap)\//.test(hash)) return undefined;
@@ -78,6 +82,10 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   const iccs = useAoVivo<Icc[]>((ok, erro) => observarIccsAbertas(db, ok, erro), []);
   const respostasIcc = useAoVivo<RespostaIcc[]>((ok, erro) => observarRespostasIccDaUnidade(db, unidade, ok, erro), [unidade]);
   const temIcc = (iccs.valor ?? []).length > 0;
+  const racMeses = useAoVivo<RacMes[]>((ok, erro) => observarRacMesesAbertos(db, ok, erro), []);
+  const racs = useAoVivo<RacSalvo[]>((ok, erro) => observarRacsDaUnidade(db, unidade, ok, erro), [unidade]);
+  const temRac = (racMeses.valor ?? []).length > 0;
+  const racAberto = /^#\/rac\/(\d{4}-\d{2})$/.exec(hash)?.[1];
   const itens = [
     ...ABAS.map((a) => ({
       id: a.id as AbaCia,
@@ -102,6 +110,9 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
           },
         ]
       : []),
+    ...(temRac || ativa === 'rac'
+      ? [{ id: 'rac' as AbaCia, href: '#/rac', rotulo: 'RAC', contador: contarPendentesRac(racMeses.valor ?? [], racs.valor ?? []) }]
+      : []),
   ];
   const docAberto = /^#\/documentos\/([\w-]+)$/.exec(hash)?.[1];
 
@@ -113,6 +124,21 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   );
 
   function conteudo(): ReactNode {
+    if (ativa === 'rac') {
+      if (racMeses.carregando || racs.carregando) return <p className="carregando">Carregando…</p>;
+      const m = racAberto ? racMeses.valor?.find((x) => x.mes === racAberto) : undefined;
+      if (racAberto && !m)
+        return (
+          <section className="painel">
+            <p className="mensagem erro" role="alert">
+              RAC não encontrado ou encerrado pela P/3.
+            </p>
+            <a href="#/rac">Voltar</a>
+          </section>
+        );
+      if (m) return <FormRacCia key={m.mes} unidade={unidade} mes={m} racs={racs.valor ?? []} />;
+      return <ListaRacCia meses={racMeses.valor ?? []} racs={racs.valor ?? []} carregando={false} />;
+    }
     if (docAberto) {
       const d = DOCUMENTOS.find((x) => x.id === docAberto);
       if (!d) return <p className="mensagem erro">Documento não encontrado.</p>;

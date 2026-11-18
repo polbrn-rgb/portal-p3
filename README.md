@@ -105,6 +105,12 @@ histórico das demandas.
   cabeçalho (linhas 4 a 6, títulos e apresentações) e deixa cada turma com as linhas das vagas da Cia. Cada Cia indica o
   efetivo pelo portal (RE puxa graduação, nome completo, e-mail e celular do banco) ou marca "Sem efetivo pendente de
   EAP"; o motor grava na aba da Cia com "Validado por" em H3. A P/3 acompanha, gera o compilado e encerra.
+- **Operações → RAC**: a P/3 abre o RAC do **mês de referência** (o de setembro é feito em outubro) com o prazo das
+  Cias, muda o prazo, encerra/reabre e acompanha quem enviou. Na página da Cia/FT, aba **RAC**: crimes (ano anterior,
+  trimestral, mês e inconsistências), produtividade por pelotão, itens à parte e o comparativo. **Real, TOTAL e Var %
+  são calculados** (Var % com base zero mostra "—"); mês anterior/trimestral/ano anterior vêm dos RAC já enviados.
+  Erro (vazio, inválido, inconsistência maior que o total) impede o envio; aviso (coluna copiada, número diferente do
+  RAC já enviado) pede justificativa. Regras em `src/domain/rac.ts`.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de

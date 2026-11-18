@@ -2649,3 +2649,56 @@ fieldset:has(> .erro-campo) > legend {
 .acoes-acesso {
   gap: 16px;
 }
+
+/* ---------- Operações → RAC (Cias e FT) ---------- */
+.formulario-rac .grupo {
+  gap: 10px;
+}
+
+.rac-linha {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid #e3e7ee;
+}
+
+.rac-linha h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--cor-secundaria);
+}
+
+.grade-rac {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.grade-rac .campo {
+  gap: 4px;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.grade-rac .campo input {
+  padding: 8px;
+  text-align: center;
+}
+
+.rac-calculo {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cor-suave);
+}
+
+.rac-aviso {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aviso-rac {
+  background: #fff6e0;
+  color: #7a5200;
+}
