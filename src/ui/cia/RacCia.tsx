@@ -34,7 +34,7 @@ import {
   type RacSalvo,
   type SituacaoRac,
 } from '../../domain/rac';
-import { conferirPrints, preencherDoPrint, slotsDaUnidade, type ColunaLida, type LeituraPainel, type SlotPrint } from '../../domain/racPrints';
+import { conferirPrints, motivoDoErroDoPrint, preencherDoPrint, slotsDaUnidade, type ColunaLida, type LeituraPainel, type SlotPrint } from '../../domain/racPrints';
 import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { reduzirFoto } from '../../lib/imagem';
@@ -314,8 +314,10 @@ function PrintsRac(p: {
   async function escolher(slot: SlotPrint, delito: DelitoId, painel: boolean, arquivo: File | undefined) {
     if (!arquivo) return;
     marcar(slot, 'Preparando…');
+    let etapa: 'preparar' | 'enviar' = 'preparar';
     try {
       const foto = await reduzirFoto(arquivo);
+      etapa = 'enviar';
       let leitura: LeituraPainel | null = null;
       if (painel && OCR_LIGADO) {
         marcar(slot, 'Lendo os números do print…');
@@ -325,8 +327,9 @@ function PrintsRac(p: {
       await salvarPrintRac(db, p.mes, p.unidade, slot, foto, leitura);
       if (leitura) p.aoLer(delito, leitura);
       marcar(slot, painel && OCR_LIGADO && !leitura ? 'Enviado. Não deu para ler os números: confira e digite abaixo.' : 'Enviado.');
-    } catch {
-      marcar(slot, 'Não foi possível enviar. Escolha uma imagem (print) e tente de novo.');
+    } catch (e) {
+      console.error('Print do RAC:', e);
+      marcar(slot, motivoDoErroDoPrint(etapa, e));
     }
   }
 
