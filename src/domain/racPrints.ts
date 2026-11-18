@@ -185,3 +185,13 @@ export function conferirPrints(d: RacDados, prints: readonly PrintSalvo[]): Aler
     out.push({ id: 'printDivergente', nivel: 'aviso', campo: campoDif, mensagem: `Número diferente do print — ${diferentes.join('; ')}.` });
   return out;
 }
+
+/** Mensagem que diz por que o print não foi (em vez de uma mensagem genérica). */
+export function motivoDoErroDoPrint(etapa: 'preparar' | 'enviar', e: unknown): string {
+  if (etapa === 'preparar') return 'Esse arquivo não abriu como imagem. Escolha o print (PNG ou JPG) e tente de novo.';
+  const codigo = (e as { code?: string } | null)?.code ?? '';
+  if (codigo.includes('permission-denied'))
+    return 'O banco recusou o print: o RAC deste mês pode ter sido encerrado ou as regras do portal ainda não foram publicadas. Avise a P/3.';
+  if (codigo.includes('unavailable') || codigo.includes('deadline-exceeded')) return 'Sem conexão com o portal agora. Tente de novo em instantes.';
+  return `Não foi possível enviar o print (${codigo || 'erro desconhecido'}). Tente de novo; se repetir, avise a P/3.`;
+}

@@ -8,6 +8,7 @@ import {
   ciaDoTexto,
   conferirPrints,
   delitoDoTexto,
+  motivoDoErroDoPrint,
   ehPainelPadrao,
   GRADE,
   precisaMaisTentativas,
@@ -118,5 +119,15 @@ describe('uso no RAC', () => {
     expect(a[1].mensagem).toContain('Roubo outros — Indicadores Criminais (lido: FURTOS OUTROS)');
     expect(a[2]).toMatchObject({ campo: 'crimes.furtoVeiculo.atual' });
     expect(a[2].mensagem).toBe('Número diferente do print — FURTO VEÍCULO set/26: digitado 62, no print 63.');
+  });
+});
+
+describe('erro ao enviar o print', () => {
+  test('a mensagem diz o motivo', () => {
+    expect(motivoDoErroDoPrint('preparar', new Error('x'))).toContain('não abriu como imagem');
+    expect(motivoDoErroDoPrint('enviar', { code: 'permission-denied' })).toContain('regras do portal ainda não foram publicadas');
+    expect(motivoDoErroDoPrint('enviar', { code: 'unavailable' })).toContain('Sem conexão');
+    expect(motivoDoErroDoPrint('enviar', { code: 'resource-exhausted' })).toContain('(resource-exhausted)');
+    expect(motivoDoErroDoPrint('enviar', null)).toContain('(erro desconhecido)');
   });
 });
