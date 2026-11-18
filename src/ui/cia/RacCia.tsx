@@ -34,6 +34,7 @@ import {
   type RacMes,
   type RacSalvo,
   type SituacaoRac,
+  type UnidadeRac,
 } from '../../domain/rac';
 import { conferirPrints, motivoDoErroDoPrint, preencherDoPrint, slotsDaUnidade, type ColunaLida, type LeituraPainel, type SlotPrint } from '../../domain/racPrints';
 import type { UnidadeId } from '../../domain/unidades';
@@ -351,7 +352,7 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
 }
 
 /** Tabela do formulário no mesmo formato do slide (título, fonte e colunas). */
-function TabelaRac(p: { titulo: string; fonte: string; cabecalho: string[]; children: ReactNode }) {
+export function TabelaRac(p: { titulo: string; fonte: string; cabecalho: string[]; children: ReactNode }) {
   return (
     <fieldset className="cartao grupo">
       <legend>{p.titulo}</legend>
@@ -396,12 +397,12 @@ function Avisos(p: { avisos: Alerta[]; d: RacDados; tentou: boolean; mudar: (id:
 const COLUNAS_LIDAS: ColunaLida[] = ['anoAnterior', 'mesRetrasado', 'mesAnterior', 'atual'];
 
 /** Os 7 prints do painel. Nos de "Indicadores Criminais" os números são lidos no próprio aparelho. */
-function PrintsRac(p: {
-  unidade: UnidadeId;
+export function PrintsRac(p: {
+  unidade: UnidadeRac;
   mes: string;
   prints: PrintRac[];
   erroDe: (campo: string) => string | undefined;
-  aoLer: (delito: DelitoId, l: LeituraPainel) => void;
+  aoLer?: (delito: DelitoId, l: LeituraPainel) => void;
 }) {
   const [estado, setEstado] = useState<Partial<Record<SlotPrint, string>>>({});
   const m = mesesDoRac(p.mes);
@@ -427,7 +428,7 @@ function PrintsRac(p: {
       }
       marcar(slot, 'Enviando…');
       await salvarPrintRac(db, p.mes, p.unidade, slot, foto, leitura);
-      if (leitura) p.aoLer(delito, leitura);
+      if (leitura) p.aoLer?.(delito, leitura);
       marcar(slot, motivo ? `Enviado. ${motivo}` : 'Enviado.');
     } catch (e) {
       console.error('Print do RAC:', e);
@@ -440,7 +441,7 @@ function PrintsRac(p: {
       <legend>Prints do painel (Coordenadoria Operacional)</legend>
       <p className="pendente-detalhe">
         Envie o print inteiro do painel. Nos de Indicadores Criminais o portal lê os números de {rotuloCurto(m.anoAnterior)}, {rotuloCurto(m.mesRetrasado)},{' '}
-        {rotuloCurto(m.mesAnterior)} e {rotuloCurto(m.atual)} e preenche os crimes que estiverem vazios.
+        {rotuloCurto(m.mesAnterior)} e {rotuloCurto(m.atual)} e {p.unidade === 'btl' ? 'confere com a soma das Cias' : 'preenche os crimes que estiverem vazios'}.
       </p>
       <div className="grade-prints">
         {slotsDaUnidade(p.unidade).map((s) => {

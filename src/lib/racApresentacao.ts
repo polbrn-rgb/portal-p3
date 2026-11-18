@@ -1,9 +1,8 @@
 import type { Firestore } from 'firebase/firestore';
 import { lerImagemPrint } from '../data/racPrints';
-import type { RacDados } from '../domain/rac';
+import { ordemDoCompilado, rotuloMesLongo, type LinhaRpm, type RacDados, type RacSalvo, type RpmId } from '../domain/rac';
 import { dimensoesJpeg, montarApresentacao, nomeArquivoRac, type ImagemPrint, type RacParaSlides } from '../domain/racPptx';
 import { idPrint, slotsDaUnidade, type SlotPrint } from '../domain/racPrints';
-import type { UnidadeId } from '../domain/unidades';
 import { base64ParaBytes } from './imagem';
 import { zip } from './xlsx';
 import { deszipar, type ArquivosZip } from './zipLeitura';
@@ -28,8 +27,7 @@ function carregarModelo(): Promise<ArquivosZip> {
 /** Os prints (em tamanho cheio) que a unidade já enviou; os que faltam ficam de fora. */
 export async function imagensDoRac(db: Firestore, d: RacDados): Promise<Partial<Record<SlotPrint, ImagemPrint>>> {
   const saida: Partial<Record<SlotPrint, ImagemPrint>> = {};
-  if (d.unidade === 'btl') return saida;
-  const u = d.unidade as UnidadeId;
+  const u = d.unidade;
   await Promise.all(
     slotsDaUnidade(d.unidade).map(async (s) => {
       try {
@@ -61,7 +59,15 @@ export function baixarArquivo(nome: string, dados: Uint8Array, tipo = 'applicati
 }
 
 /** Baixa o RAC de uma unidade (com o que estiver preenchido; o que falta sai como "—"). */
-export async function baixarRacDaUnidade(db: Firestore, d: RacDados, titulo: string): Promise<void> {
+export async function baixarRacDaUnidade(db: Firestore, d: RacDados, titulo: string, rpmAnterior?: Record<RpmId, LinhaRpm>): Promise<void> {
   const prints = await imagensDoRac(db, d);
-  baixarArquivo(nomeArquivoRac(titulo, d.mes), await gerarPptx([{ dados: d, prints }]));
+  baixarArquivo(nomeArquivoRac(titulo, d.mes), await gerarPptx([{ dados: d, prints, rpmAnterior }]));
+}
+
+/** RAC GERAL: as Cias e a FT que enviaram, na ordem oficial, e o Batalhão no fim — um .pptx só. */
+export async function baixarRacGeral(db: Firestore, mes: string, racs: readonly RacSalvo[], rpmAnterior?: Record<RpmId, LinhaRpm>): Promise<void> {
+  const unidades = await Promise.all(
+    ordemDoCompilado(racs, mes).map(async (dados) => ({ dados, prints: await imagensDoRac(db, dados), rpmAnterior: dados.unidade === 'btl' ? rpmAnterior : undefined })),
+  );
+  baixarArquivo(`RAC GERAL - ${rotuloMesLongo(mes).replace('/', '-')}.pptx`, await gerarPptx(unidades));
 }

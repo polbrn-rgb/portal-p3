@@ -7,6 +7,7 @@ import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
 import { ROTULO_SITUACAO_RAC } from '../cia/RacCia';
 import { PreviaRac } from '../PreviaRac';
+import { RacBatalhao } from './RacBatalhao';
 import { baixarRacDaUnidade } from '../../lib/racApresentacao';
 import type { UnidadeId } from '../../domain/unidades';
 
@@ -217,6 +218,8 @@ function CartaoRacP3({ m }: { m: RacMes }) {
           </div>
         </div>
       )}
+
+      <RacBatalhao m={m} racs={racs.valor ?? []} />
 
       {m.status === 'aberto' && (
         <div className="acoes-linha">

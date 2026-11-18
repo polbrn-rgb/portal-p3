@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
   comCampo,
+  faltamNoCompilado,
+  ordemDoCompilado,
+  racBatalhao,
+  totalRpm,
   conferirRac,
   corVariacao,
   CORES_VAR,
@@ -240,7 +244,7 @@ describe('Batalhão = soma das Cias (+ FT na produtividade)', () => {
   test('produtividade de ago/26 bate com o RAC do Batalhão', () => {
     const btl = somarBatalhao(todas(), '2026-09');
     expect(PRODUTIVIDADE.map((p) => btl.producao[p.id].mesAnterior)).toEqual([69, 4, 3, 16571, 35, 6606, 3705, 46, 104, 633, 912, 0, 550, 4729]);
-    expect(tabelasDoRac(btl).map((t) => t.id)).toEqual(['anual', 'inconsistencias', 'trimestral', 'prodMensal', 'prodAnual']);
+    expect(tabelasDoRac(btl).map((t) => t.id)).toEqual(['anual', 'trimestral', 'rpm', 'prodMensal', 'prodAnual']); // como o RAC BTL oficial
   });
   test('falta de uma Cia ou de um número deixa o total vazio (não soma pela metade)', () => {
     const l = todas();
@@ -297,5 +301,33 @@ describe('abertura pela P/3 e envio das Cias (Fase 2)', () => {
     expect(n.pelotoes.ai).toEqual({ pelA: null, pelB: null, pelC: null, pelD: null, re: null, rpm: 165 });
     expect(n.justificativas).toEqual({ copiaProducao: 'ok' });
     expect(n.producao.bopm).toEqual({ anoAnterior: null, mesAnterior: null, atual: null });
+  });
+});
+
+describe('Batalhão e RAC GERAL (Fase 5)', () => {
+  const salvo = (d: RacDados, status: 'enviado' | 'rascunho' = 'enviado'): RacSalvo => ({ ...d, id: `${d.mes}_${d.unidade}`, status, preenchidoPor: 'X' });
+  const todas = () => [...(['1cia', '2cia', '3cia', '4cia', '5cia', '6cia'] as const).map((u) => salvo(rac(u))), salvo(rac('ft'))];
+
+  test('Batalhão = soma dos RAC enviados + RPM da P/3; rascunho não entra', () => {
+    const btl = racVazio('btl', '2026-09');
+    btl.rpm!.pessoasAbordadas = { mesAnterior: 1462, atual: 1936, totalGeral: null };
+    const lista = [...todas(), salvo(btl, 'rascunho')];
+    const r = racBatalhao(lista, '2026-09');
+    expect(r.crimes.furtoVeiculo.atual).toBe(218);
+    expect(r.rpm!.pessoasAbordadas.atual).toBe(1936);
+    const t = tabelasDoRac(r).find((x) => x.id === 'rpm')!;
+    expect(t.cabecalho).toEqual(['Indicadores', 'AGOSTO', 'SETEMBRO', 'TOTAL GERAL']);
+    expect(t.linhas[0].valores).toEqual([1462, 1936, 3398]); // como no RAC de setembro (RPM começou em agosto)
+
+    lista[1] = salvo(rac('2cia'), 'rascunho');
+    expect(racBatalhao(lista, '2026-09').crimes.furtoVeiculo.atual).toBeNull();
+    expect(faltamNoCompilado(lista, '2026-09')).toEqual(['2cia']);
+    expect(ordemDoCompilado(lista, '2026-09').map((d) => d.unidade)).toEqual(['1cia', '3cia', '4cia', '5cia', '6cia', 'ft', 'btl']);
+  });
+  test('TOTAL GERAL do RPM: digitado vale; vazio soma ao TOTAL do mês anterior', () => {
+    expect(totalRpm({ mesAnterior: 10, atual: 5, totalGeral: 99 })).toBe(99);
+    expect(totalRpm({ mesAnterior: 1936, atual: 2000, totalGeral: null }, { mesAnterior: 1462, atual: 1936, totalGeral: 3398 })).toBe(5398);
+    expect(totalRpm({ mesAnterior: 1936, atual: 2000, totalGeral: null }, { mesAnterior: 1462, atual: 1936, totalGeral: null })).toBeNull();
+    expect(totalRpm({ mesAnterior: null, atual: 7, totalGeral: null })).toBeNull();
   });
 });

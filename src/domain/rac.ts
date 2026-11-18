@@ -84,6 +84,34 @@ export interface RacDados {
   pelotoes: Record<string, Record<string, Valor>>; // linha -> coluna -> valor
   producao: Record<ProdId, LinhaProd>;
   justificativas: Record<string, string>; // id do aviso -> texto
+  rpm?: Record<RpmId, LinhaRpm>; // só no Batalhão (digitado pela P/3)
+}
+
+// Produtividade RPM (só no RAC do Batalhão), como na aba RPM da planilha RAC BTL.
+export const RPM = [
+  { id: 'pessoasAbordadas', rotulo: 'Pessoas Abordadas' },
+  { id: 'motoAbordada', rotulo: 'Moto Abordada-(LÍCITO)' },
+  { id: 'autoAbordado', rotulo: 'Auto Abordado-(LÍCITO)' },
+  { id: 'motoRemovida', rotulo: 'Moto Removida' },
+  { id: 'aiEstadual', rotulo: 'AI (Estadual)' },
+  { id: 'pessoasPresas', rotulo: 'Pessoas Presas' },
+  { id: 'procurados', rotulo: 'Procurados Recapturados' },
+  { id: 'armaPermitido', rotulo: 'Arma de Fogo (Permitido)' },
+  { id: 'armaRestrito', rotulo: 'Arma de Fogo (Restrito)' },
+] as const;
+export type RpmId = (typeof RPM)[number]['id'];
+/** TOTAL GERAL = acumulado do ano. Vazio = o portal calcula (TOTAL do RAC anterior + mês; sem anterior, anterior + mês). */
+export type LinhaRpm = { mesAnterior: Valor; atual: Valor; totalGeral: Valor };
+
+export function rpmVazio(): Record<RpmId, LinhaRpm> {
+  return Object.fromEntries(RPM.map((r) => [r.id, { mesAnterior: null, atual: null, totalGeral: null }])) as Record<RpmId, LinhaRpm>;
+}
+/** TOTAL GERAL da linha: o digitado ou o calculado a partir do RAC do Batalhão do mês anterior. */
+export function totalRpm(l: LinhaRpm, anterior?: LinhaRpm): Valor {
+  if (l.totalGeral !== null) return l.totalGeral;
+  if (l.atual === null) return null;
+  const base = anterior ? (anterior.totalGeral ?? null) : l.mesAnterior;
+  return base === null ? null : base + l.atual;
 }
 
 export const temCrimes = (u: UnidadeRac): boolean => u !== 'ft';
@@ -175,7 +203,7 @@ export function racVazio(unidade: UnidadeRac, mes: string): RacDados {
   for (const p of PRODUTIVIDADE) producao[p.id] = linhaProdVazia();
   const pelotoes: RacDados['pelotoes'] = {};
   for (const l of linhasPelotao(unidade)) pelotoes[l.id] = Object.fromEntries(colunasPelotao(unidade).map((c) => [c.id, null]));
-  return { unidade, mes, crimes, pelotoes, producao, justificativas: {} };
+  return { unidade, mes, crimes, pelotoes, producao, justificativas: {}, ...(unidade === 'btl' ? { rpm: rpmVazio() } : {}) };
 }
 
 export interface Historico {
@@ -376,7 +404,7 @@ export interface LinhaTabela {
   variacao?: number | null;
 }
 export interface Tabela {
-  id: 'anual' | 'inconsistencias' | 'trimestral' | 'pelotao' | 'prodMensal' | 'prodAnual';
+  id: 'anual' | 'inconsistencias' | 'trimestral' | 'pelotao' | 'rpm' | 'prodMensal' | 'prodAnual';
   titulo: string;
   fonte: string;
   cabecalho: string[];
@@ -396,8 +424,11 @@ const NOME_UNIDADE: Record<UnidadeRac, string> = {
 };
 export const nomeUnidadeRac = (u: UnidadeRac) => NOME_UNIDADE[u];
 
-/** As tabelas do RAC, na ordem dos slides, já com Real, TOTAL e Var % calculados. */
-export function tabelasDoRac(d: RacDados): Tabela[] {
+/**
+ * As tabelas do RAC, na ordem dos slides, já com Real, TOTAL e Var % calculados.
+ * Batalhão: sem a de inconsistências (como no RAC BTL oficial) e com a Produtividade RPM.
+ */
+export function tabelasDoRac(d: RacDados, rpmAnterior?: Record<RpmId, LinhaRpm>): Tabela[] {
   const m = mesesDoRac(d.mes);
   const [ano, ant, ret, atu] = [m.anoAnterior, m.mesAnterior, m.mesRetrasado, m.atual].map(rotuloCurto);
   const t: Tabela[] = [];
@@ -411,18 +442,19 @@ export function tabelasDoRac(d: RacDados): Tabela[] {
       linhas: cr.map(({ c, l }) => ({ rotulo: c.rotulo, valores: [l.anoAnterior, l.atual], variacao: variacao(l.anoAnterior, l.atual) })),
       tipoVar: 'crime',
     });
-    t.push({
-      id: 'inconsistencias',
-      titulo: 'COMPARATIVO ANUAL COM INCONSISTÊNCIAS',
-      fonte: 'FONTE: SICOORD - SPJ',
-      cabecalho: ['DELITO', ano, atu, 'Inconsistências', 'Real', 'Var %'],
-      linhas: cr.map(({ c, l }) => ({
-        rotulo: c.rotulo,
-        valores: [l.anoAnterior, l.atual, l.inconsistencias, realCrime(l)],
-        variacao: variacao(l.anoAnterior, realCrime(l)),
-      })),
-      tipoVar: 'crime',
-    });
+    if (d.unidade !== 'btl')
+      t.push({
+        id: 'inconsistencias',
+        titulo: 'COMPARATIVO ANUAL COM INCONSISTÊNCIAS',
+        fonte: 'FONTE: SICOORD - SPJ',
+        cabecalho: ['DELITO', ano, atu, 'Inconsistências', 'Real', 'Var %'],
+        linhas: cr.map(({ c, l }) => ({
+          rotulo: c.rotulo,
+          valores: [l.anoAnterior, l.atual, l.inconsistencias, realCrime(l)],
+          variacao: variacao(l.anoAnterior, realCrime(l)),
+        })),
+        tipoVar: 'crime',
+      });
     t.push({
       id: 'trimestral',
       titulo: 'COMPARATIVO TRIMESTRAL',
@@ -441,6 +473,17 @@ export function tabelasDoRac(d: RacDados): Tabela[] {
         rotulo: l.rotulo,
         valores: [...colunasPelotao(d.unidade).map((c) => d.pelotoes[l.id]?.[c.id] ?? null), totalPelotao(d, l.id)],
       })),
+    });
+  }
+  if (d.unidade === 'btl') {
+    const rpm = d.rpm ?? rpmVazio();
+    const longo = (x: string) => rotuloMesLongo(x).split('/')[0];
+    t.push({
+      id: 'rpm',
+      titulo: 'PRODUTIVIDADE RPM',
+      fonte: 'FONTE QMO',
+      cabecalho: ['Indicadores', longo(m.mesAnterior), longo(m.atual), 'TOTAL GERAL'],
+      linhas: RPM.map((r) => ({ rotulo: r.rotulo, valores: [rpm[r.id].mesAnterior, rpm[r.id].atual, totalRpm(rpm[r.id], rpmAnterior?.[r.id])] })),
     });
   }
   const atual = producaoAtual(d);
@@ -520,6 +563,10 @@ export function normalizarRac(unidade: UnidadeRac, mes: string, x: Partial<Recor
   for (const p of PRODUTIVIDADE) for (const k of Object.keys(d.producao[p.id]) as (keyof LinhaProd)[]) d.producao[p.id][k] = valorOuNull(producao[p.id]?.[k]);
   const pel = (x.pelotoes ?? {}) as Record<string, Record<string, unknown>>;
   for (const l of Object.keys(d.pelotoes)) for (const c of Object.keys(d.pelotoes[l])) d.pelotoes[l][c] = valorOuNull(pel[l]?.[c]);
+  if (d.rpm) {
+    const rpm = (x.rpm ?? {}) as Record<string, Record<string, unknown>>;
+    for (const r of RPM) for (const k of Object.keys(d.rpm[r.id]) as (keyof LinhaRpm)[]) d.rpm[r.id][k] = valorOuNull(rpm[r.id]?.[k]);
+  }
   const j = (x.justificativas ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(j)) if (typeof v === 'string') d.justificativas[k] = v;
   return d;
@@ -538,4 +585,25 @@ export function comCampo(d: RacDados, campo: string, valor: Valor): RacDados {
   const g = (n as unknown as Record<string, Record<string, Record<string, Valor>>>)[grupo];
   if (g?.[a] && b in g[a]) g[a][b] = valor;
   return n;
+}
+
+// ---------- Fase 5: Batalhão e RAC GERAL ----------
+
+/** RAC do Batalhão do mês: soma dos RAC ENVIADOS (vazio onde faltar unidade) + a Produtividade RPM da P/3. */
+export function racBatalhao(racs: readonly RacSalvo[], mes: string): RacDados {
+  const enviados = racs.filter((r) => r.mes === mes && r.status === 'enviado' && r.unidade !== 'btl');
+  const btl = somarBatalhao(enviados, mes);
+  btl.rpm = racs.find((r) => r.mes === mes && r.unidade === 'btl')?.rpm ?? rpmVazio();
+  return btl;
+}
+
+/** Unidades que ainda não enviaram o RAC do mês (ficam fora do compilado e deixam o Batalhão com "—"). */
+export function faltamNoCompilado(racs: readonly RacSalvo[], mes: string): UnidadeId[] {
+  return UNIDADES_RAC.filter((u) => !racs.some((r) => r.mes === mes && r.unidade === u && r.status === 'enviado'));
+}
+
+/** Ordem do RAC GERAL: 1ª a 6ª Cia, Força Tática (só as que enviaram) e o Batalhão. */
+export function ordemDoCompilado(racs: readonly RacSalvo[], mes: string): RacDados[] {
+  const enviados = UNIDADES_RAC.map((u) => racs.find((r) => r.mes === mes && r.unidade === u && r.status === 'enviado')).filter((r): r is RacSalvo => !!r);
+  return [...enviados, racBatalhao(racs, mes)];
 }

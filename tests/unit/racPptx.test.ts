@@ -45,6 +45,8 @@ describe('peças da apresentação', () => {
   test('plano de slides: Cia 16 (como o modelo), Força Tática 5', () => {
     expect(planoDeSlides(cia1()).map((p) => p.base)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     expect(planoDeSlides(racVazio('ft', '2026-09')).length).toBe(5);
+    // Batalhão como o RAC BTL: sem inconsistências, 4 painéis, RPM.
+    expect(planoDeSlides(racVazio('btl', '2026-09')).map((p) => p.base)).toEqual([1, 2, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16]);
   });
 });
 
@@ -86,5 +88,22 @@ describe('apresentação montada do modelo', () => {
     // O .pptx (zip) abre de novo com os mesmos arquivos.
     const de = await deszipar(zip([...a].map(([nome, dados]) => ({ nome, dados }))));
     expect([...de.keys()].sort()).toEqual([...a.keys()].sort());
+  });
+});
+
+describe('RAC GERAL', () => {
+  test('Cia + FT + Batalhão num .pptx só, Batalhão com RPM e título', async () => {
+    const btl = racVazio('btl', '2026-09');
+    btl.rpm!.pessoasAbordadas = { mesAnterior: 1462, atual: 1936, totalGeral: null };
+    const a = montarApresentacao(await modelo(), [
+      { dados: cia1(), prints: {} },
+      { dados: racVazio('ft', '2026-09'), prints: {} },
+      { dados: btl, prints: { foPainel: { jpeg: JPEG, largura: 1861, altura: 774 } } },
+    ]);
+    expect([...a.keys()].filter((k) => /^ppt\/slides\/slide\d+\.xml$/.test(k)).length).toBe(16 + 5 + 12);
+    expect(txt(a, 'ppt/slides/slide22.xml')).toContain('RAC – Batalhão - ');
+    const rpm = txt(a, 'ppt/slides/slide31.xml');
+    for (const t of ['PRODUTIVIDADE RPM', 'Moto Abordada-(LÍCITO)', '<a:t>3398</a:t>', 'TOTAL GERAL']) expect(rpm).toContain(t);
+    expect(txt(a, 'ppt/slides/slide29.xml')).toContain('r:embed="rIdPrint"'); // furto outros do Batalhão
   });
 });

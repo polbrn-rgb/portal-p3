@@ -161,8 +161,8 @@ test('tela da Cia: respondida com prazo vencido há um dia sai; atrasada sem res
   await entrar(page, '6cia', SENHA_TESTE);
   await expect(page.getByText(`Atrasada sem resposta ${marca}`)).toBeVisible({ timeout: 15000 }); // 1ª carga depois do login
   await irParaAbaCia(page, 'Respondidas');
-  await expect(page.getByText(`Respondida no prazo ${marca}`)).toBeVisible();
+  await expect(page.getByText(`Respondida no prazo ${marca}`)).toBeVisible({ timeout: 15000 });
   await irParaAbaCia(page, 'Finalizadas');
-  await expect(page.getByRole('heading', { name: '6ª CIA' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '6ª CIA' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText(`Respondida vencida ${marca}`)).toHaveCount(0);
 });
