@@ -59,7 +59,12 @@ jobs:
         run: |
           printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
           printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > .clasp.json
-          npx --yes @google/clasp@2.4.2 push --force
+          # O clasp 2.4.2 escreve "Pushed N files" até quando falha: confere a saída.
+          npx --yes @google/clasp@2.4.2 push --force 2>&1 | tee /tmp/push.log
+          if grep -qiE "push failed|not enabled|error" /tmp/push.log; then
+            echo "::error::O envio para o Apps Script falhou (veja acima)."
+            exit 1
+          fi
 
       - name: Atualizar a implantação do app da Web (mesma URL)
         if: steps.segredos.outputs.ok == 'true'
