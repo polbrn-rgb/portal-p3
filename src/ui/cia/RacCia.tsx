@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { salvarRac } from '../../data/rac';
 import { observarPrintsDoRac, salvarPrintRac, type PrintRac } from '../../data/racPrints';
 import { formatarData, hojeISO } from '../../domain/datas';
@@ -6,6 +6,7 @@ import {
   colunasPelotao,
   comCampo,
   conferirRac,
+  corVariacao,
   DELITOS,
   historicoDoRac,
   lerNumero,
@@ -116,13 +117,33 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
     if (!tentou) return undefined;
     const a = erros.get(campo);
     if (!a) return undefined;
-    return !campo.startsWith('prints.') && valorDoCampo(d, campo) === null ? 'Preencha (se não houve, 0).' : a.mensagem;
+    return !campo.startsWith('prints.') && valorDoCampo(d, campo) === null ? 'Preencha' : a.mensagem;
   };
-  const num = (campo: string, rotulo: string) => (
-    <Campo key={campo} rotulo={rotulo} obrigatorio erro={erroDe(campo)}>
-      <input inputMode="numeric" autoComplete="off" value={valorDoCampo(d, campo) ?? ''} onChange={(e) => mudar(campo, e.target.value)} />
-    </Campo>
+  // Célula com campo (dentro das tabelas iguais às da apresentação) e células calculadas.
+  const campo = (c: string, rotulo: string) => {
+    const e = erroDe(c);
+    return (
+      <td key={c}>
+        <div className={`campo celula-rac${e ? ' com-erro' : ''}`}>
+          <input inputMode="numeric" autoComplete="off" aria-label={rotulo} value={valorDoCampo(d, c) ?? ''} onChange={(ev) => mudar(c, ev.target.value)} />
+          {e && <span className="erro-campo">{e}</span>}
+        </div>
+      </td>
+    );
+  };
+  const calc = (k: string, v: number | null) => (
+    <td key={k} className="calc-rac">
+      {v ?? '—'}
+    </td>
   );
+  const pct = (k: string, v: number | null, tipo: 'crime' | 'producao') => {
+    const cor = corVariacao(v, tipo);
+    return (
+      <td key={k} className="calc-rac var-rac" style={cor ? { background: `#${cor}`, color: '#fff' } : undefined}>
+        {textoVariacao(v)}
+      </td>
+    );
+  };
 
   async function gravar(status: 'rascunho' | 'enviado') {
     setErro('');
@@ -162,7 +183,7 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
 
       {tentou && faltam > 0 && (
         <p className="mensagem erro" role="alert">
-          Falta preencher ou corrigir {faltam === 1 ? '1 campo' : `${faltam} campos`}.
+          Falta preencher ou corrigir {faltam === 1 ? '1 campo' : `${faltam} campos`} (se não houve, coloque 0).
         </p>
       )}
 
@@ -177,70 +198,94 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
       )}
 
       {temCrimes(p.unidade) && (
-        <fieldset className="cartao grupo">
-          <legend>Crimes (SICOORD)</legend>
-          {DELITOS.map((c) => {
-            const l = d.crimes[c.id];
-            const real = realCrime(l);
-            return (
-              <div key={c.id} className="rac-linha" role="group" aria-label={c.rotulo}>
-                <h4>{c.rotulo}</h4>
-                <div className="grade-rac">
-                  {num(`crimes.${c.id}.anoAnterior`, ano)}
-                  {num(`crimes.${c.id}.mesRetrasado`, ret)}
-                  {num(`crimes.${c.id}.mesAnterior`, ant)}
-                  {num(`crimes.${c.id}.atual`, atu)}
-                  {num(`crimes.${c.id}.inconsistencias`, 'Inconsist.')}
-                </div>
-                <p className="rac-calculo">
-                  Var % {textoVariacao(variacao(l.anoAnterior, l.atual))} · Real {real ?? '—'} · Var % c/ inconsist.{' '}
-                  {textoVariacao(variacao(l.anoAnterior, real))}
-                </p>
-              </div>
-            );
-          })}
-        </fieldset>
+        <>
+          <TabelaRac titulo="COMPARATIVO ANUAL" fonte="FONTE: SICOORD - SPJ" cabecalho={['DELITO', ano, atu, 'Var %']}>
+            {DELITOS.map((c) => {
+              const l = d.crimes[c.id];
+              return (
+                <tr key={c.id}>
+                  <th scope="row">{c.rotulo}</th>
+                  {campo(`crimes.${c.id}.anoAnterior`, `${c.rotulo} ${ano}`)}
+                  {campo(`crimes.${c.id}.atual`, `${c.rotulo} ${atu}`)}
+                  {pct('v', variacao(l.anoAnterior, l.atual), 'crime')}
+                </tr>
+              );
+            })}
+          </TabelaRac>
+
+          <TabelaRac
+            titulo="COMPARATIVO ANUAL COM INCONSISTÊNCIAS"
+            fonte={`FONTE: SICOORD - SPJ · ${ano} e ${atu} vêm do comparativo anual; Real = ${atu} − inconsistências`}
+            cabecalho={['DELITO', ano, atu, 'Inconsistências', 'Real', 'Var %']}
+          >
+            {DELITOS.map((c) => {
+              const l = d.crimes[c.id];
+              const real = realCrime(l);
+              return (
+                <tr key={c.id}>
+                  <th scope="row">{c.rotulo}</th>
+                  {calc('a', l.anoAnterior)}
+                  {calc('m', l.atual)}
+                  {campo(`crimes.${c.id}.inconsistencias`, `${c.rotulo} Inconsistências`)}
+                  {calc('r', real)}
+                  {pct('v', variacao(l.anoAnterior, real), 'crime')}
+                </tr>
+              );
+            })}
+          </TabelaRac>
+
+          <TabelaRac titulo="COMPARATIVO TRIMESTRAL" fonte={`FONTE: SICOORD · ${atu} vem do comparativo anual`} cabecalho={['DELITO', ret, ant, atu]}>
+            {DELITOS.map((c) => (
+              <tr key={c.id}>
+                <th scope="row">{c.rotulo}</th>
+                {campo(`crimes.${c.id}.mesRetrasado`, `${c.rotulo} ${ret}`)}
+                {campo(`crimes.${c.id}.mesAnterior`, `${c.rotulo} ${ant}`)}
+                {calc('m', d.crimes[c.id].atual)}
+              </tr>
+            ))}
+          </TabelaRac>
+        </>
       )}
 
-      <fieldset className="cartao grupo">
-        <legend>Produtividade mensal por pelotão — {atu} (QMO)</legend>
+      <TabelaRac
+        titulo="PRODUTIVIDADE MENSAL"
+        fonte={`FONTE QMO · ${atu}`}
+        cabecalho={[`8º BPMM – ${nomeUnidadeRac(p.unidade)}`, ...colunasPelotao(p.unidade).map((c) => c.rotulo), 'TOTAL']}
+      >
         {linhasPelotao(p.unidade).map((l) => (
-          <div key={l.id} className="rac-linha" role="group" aria-label={l.rotulo}>
-            <h4>{l.rotulo}</h4>
-            <div className="grade-rac">{colunasPelotao(p.unidade).map((c) => num(`pelotoes.${l.id}.${c.id}`, c.rotulo))}</div>
-            <p className="rac-calculo">TOTAL {totalPelotao(d, l.id) ?? '—'}</p>
-          </div>
+          <tr key={l.id}>
+            <th scope="row">{l.rotulo}</th>
+            {colunasPelotao(p.unidade).map((c) => campo(`pelotoes.${l.id}.${c.id}`, `${l.rotulo} ${c.rotulo}`))}
+            {calc('t', totalPelotao(d, l.id))}
+          </tr>
         ))}
-      </fieldset>
+      </TabelaRac>
 
-      {prodDigitadaAParte(p.unidade).length > 0 && (
-        <fieldset className="cartao grupo">
-          <legend>Outros itens de {atu} (QMO)</legend>
-          <div className="grade-rac">
-            {prodDigitadaAParte(p.unidade).map((id) => num(`producao.${id}.atual`, PRODUTIVIDADE.find((x) => x.id === id)!.rotulo))}
-          </div>
-        </fieldset>
-      )}
+      <TabelaRac
+        titulo="COMPARATIVO PRODUTIVIDADE MENSAL"
+        fonte={`FONTE QMO · ${atu} vem do TOTAL da produtividade mensal${prodDigitadaAParte(p.unidade).length ? ' (os itens que não estão nela são digitados aqui)' : ''}`}
+        cabecalho={['PRODUTIVIDADE POLICIAL', ant, atu, 'Var %']}
+      >
+        {PRODUTIVIDADE.map((x) => (
+          <tr key={x.id}>
+            <th scope="row">{x.rotulo}</th>
+            {campo(`producao.${x.id}.mesAnterior`, `${x.rotulo} ${ant}`)}
+            {prodDigitadaAParte(p.unidade).includes(x.id) ? campo(`producao.${x.id}.atual`, `${x.rotulo} ${atu}`) : calc('m', atual[x.id])}
+            {pct('v', variacao(d.producao[x.id].mesAnterior, atual[x.id]), 'producao')}
+          </tr>
+        ))}
+      </TabelaRac>
 
-      <fieldset className="cartao grupo">
-        <legend>Comparativo de produtividade (QMO)</legend>
-        {PRODUTIVIDADE.map((x) => {
-          const l = d.producao[x.id];
-          return (
-            <div key={x.id} className="rac-linha" role="group" aria-label={x.rotulo}>
-              <h4>{x.rotulo}</h4>
-              <div className="grade-rac">
-                {num(`producao.${x.id}.mesAnterior`, ant)}
-                {num(`producao.${x.id}.anoAnterior`, ano)}
-              </div>
-              <p className="rac-calculo">
-                {atu}: {atual[x.id] ?? '—'} · mensal {textoVariacao(variacao(l.mesAnterior, atual[x.id]))} · anual{' '}
-                {textoVariacao(variacao(l.anoAnterior, atual[x.id]))}
-              </p>
-            </div>
-          );
-        })}
-      </fieldset>
+      <TabelaRac titulo="COMPARATIVO PRODUTIVIDADE ANUAL" fonte="FONTE QMO" cabecalho={['PRODUTIVIDADE POLICIAL', ano, atu, 'Var %']}>
+        {PRODUTIVIDADE.map((x) => (
+          <tr key={x.id}>
+            <th scope="row">{x.rotulo}</th>
+            {campo(`producao.${x.id}.anoAnterior`, `${x.rotulo} ${ano}`)}
+            {calc('m', atual[x.id])}
+            {pct('v', variacao(d.producao[x.id].anoAnterior, atual[x.id]), 'producao')}
+          </tr>
+        ))}
+      </TabelaRac>
 
       {avisos.length > 0 && <Avisos avisos={avisos} d={d} tentou={tentou} mudar={(id, t) => setD((x) => ({ ...x, justificativas: { ...x.justificativas, [id]: t } }))} />}
 
@@ -275,6 +320,30 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
         </button>
       </div>
     </section>
+  );
+}
+
+/** Tabela do formulário no mesmo formato do slide (título, fonte e colunas). */
+function TabelaRac(p: { titulo: string; fonte: string; cabecalho: string[]; children: ReactNode }) {
+  return (
+    <fieldset className="cartao grupo">
+      <legend>{p.titulo}</legend>
+      <p className="rac-fonte">{p.fonte}</p>
+      <div className="tabela-rolagem">
+        <table className="tabela-rac" aria-label={p.titulo}>
+          <thead>
+            <tr>
+              {p.cabecalho.map((h, i) => (
+                <th key={i} scope="col">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>{p.children}</tbody>
+        </table>
+      </div>
+    </fieldset>
   );
 }
 

@@ -47,19 +47,23 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   expect(await numeros.count()).toBe(137); // 45 de crimes, 60 por pelotão, 4 à parte e 28 do comparativo
   for (const campo of await numeros.all()) await campo.fill('0');
 
-  // Inconsistências maiores que o total do mês: erro; corrigido, o Real aparece calculado.
-  const furto = page.getByRole('group', { name: 'FURTO VEÍCULO' });
-  await furto.locator('input').nth(3).fill('62');
-  await furto.locator('input').nth(4).fill('63');
+  // Inconsistências maiores que o total do mês: erro; corrigido, o Real aparece calculado na tabela.
+  const mesTitulo = `mai/${String(ano).slice(2)}`;
+  await page.getByLabel(`FURTO VEÍCULO ${mesTitulo}`, { exact: true }).fill('62');
+  await page.getByLabel('FURTO VEÍCULO Inconsistências', { exact: true }).fill('63');
   await page.getByLabel('Preenchido por').fill('Sd PM Teste');
   await page.getByRole('button', { name: 'Enviar à P/3' }).click();
-  await expect(furto.getByText('não podem passar do total do mês (62)')).toBeVisible();
-  await furto.locator('input').nth(4).fill('1');
-  await expect(furto.getByText(/Real 61/)).toBeVisible();
+  const inconsist = page.getByRole('table', { name: 'COMPARATIVO ANUAL COM INCONSISTÊNCIAS' });
+  await expect(inconsist.getByText('não podem passar do total do mês (62)')).toBeVisible();
+  await page.getByLabel('FURTO VEÍCULO Inconsistências', { exact: true }).fill('1');
+  await expect(inconsist.locator('tr', { hasText: 'FURTO VEÍCULO' })).toContainText('61');
+  // O mês do trimestral vem do comparativo anual (não é digitado de novo).
+  await expect(page.getByRole('table', { name: 'COMPARATIVO TRIMESTRAL' }).locator('tr', { hasText: 'FURTO VEÍCULO' })).toContainText('62');
 
-  // Pessoas abordadas por pelotão: o TOTAL vai para o comparativo.
-  await page.getByRole('group', { name: 'Pessoas Abordadas' }).first().locator('input').first().fill('647');
-  await expect(page.getByRole('group', { name: 'Pessoas Abordadas' }).first().getByText('TOTAL 647')).toBeVisible();
+  // Pessoas abordadas por pelotão: o TOTAL vai para o comparativo de produtividade.
+  await page.getByLabel('Pessoas Abordadas Pel A', { exact: true }).fill('647');
+  await expect(page.getByRole('table', { name: 'PRODUTIVIDADE MENSAL', exact: true }).locator('tr', { hasText: 'Pessoas Abordadas' })).toContainText('647');
+  await expect(page.getByRole('table', { name: 'COMPARATIVO PRODUTIVIDADE ANUAL' }).locator('tr', { hasText: 'Pessoas Abordadas' })).toContainText('647');
 
   // Sem os 7 prints não envia; depois de enviar, aparece a miniatura de cada um.
   await page.getByRole('button', { name: 'Enviar à P/3' }).click();
