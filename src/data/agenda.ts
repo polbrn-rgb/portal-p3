@@ -20,7 +20,8 @@ import type { Demanda } from '../domain/demanda';
 import { paraDemanda } from './demandas';
 
 function paraCompromisso(x: QueryDocumentSnapshot): Compromisso {
-  return { excecoes: [], ...(x.data() as Omit<Compromisso, 'id'>), id: x.id };
+  const d = x.data() as Omit<Compromisso, 'id' | 'excecoes'> & { excecoes?: string[] };
+  return { ...d, excecoes: d.excecoes ?? [], id: x.id };
 }
 
 // Eventos da agenda da P/3 (coleção "agenda"). Só a P/3 lê e grava.
