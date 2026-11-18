@@ -66,9 +66,9 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   await expect(page.getByRole('heading', { name: `RAC – ${nomeUnidade} – MAIO/${ano}` })).toBeVisible();
   await expect(page.getByText('📝 Rascunho')).toBeVisible();
 
-  // Enviar com campos vazios: avisa quanto falta (os 3 números e quem preencheu).
+  // Enviar com campos vazios: avisa quanto falta (3 números, 7 prints e quem preencheu).
   await page.getByRole('button', { name: 'Enviar à P/3' }).click();
-  await expect(page.getByText('Falta preencher ou corrigir 4 campos (se não houve, coloque 0).')).toBeVisible();
+  await expect(page.getByText('Falta preencher ou corrigir 11 campos (se não houve, coloque 0).')).toBeVisible();
   expect(await page.locator('.formulario-rac input[inputmode="numeric"]').count()).toBe(137); // 45 de crimes, 60 por pelotão, 4 à parte e 28 do comparativo
 
   // Inconsistências maiores que o total do mês: erro; corrigido, o Real aparece calculado na tabela.
