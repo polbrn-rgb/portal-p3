@@ -1,6 +1,6 @@
 import type { Firestore } from 'firebase/firestore';
 import { lerImagemPrint } from '../data/racPrints';
-import { ordemDoCompilado, rotuloMesLongo, type LinhaRpm, type RacDados, type RacSalvo, type RpmId } from '../domain/rac';
+import { nomeRacGeral, ordemDoCompilado, type LinhaRpm, type RacDados, type RacSalvo, type RpmId } from '../domain/rac';
 import { dimensoesJpeg, montarApresentacao, nomeArquivoRac, type ImagemPrint, type RacParaSlides } from '../domain/racPptx';
 import { idPrint, slotsDaUnidade, type SlotPrint } from '../domain/racPrints';
 import { base64ParaBytes } from './imagem';
@@ -65,9 +65,13 @@ export async function baixarRacDaUnidade(db: Firestore, d: RacDados, titulo: str
 }
 
 /** RAC GERAL: as Cias e a FT que enviaram, na ordem oficial, e o Batalhão no fim — um .pptx só. */
-export async function baixarRacGeral(db: Firestore, mes: string, racs: readonly RacSalvo[], rpmAnterior?: Record<RpmId, LinhaRpm>): Promise<void> {
+export async function gerarRacGeral(db: Firestore, mes: string, racs: readonly RacSalvo[], rpmAnterior?: Record<RpmId, LinhaRpm>): Promise<Uint8Array> {
   const unidades = await Promise.all(
     ordemDoCompilado(racs, mes).map(async (dados) => ({ dados, prints: await imagensDoRac(db, dados), rpmAnterior: dados.unidade === 'btl' ? rpmAnterior : undefined })),
   );
-  baixarArquivo(`RAC GERAL - ${rotuloMesLongo(mes).replace('/', '-')}.pptx`, await gerarPptx(unidades));
+  return gerarPptx(unidades);
+}
+
+export async function baixarRacGeral(db: Firestore, mes: string, racs: readonly RacSalvo[], rpmAnterior?: Record<RpmId, LinhaRpm>): Promise<void> {
+  baixarArquivo(nomeRacGeral(mes), await gerarRacGeral(db, mes, racs, rpmAnterior));
 }

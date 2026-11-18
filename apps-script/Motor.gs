@@ -47,7 +47,9 @@ var CONFIG_P3 = {
   // Operações → Documentos Mensais: cópia de cada mês (uma subpasta por mês)
   PASTA_DOCS_MENSAIS_ARQUIVO: '1mkm8R8dTpYF1jp1C2kStpONI1eN95EpN',
   // Aperfeiçoamento → ICC: modelo das planilhas (cada ICC nova é uma cópia zerada, na mesma pasta)
-  PLANILHA_ICC_MODELO: '1G5kd6AldoiYL8kV-mckAUf67aIBGy9LdhKzLiLNPJxw'
+  PLANILHA_ICC_MODELO: '1G5kd6AldoiYL8kV-mckAUf67aIBGy9LdhKzLiLNPJxw',
+  // Operações → RAC: pasta onde o RAC GERAL de cada mês é arquivado ao fechar o mês
+  PASTA_RAC_ARQUIVO: '1GPMB1HBLUW2K1AALy5en0L3SpkbmjfoG'
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -304,6 +306,11 @@ function rodarMotor_(esperaMs) {
       processarAcessos_();
     } catch (e11) {
       console.error('Acessos: ' + e11.message);
+    }
+    try {
+      processarRac_();
+    } catch (e12) {
+      console.error('RAC: ' + e12.message);
     }
   } finally {
     trava.releaseLock();
@@ -1539,4 +1546,47 @@ function pedirTrocaDeSenha_(re) {
   var a = obterDoc_('acessos/' + chave);
   if (!a || a.ativo === false || a.status !== 'ok' || !a.email) return;
   enviarLinkSenha_(a, false);
+}
+
+// ---------- Operações → RAC: arquivar o RAC GERAL no Drive ----------
+
+var TIPO_PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+/**
+ * Meses com o RAC GERAL pedido para arquivar: monta o .pptx das partes (racArquivo/{mes}), cria na pasta de
+ * arquivo (trocando o de mesmo nome), grava o link no mês e apaga do banco o arquivo e os prints do mês.
+ */
+function processarRac_() {
+  consultar_('racMeses', 'arquivo.status', 'pedido', 5).forEach(function (m) {
+    var mes = m.id;
+    var nome = (m.dados.arquivo && m.dados.arquivo.nome) || '';
+    try {
+      var cab = obterDoc_('racArquivo/' + mes);
+      if (!cab) throw new Error('O arquivo do RAC GERAL não chegou ao portal. Arquive de novo.');
+      var b64 = '';
+      for (var i = 0; i < cab.partes; i++) {
+        var parte = obterDoc_('racArquivo/' + mes + '/partes/' + i);
+        if (!parte) throw new Error('O arquivo do RAC GERAL está incompleto. Arquive de novo.');
+        b64 += parte.dados;
+      }
+      var pasta = DriveApp.getFolderById(CONFIG_P3.PASTA_RAC_ARQUIVO);
+      var antigos = pasta.getFilesByName(cab.nome);
+      while (antigos.hasNext()) antigos.next().setTrashed(true);
+      var arq = pasta.createFile(Utilities.newBlob(Utilities.base64Decode(b64), TIPO_PPTX, cab.nome));
+      gravarCampos_('racMeses/' + mes, { arquivo: { status: 'pronto', nome: cab.nome, url: arq.getUrl(), prontoEm: new Date().toISOString() } });
+      apagarDoRac_(mes, cab.partes);
+    } catch (err) {
+      gravarCampos_('racMeses/' + mes, { arquivo: { status: 'erro', nome: nome, erro: err.message } });
+    }
+  });
+}
+
+/** Depois de arquivado: apaga o .pptx em partes e os prints do mês (os números ficam como histórico). */
+function apagarDoRac_(mes, partes) {
+  for (var i = 0; i < partes; i++) firestore_('delete', caminhoDocs_() + '/racArquivo/' + mes + '/partes/' + i);
+  firestore_('delete', caminhoDocs_() + '/racArquivo/' + mes);
+  idsPrintsDoRac(mes).forEach(function (id) {
+    firestore_('delete', caminhoDocs_() + '/racPrints/' + id);
+    firestore_('delete', caminhoDocs_() + '/racPrintsDados/' + id);
+  });
 }

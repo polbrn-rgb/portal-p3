@@ -75,6 +75,13 @@ export async function reduzirFoto(arquivo: Blob): Promise<FotoReduzida> {
   }
 }
 
+/** Bytes -> base64 (em blocos, para arquivos grandes não estourarem a pilha). */
+export function bytesParaBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
 export function base64ParaBytes(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);

@@ -121,6 +121,13 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   await expect(btl.getByText(/RAC GERAL gerado \(sem /)).toBeVisible({ timeout: 15000 });
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 
+  // Fecha o mês: o RAC GERAL vai em partes para o motor arquivar no Drive (nos testes o motor não roda).
+  await btl.getByRole('button', { name: '📦 Fechar mês e arquivar no Drive' }).click();
+  await btl.getByRole('alertdialog', { name: 'Confirmar fechamento do mês' }).getByRole('button', { name: 'Sim, fechar e arquivar' }).click();
+  await expect(btl.getByText('Mês encerrado. O RAC GERAL foi enviado para arquivar no Drive.')).toBeVisible({ timeout: 30000 });
+  await expect(btl.getByText(`⏳ Arquivando RAC GERAL - MAIO-${ano}.pptx no Drive`, { exact: false })).toBeVisible();
+  await expect(cartao.getByText('Encerrado', { exact: true })).toBeVisible();
+
   // Depois exclui o mês inteiro (sai do banco e da tela).
   await cartao.getByRole('button', { name: '🗑️ Excluir RAC do mês' }).click();
   await cartao.getByRole('alertdialog').getByRole('button', { name: 'Sim, excluir' }).click();

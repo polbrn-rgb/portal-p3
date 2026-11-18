@@ -508,7 +508,9 @@ export function tabelasDoRac(d: RacDados, rpmAnterior?: Record<RpmId, LinhaRpm>)
 /** Unidades que mandam RAC (o do Batalhão a P/3 monta). */
 export const UNIDADES_RAC: readonly UnidadeId[] = ['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft'];
 
-export type RacMes = { mes: string; prazo: string; status: 'aberto' | 'encerrado' };
+/** Arquivamento do RAC GERAL no Drive (feito pelo motor): pedido → pronto (com o link) ou erro. */
+export type ArquivoRac = { status: 'pedido' | 'pronto' | 'erro'; nome: string; url?: string; erro?: string };
+export type RacMes = { mes: string; prazo: string; status: 'aberto' | 'encerrado'; arquivo?: ArquivoRac };
 export type StatusRac = 'rascunho' | 'enviado';
 export type RacSalvo = RacDados & { id: string; status: StatusRac; preenchidoPor: string };
 
@@ -607,3 +609,6 @@ export function ordemDoCompilado(racs: readonly RacSalvo[], mes: string): RacDad
   const enviados = UNIDADES_RAC.map((u) => racs.find((r) => r.mes === mes && r.unidade === u && r.status === 'enviado')).filter((r): r is RacSalvo => !!r);
   return [...enviados, racBatalhao(racs, mes)];
 }
+
+/** Nome do RAC GERAL (o mesmo no download e no Drive): "RAC GERAL - SETEMBRO-2026.pptx". */
+export const nomeRacGeral = (mes: string) => `RAC GERAL - ${rotuloMesLongo(mes).replace('/', '-')}.pptx`;

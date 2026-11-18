@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { lerRacBtl, salvarRpm } from '../../data/rac';
+import { lerRacBtl, pedirArquivamento, salvarRpm } from '../../data/rac';
 import { observarPrintsDoRac, type PrintRac } from '../../data/racPrints';
 import {
   faltamNoCompilado,
   lerNumero,
   mesesDoRac,
+  nomeRacGeral,
   nomeUnidadeRac,
   racBatalhao,
   rotuloMesLongo,
@@ -19,7 +20,8 @@ import {
 import { conferirPrints } from '../../domain/racPrints';
 import { db } from '../../lib/firebase';
 import { useMeuResponsavel } from '../../lib/quemSou';
-import { baixarRacDaUnidade, baixarRacGeral } from '../../lib/racApresentacao';
+import { cutucarMotor } from '../../lib/motor';
+import { baixarRacDaUnidade, baixarRacGeral, gerarRacGeral } from '../../lib/racApresentacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { PrintsRac, TabelaRac } from '../cia/RacCia';
 import { PreviaRac } from '../PreviaRac';
@@ -38,7 +40,9 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
   const [rpm, setRpm] = useState<Record<RpmId, LinhaRpm>>(() => salvo?.rpm ?? rpmVazio());
   const [mexeu, setMexeu] = useState(false);
   const [previa, setPrevia] = useState(false);
-  const [ocupado, setOcupado] = useState<'' | 'rpm' | 'btl' | 'geral'>('');
+  const [ocupado, setOcupado] = useState<'' | 'rpm' | 'btl' | 'geral' | 'arquivo'>('');
+  const [confirmarArquivo, setConfirmarArquivo] = useState(false);
+  const [progresso, setProgresso] = useState(0);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const responsavel = useMeuResponsavel();
@@ -60,11 +64,14 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
   }, [meses.mesAnterior]);
 
   const comRpm = { ...btl, rpm };
+  // Lista para o compilado: os RAC das unidades + o do Batalhão com a RPM da tela (mesmo sem salvar).
+  const paraCompilar = [...racs.filter((r) => r.unidade !== 'btl'), { ...(salvo ?? { ...comRpm, id: '', status: 'rascunho' as const, preenchidoPor: '' }), rpm }];
+  const arq = m.arquivo;
   const alertas = conferirPrints(comRpm, prints.valor ?? []);
   const faltaPrint = alertas.filter((a) => a.nivel === 'erro');
   const divergencias = alertas.filter((a) => a.nivel === 'aviso');
 
-  async function executar(tipo: 'rpm' | 'btl' | 'geral', acao: () => Promise<void>, ok: string) {
+  async function executar(tipo: 'rpm' | 'btl' | 'geral' | 'arquivo', acao: () => Promise<void>, ok: string) {
     setOcupado(tipo);
     setErro('');
     setAviso('');
@@ -74,7 +81,13 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
       if (tipo === 'rpm') setMexeu(false);
     } catch (e) {
       console.error('RAC do Batalhão:', e);
-      setErro(tipo === 'rpm' ? 'Não foi possível gravar a Produtividade RPM. Tente de novo.' : 'Não foi possível gerar a apresentação. Tente de novo.');
+      setErro(
+        tipo === 'rpm'
+          ? 'Não foi possível gravar a Produtividade RPM. Tente de novo.'
+          : tipo === 'arquivo'
+            ? 'Não foi possível enviar o RAC GERAL para arquivar. Verifique a conexão e tente de novo.'
+            : 'Não foi possível gerar a apresentação. Tente de novo.',
+      );
     }
     setOcupado('');
   }
@@ -173,7 +186,7 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
           onClick={() =>
             void executar(
               'geral',
-              () => baixarRacGeral(db, m.mes, [...racs.filter((r) => r.unidade !== 'btl'), { ...(salvo ?? { ...comRpm, id: '', status: 'rascunho', preenchidoPor: '' }), rpm }], anterior),
+              () => baixarRacGeral(db, m.mes, paraCompilar, anterior),
               `RAC GERAL gerado${faltam.length ? ` (sem ${faltam.map(nomeUnidadeRac).join(', ')})` : ''}.`,
             )
           }
@@ -182,6 +195,67 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
         </button>
       </div>
       {previa && <PreviaRac d={comRpm} rpmAnterior={anterior} />}
+
+      <h4 className="titulo-secao">Fechar o mês</h4>
+      {arq?.status === 'pronto' && (
+        <p className="mensagem aviso" role="status">
+          ✅ RAC GERAL arquivado no Drive:{' '}
+          <a href={arq.url} target="_blank" rel="noreferrer">
+            {arq.nome}
+          </a>
+          . Os prints saíram do banco; os números ficam como histórico.
+        </p>
+      )}
+      {arq?.status === 'pedido' && (
+        <p className="mensagem aviso-rac" role="status">
+          ⏳ Arquivando {arq.nome} no Drive… o motor leva até 5 minutos.
+        </p>
+      )}
+      {arq?.status === 'erro' && (
+        <p className="mensagem erro" role="alert">
+          ❌ Não foi possível arquivar no Drive: {arq.erro}
+        </p>
+      )}
+      {ocupado === 'arquivo' && <p className="pendente-detalhe">Enviando o RAC GERAL… {Math.round(progresso * 100)}%</p>}
+      {confirmarArquivo ? (
+        <div className="confirmar-linha" role="alertdialog" aria-label="Confirmar fechamento do mês">
+          <p>
+            Fechar {rotuloMesLongo(m.mes)}? O mês é encerrado (as Cias não alteram mais), o RAC GERAL vai para a pasta de arquivo do Drive e os prints saem
+            do banco; os números ficam.{faltam.length ? ` Atenção: ainda não enviaram ${faltam.map(nomeUnidadeRac).join(', ')}.` : ''}
+          </p>
+          <div className="acoes-linha">
+            <button className="botao secundario" type="button" onClick={() => setConfirmarArquivo(false)}>
+              Cancelar
+            </button>
+            <button
+              className="botao destaque"
+              type="button"
+              disabled={!!ocupado}
+              onClick={() => {
+                setConfirmarArquivo(false);
+                void executar(
+                  'arquivo',
+                  async () => {
+                    setProgresso(0);
+                    const pptx = await gerarRacGeral(db, m.mes, paraCompilar, anterior);
+                    await pedirArquivamento(db, m.mes, nomeRacGeral(m.mes), pptx, setProgresso);
+                    cutucarMotor();
+                  },
+                  'Mês encerrado. O RAC GERAL foi enviado para arquivar no Drive.',
+                );
+              }}
+            >
+              Sim, fechar e arquivar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="acoes-linha">
+          <button className="botao secundario" type="button" disabled={!!ocupado || arq?.status === 'pedido'} onClick={() => setConfirmarArquivo(true)}>
+            {ocupado === 'arquivo' ? 'Enviando…' : arq?.status === 'pronto' || arq?.status === 'erro' ? '📦 Arquivar de novo no Drive' : '📦 Fechar mês e arquivar no Drive'}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

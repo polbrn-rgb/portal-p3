@@ -807,3 +807,19 @@ function htmlLinkSenha(a, link, primeiro) {
     '<p style="color:#555;font-size:12px;">O link vale por pouco tempo. Se não foi você que pediu, ignore este e-mail.</p>' +
     '</div>';
 }
+
+// ---------- RAC: arquivar o RAC GERAL ----------
+
+var UNIDADES_RAC = ['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft', 'btl'];
+var SLOTS_RAC = ['rvPainel', 'rvMapa', 'fvPainel', 'fvMapa', 'roPainel', 'roMapa', 'foPainel'];
+
+/** Ids dos prints do mês (racPrints e racPrintsDados usam o mesmo id): apagados depois de arquivar no Drive. */
+function idsPrintsDoRac(mes) {
+  var ids = [];
+  UNIDADES_RAC.forEach(function (u) {
+    SLOTS_RAC.forEach(function (s) {
+      ids.push(mes + '_' + u + '_' + s);
+    });
+  });
+  return ids;
+}

@@ -131,6 +131,10 @@ histórico das demandas.
   A P/3 envia os 4 painéis do Batalhão (a leitura confere com a soma das Cias) e digita a **Produtividade RPM** (mês
   anterior vem do RAC do Batalhão anterior; TOTAL GERAL em branco = TOTAL anterior + mês). **⬇️ Compilar RAC GERAL**
   gera um .pptx só: 1ª a 6ª Cia, FT (as que enviaram) e o Batalhão; avisa quem ainda não enviou.
+- **RAC — fechar o mês** (Operações → RAC → Batalhão e RAC GERAL): **📦 Fechar mês e arquivar no Drive** encerra o mês,
+  gera o RAC GERAL e manda em partes para `racArquivo/{mês}`; o motor cria o .pptx na pasta de arquivo
+  (`PASTA_RAC_ARQUIVO`), grava o link no mês (✅ com o link, ⏳ enquanto espera, ❌ com o motivo) e apaga do banco o
+  arquivo e os prints do mês. Os números ficam como histórico (mês anterior, trimestral e ano anterior dos próximos RAC).
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de
