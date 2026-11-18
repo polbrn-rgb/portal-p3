@@ -67,13 +67,16 @@ describe.each(CASOS)('Recados do Cmt do P3 para $setor', ({ setor, perfil, outro
     await expect(enviarRecado(p3, setor, '   ')).rejects.toThrow('Escreva o recado.');
   });
 
-  test('só a P/3 escreve; o setor não escreve nem apaga; Cia e o outro setor não leem', async () => {
+  test('só a P/3 escreve; o setor não escreve nem apaga; Cia não lê; a Sala não lê os do CFP (o CFP lê os da Sala)', async () => {
     const id = await enviarRecado(p3, setor, 'Recado');
     await assertSucceeds(getDoc(doc(destino(), colecao, id)));
     await assertFails(addDoc(collection(destino(), colecao), { texto: 'x', criadoEm: serverTimestamp() }));
     await assertFails(apagarRecado(destino(), setor, id));
     await assertFails(getDocs(collection(como('conta-1cia', { perfil: 'unidade', unidade: '1cia' }), colecao)));
-    await assertFails(getDoc(doc(como(`conta-${outro}`, { perfil: outro }), colecao, id)));
+    // O CFP usa a página da Sala, então lê os recados da Sala; o contrário continua fechado.
+    const outroLe = getDoc(doc(como(`conta-${outro}`, { perfil: outro }), colecao, id));
+    if (setor === 'sala') await assertSucceeds(outroLe);
+    else await assertFails(outroLe);
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore() as unknown as Firestore, colecao, id)));
   });
 

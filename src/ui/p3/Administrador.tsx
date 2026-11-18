@@ -38,6 +38,8 @@ import {
   rotuloContador,
 } from '../../domain/numeracao';
 import { entrarAdmin, sairAdmin } from '../../lib/appAdmin';
+import { db as dbPrincipal } from '../../lib/firebase';
+import { AdminAcessos } from './AdminAcessos';
 import { cutucarMotor } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
@@ -53,25 +55,30 @@ function motivo(falha: unknown): string {
   return `Erro: ${codigo || (falha as Error)?.message || 'desconhecido'}.`;
 }
 
-type SubAbaAdmin = 'numeracao' | 'listas' | 'assinaturas' | 'zerar';
+type SubAbaAdmin = 'numeracao' | 'acessos' | 'listas' | 'assinaturas' | 'zerar';
 
 const SUBABAS: { id: SubAbaAdmin; href: string; rotulo: string }[] = [
   { id: 'numeracao', href: '#/admin', rotulo: 'Numeração' },
+  { id: 'acessos', href: '#/admin/acessos', rotulo: 'Acessos' },
   { id: 'listas', href: '#/admin/listas', rotulo: 'Listas do numerador' },
   { id: 'assinaturas', href: '#/admin/assinaturas', rotulo: 'Assinaturas de e-mail' },
   { id: 'zerar', href: '#/admin/zerar', rotulo: 'Zerar portal' },
 ];
 
 export function subAbaAdmin(rota: string): SubAbaAdmin {
+  if (rota === '#/admin/acessos') return 'acessos';
   if (rota === '#/admin/listas') return 'listas';
   if (rota === '#/admin/assinaturas') return 'assinaturas';
   if (rota === '#/admin/zerar') return 'zerar';
   return 'numeracao';
 }
 
-/** Aba Administrador: senha própria (conta do Administrador), separada do login da P/3. Sub-abas no topo. */
-export function Administrador({ rota }: { rota: string }) {
-  const [db, setDb] = useState<Firestore | null>(null);
+/**
+ * Aba Administrador. Chefe e encarregado da P/3 (login individual com admin) entram direto;
+ * a conta antiga da P/3 usa a senha própria do Administrador (conexão separada). Sub-abas no topo.
+ */
+export function Administrador({ rota, direto = false }: { rota: string; direto?: boolean }) {
+  const [db, setDb] = useState<Firestore | null>(direto ? dbPrincipal : null);
   // Saiu da aba Administrador: o Administrador sai junto (trocar de sub-aba não desloga).
   useEffect(() => () => void sairAdmin(), []);
   const ativa = subAbaAdmin(rota);
@@ -87,9 +94,11 @@ export function Administrador({ rota }: { rota: string }) {
             </a>
           ))}
         </nav>
-        <button className="botao secundario" type="button" onClick={() => void sairAdmin().then(() => setDb(null))}>
-          🔒 Sair do Administrador
-        </button>
+        {!direto && (
+          <button className="botao secundario" type="button" onClick={() => void sairAdmin().then(() => setDb(null))}>
+            🔒 Sair do Administrador
+          </button>
+        )}
       </div>
       <ConteudoAdmin db={db} ativa={ativa} />
     </>
@@ -101,6 +110,7 @@ function ConteudoAdmin({ db, ativa }: { db: Firestore; ativa: SubAbaAdmin }) {
   const tipos = conhecidos(listas.valor ?? listasPadrao(), 'tiposSaida');
   if (ativa === 'listas') return <ManutencaoListas db={db} listas={listas.valor} erro={listas.erro} />;
   if (ativa === 'zerar') return <Zerar db={db} />;
+  if (ativa === 'acessos') return <AdminAcessos db={db} />;
   if (ativa === 'assinaturas') return <Assinaturas db={db} responsaveis={conhecidos(listas.valor ?? listasPadrao(), 'responsaveis')} />;
   return <Numeracao db={db} tipos={tipos} />;
 }

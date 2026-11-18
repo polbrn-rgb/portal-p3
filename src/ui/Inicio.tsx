@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import type { Sessao } from '../domain/contas';
 import { auth } from '../lib/firebase';
@@ -16,7 +17,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
           Sair
         </button>
       </Topo>
-      {sessao.tipo === 'p3' && <PainelP3 />}
+      {sessao.tipo === 'p3' && <PainelP3 admin={sessao.admin} />}
       {sessao.tipo === 'unidade' && <PainelUnidade unidade={sessao.unidade} sigla={sessao.sigla} />}
       {sessao.tipo === 'sala' && (
         <>
@@ -24,7 +25,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
           <PainelSala />
         </>
       )}
-      {sessao.tipo === 'cfp' && <PainelCfp />}
+      {sessao.tipo === 'cfp' && <PaginasCfp />}
       {sessao.tipo === 'sem-perfil' && (
         <section className="cartao" role="alert">
           <h2>Conta sem perfil</h2>
@@ -32,5 +33,30 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
         </section>
       )}
     </main>
+  );
+}
+
+/** O CFP usa a página dele e a da Sala de Operações (troca por abas no topo). */
+function PaginasCfp() {
+  const [pagina, setPagina] = useState<'cfp' | 'sala'>('cfp');
+  return (
+    <>
+      <nav className="abas subabas abas-cfp-sala" aria-label="Páginas do CFP">
+        <button type="button" aria-current={pagina === 'cfp' ? 'page' : undefined} onClick={() => setPagina('cfp')}>
+          CFP
+        </button>
+        <button type="button" aria-current={pagina === 'sala' ? 'page' : undefined} onClick={() => setPagina('sala')}>
+          Sala de Operações
+        </button>
+      </nav>
+      {pagina === 'cfp' ? (
+        <PainelCfp />
+      ) : (
+        <>
+          <Recados setor="sala" />
+          <PainelSala />
+        </>
+      )}
+    </>
   );
 }

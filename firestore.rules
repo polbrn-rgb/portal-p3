@@ -3,7 +3,8 @@ rules_version = '2';
 // O perfil vem do token do login (custom claims gravados pelo script de usuários):
 //   P/3    -> perfil = 'p3'
 //   Cia    -> perfil = 'unidade' e unidade = '1cia' ... '6cia' | 'ft'
-//   Sala de Operações -> perfil = 'sala';  CFP -> perfil = 'cfp'
+//   Sala de Operações -> perfil = 'sala';  CFP -> perfil = 'cfp' (o CFP também usa a página da Sala)
+// Logins individuais (por RE) levam ainda re e, no chefe/encarregado da P/3, admin = true (aba Administrador).
 // Tudo que não estiver liberado aqui fica bloqueado.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -18,7 +19,13 @@ service cloud.firestore {
 
     // Conta do Administrador (senha própria, usada só na aba Administrador da P/3).
     function ehAdmin() {
-      return logado() && request.auth.token.perfil == 'admin';
+      return logado() && (request.auth.token.perfil == 'admin'
+        || (request.auth.token.perfil == 'p3' && request.auth.token.get('admin', false) == true));
+    }
+
+    // Página da Sala de Operações: a Sala e o CFP.
+    function veSala() {
+      return logado() && (request.auth.token.perfil == 'sala' || request.auth.token.perfil == 'cfp');
     }
 
     // O Administrador lê e grava tudo (zerar o portal, ajustar o contador do numerador).
@@ -67,7 +74,7 @@ service cloud.firestore {
 
     // Checklist Operações (id = número da demanda). A Sala lê para lançar os resultados.
     match /operacoes/{numero} {
-      allow read: if ehP3() || ehPerfil('sala');
+      allow read: if ehP3() || veSala();
       allow write: if ehP3();
     }
 
@@ -82,8 +89,8 @@ service cloud.firestore {
     }
 
     match /resultados/{id} {
-      allow read: if ehP3() || ehPerfil('sala');
-      allow create, update: if ehPerfil('sala') && resultadoValido(id);
+      allow read: if ehP3() || veSala();
+      allow create, update: if veSala() && resultadoValido(id);
     }
 
     // Solicitação de efetivo: a P/3 cria uma por Cia; a Cia só informa os policiais.
@@ -313,8 +320,11 @@ service cloud.firestore {
       allow delete: if ehP3();
     }
 
+    // Acessos individuais (id = RE sem dígito): só o Administrador cadastra; o motor cria as contas.
+    // (A regra geral do Administrador, no topo, já libera leitura e gravação.)
+
     match /recadosSala/{recadoId} {
-      allow read: if ehP3() || ehPerfil('sala');
+      allow read: if ehP3() || veSala();
       allow create: if recadoValido();
       allow delete: if ehP3();
     }

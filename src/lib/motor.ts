@@ -19,3 +19,9 @@ export function cutucarMotor(url: string = URL_MOTOR): boolean {
     return false;
   }
 }
+
+/** "Esqueci minha senha" (login por RE): o motor manda o link para o e-mail funcional cadastrado, se houver acesso. */
+export function pedirTrocaDeSenha(re: string, url: string = URL_MOTOR): boolean {
+  if (!url) return false;
+  return cutucarMotor(`${url}?acao=senha&re=${encodeURIComponent(re.trim())}`);
+}

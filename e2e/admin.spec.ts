@@ -8,16 +8,16 @@ test('aba Administrador: senha própria, sub-abas e manutenção das listas do n
   await irPara(page, /Administrador/);
 
   const senha = page.getByLabel(/Senha do Administrador/);
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.getByText('Digite a senha do Administrador.')).toBeVisible();
   await senha.fill('senha-errada');
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.getByText('Senha incorreta.')).toBeVisible();
   await senha.fill(SENHA_TESTE);
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
   const subabas = page.getByRole('navigation', { name: 'Administrador' });
-  await expect(subabas.getByRole('link')).toHaveText(['Numeração', 'Listas do numerador', 'Assinaturas de e-mail', 'Zerar portal']);
+  await expect(subabas.getByRole('link')).toHaveText(['Numeração', 'Acessos', 'Listas do numerador', 'Assinaturas de e-mail', 'Zerar portal']);
   await expect(page.getByRole('heading', { name: 'Numeração' })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 
@@ -41,7 +41,7 @@ test('aba Administrador: senha própria, sub-abas e manutenção das listas do n
 
   await irPara(page, /Administrador/);
   await page.getByLabel(/Senha do Administrador/).fill(SENHA_TESTE);
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await page.getByRole('navigation', { name: 'Administrador' }).getByRole('link', { name: 'Listas do numerador' }).click();
   await page.getByRole('combobox', { name: /^Lista/ }).selectOption('responsaveis');
   await page.getByRole('listitem').filter({ hasText: nome }).getByRole('button', { name: 'Retirar' }).click();
