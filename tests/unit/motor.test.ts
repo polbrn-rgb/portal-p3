@@ -241,8 +241,8 @@ describe('Checklist Operações (Apps Script)', () => {
       [3, '1º Sgt PM', 234567, 'BELTRANO', 'BELTRANO', ''],
     ];
     expect(motor.linhasDoEfetivo(aba)).toEqual([
-      { chave: '123456', re: '123456-7', posto: 'Cb PM', nomeGuerra: 'FULANO', telefone: '(11) 90000-0000', nomeCompleto: 'FULANO DE TAL', email: '' },
-      { chave: '234567', re: '234567', posto: '1º Sgt PM', nomeGuerra: 'BELTRANO', telefone: '', nomeCompleto: 'BELTRANO', email: '' },
+      { chave: '123456', re: '123456-7', posto: 'Cb PM', nomeGuerra: 'FULANO', telefone: '(11) 90000-0000', nomeCompleto: 'FULANO DE TAL', email: '', opm: '' },
+      { chave: '234567', re: '234567', posto: '1º Sgt PM', nomeGuerra: 'BELTRANO', telefone: '', nomeCompleto: 'BELTRANO', email: '', opm: '' },
     ]);
     expect(motor.linhasDoEfetivo([['sem', 'cabeçalho']])).toEqual([]);
   });
