@@ -66,23 +66,22 @@ describe('RAC da Cia', () => {
 
 describe('prints do RAC', () => {
   const foto = { dados: btoa('jpeg'), miniatura: btoa('mini') };
-  const leitura = { companhia: '1cia', delito: 'rouboVeiculo' as const, valores: { atual: { valor: 1, confira: false } } };
 
   test('a Cia envia e troca os prints dela; a P/3 lê; outra Cia não lê nem grava', async () => {
     await abrirRac(p3, '2026-09', '2026-10-10', []);
-    await salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'rvPainel', foto, leitura);
-    await salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'rvPainel', { ...foto, dados: btoa('outra') }, null); // troca
+    await salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'rvPainel', foto);
+    await salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'rvPainel', { ...foto, dados: btoa('outra') }); // troca
     expect(atob(await lerImagemPrint(p3, '2026-09_1cia_rvPainel'))).toBe('outra');
-    expect((await getDoc(doc(p3, 'racPrints', '2026-09_1cia_rvPainel'))).data()).toMatchObject({ slot: 'rvPainel', leitura: null });
+    expect((await getDoc(doc(p3, 'racPrints', '2026-09_1cia_rvPainel'))).data()).toMatchObject({ slot: 'rvPainel' });
     await assertSucceeds(getDocs(query(collection(cia('1cia'), 'racPrints'), where('unidadeId', '==', '1cia'), where('mes', '==', '2026-09'))));
 
     await assertFails(getDoc(doc(cia('2cia'), 'racPrintsDados', '2026-09_1cia_rvPainel')));
-    await assertFails(salvarPrintRac(cia('2cia'), '2026-09', '1cia', 'rvPainel', foto, null));
-    await assertFails(setDoc(doc(cia('1cia'), 'racPrints', '2026-09_1cia_outro'), { mes: '2026-09', unidadeId: '1cia', slot: 'outro', miniatura: '', leitura: null, tamanho: 1, enviadoEm: serverTimestamp() }));
+    await assertFails(salvarPrintRac(cia('2cia'), '2026-09', '1cia', 'rvPainel', foto));
+    await assertFails(setDoc(doc(cia('1cia'), 'racPrints', '2026-09_1cia_outro'), { mes: '2026-09', unidadeId: '1cia', slot: 'outro', miniatura: '', tamanho: 1, enviadoEm: serverTimestamp() }));
     await assertFails(setDoc(doc(cia('1cia'), 'racPrintsDados', '2026-09_1cia_fvMapa'), { mes: '2026-09', unidadeId: '1cia', slot: 'fvMapa', dados: 'x'.repeat(900_001) }));
 
     await alterarRac(p3, '2026-09', { status: 'encerrado' });
-    await assertFails(salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'fvPainel', foto, null)); // mês encerrado
+    await assertFails(salvarPrintRac(cia('1cia'), '2026-09', '1cia', 'fvPainel', foto)); // mês encerrado
   });
 });
 
@@ -93,7 +92,7 @@ describe('excluir RAC', () => {
     await abrirRac(p3, '2026-09', '2026-10-10', []);
     for (const u of ['1cia', '2cia'] as const) {
       await salvarRac(cia(u), racVazio(u, '2026-09'), 'rascunho', '');
-      await salvarPrintRac(cia(u), '2026-09', u, 'rvPainel', foto, null);
+      await salvarPrintRac(cia(u), '2026-09', u, 'rvPainel', foto);
     }
     await assertFails(excluirRacDaUnidade(cia('1cia'), '2026-09', '1cia'));
     await assertFails(excluirRacDoMes(cia('1cia'), '2026-09'));
@@ -120,14 +119,14 @@ describe('Batalhão (P/3)', () => {
     rpm.pessoasAbordadas = { mesAnterior: 1462, atual: 1936, totalGeral: null };
     await salvarRpm(p3, '2026-09', rpm, 'Cap Teste');
     expect((await lerRacBtl(p3, '2026-09'))?.rpm?.pessoasAbordadas.atual).toBe(1936);
-    await salvarPrintRac(p3, '2026-09', 'btl', 'foPainel', foto, null);
+    await salvarPrintRac(p3, '2026-09', 'btl', 'foPainel', foto);
     await alterarRac(p3, '2026-09', { status: 'encerrado' });
     await salvarRpm(p3, '2026-09', rpm, 'Cap Teste');
-    await salvarPrintRac(p3, '2026-09', 'btl', 'rvPainel', foto, null);
+    await salvarPrintRac(p3, '2026-09', 'btl', 'rvPainel', foto);
 
-    await assertFails(salvarPrintRac(p3, '2026-09', 'btl', 'rvMapa', foto, null)); // Batalhão não tem mapa
+    await assertFails(salvarPrintRac(p3, '2026-09', 'btl', 'rvMapa', foto)); // Batalhão não tem mapa
     await assertFails(salvarRpm(cia('1cia'), '2026-09', rpm, 'X'));
-    await assertFails(salvarPrintRac(cia('1cia'), '2026-09', 'btl', 'fvPainel', foto, null));
+    await assertFails(salvarPrintRac(cia('1cia'), '2026-09', 'btl', 'fvPainel', foto));
     await assertFails(getDoc(doc(cia('1cia'), 'racs', '2026-09_btl')));
 
     await excluirRacDoMes(p3, '2026-09');

@@ -323,8 +323,8 @@ service cloud.firestore {
       allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
       allow create, update: if ((ehDaMinhaUnidade(request.resource.data)
         && (resource == null || ehDaMinhaUnidade(resource.data))
-        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm']))
-        || printBtlValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm']))
+        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'tamanho', 'enviadoEm']))
+        || printBtlValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'tamanho', 'enviadoEm']))
         && request.resource.data.miniatura is string && request.resource.data.miniatura.size() <= 60000
         && request.resource.data.enviadoEm == request.time;
       allow delete: if ehP3();

@@ -67,9 +67,7 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
   // Lista para o compilado: os RAC das unidades + o do Batalhão com a RPM da tela (mesmo sem salvar).
   const paraCompilar = [...racs.filter((r) => r.unidade !== 'btl'), { ...(salvo ?? { ...comRpm, id: '', status: 'rascunho' as const, preenchidoPor: '' }), rpm }];
   const arq = m.arquivo;
-  const alertas = conferirPrints(comRpm, prints.valor ?? []);
-  const faltaPrint = alertas.filter((a) => a.nivel === 'erro');
-  const divergencias = alertas.filter((a) => a.nivel === 'aviso');
+  const faltaPrint = conferirPrints(comRpm, prints.valor ?? []);
 
   async function executar(tipo: 'rpm' | 'btl' | 'geral' | 'arquivo', acao: () => Promise<void>, ok: string) {
     setOcupado(tipo);
@@ -115,8 +113,8 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
     <section className="cartao grupo formulario-rac" aria-label={`Batalhão e RAC GERAL de ${rotuloMesLongo(m.mes)}`}>
       <h3 className="titulo-secao">Batalhão e RAC GERAL</h3>
       <p className="pendente-detalhe">
-        Crimes do Batalhão = soma das 6 Cias; produtividade = soma das Cias e da FT (só dos RAC enviados). A P/3 envia os 4 painéis do Batalhão e digita a
-        Produtividade RPM.
+        Os números do Batalhão não são digitados: crimes = soma das 6 Cias; produtividade = soma das Cias e da FT (só dos RAC enviados). A P/3 envia os 4
+        painéis do Batalhão (só imagem, para os slides) e digita a Produtividade RPM.
       </p>
       {faltam.length > 0 && (
         <p className="mensagem aviso-rac" role="status">
@@ -125,11 +123,6 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
       )}
 
       <PrintsRac unidade="btl" mes={m.mes} prints={prints.valor ?? []} erroDe={(c) => faltaPrint.find((a) => a.campo === c)?.mensagem} />
-      {divergencias.map((a) => (
-        <p key={a.id} className="mensagem aviso-rac">
-          ⚠️ {a.mensagem}
-        </p>
-      ))}
 
       <TabelaRac
         titulo="PRODUTIVIDADE RPM"

@@ -113,14 +113,8 @@ histórico das demandas.
   Erro (vazio, inválido, inconsistência maior que o total) impede o envio; aviso (coluna copiada, número diferente do
   RAC já enviado) pede justificativa. Regras em `src/domain/rac.ts`.
   **Prints (7 por Cia)**: 4 painéis "Indicadores Criminais" + 2 mapas de veículo + Painel de Roubos, enviados na
-  própria tela (reduzidos no aparelho, ficam em `racPrints`/`racPrintsDados`). Nos painéis, o portal lê no aparelho
-  (Tesseract.js, carregado do CDN só nessa hora) os números do mês, do anterior, do retrasado e do ano anterior e
-  preenche os crimes vazios; também lê a Cia e o indicador do filtro. Leitura incerta aparece com ⚠️. Print de outra
-  Cia/indicador ou número digitado diferente do print vira aviso com justificativa. A tabela é achada pelos nomes
-  dos meses, então serve recorte do painel, tela cheia ou zoom; sem leitura, a tela diz o motivo. Calibração em
-  `src/domain/racPrints.ts` (24 prints reais de set/2026: 95 de 96 números certos no recorte e na tela cheia, 92 de 96
-  com zoom, 93 de 96 no tamanho de notebook, 84 de 96 a 60%; nenhum errado sem ⚠️; painel com menos de ~1000 px de
-  largura não é lido).
+  própria tela (reduzidos no aparelho, ficam em `racPrints`/`racPrintsDados`) e obrigatórios para enviar. Entram **só como
+  imagem** nos slides: os números são sempre digitados (a leitura automática dos prints foi retirada por não ser confiável).
 - **RAC — apresentação**: a Cia (na tela do RAC) e a P/3 (Operações → RAC, em cada unidade) têm **👁️ Pré-visualizar**
   (os slides na tela) e **⬇️ Baixar apresentação (.pptx)**, gerada no aparelho a partir do modelo da P/3
   (`public/rac/modelo-rac.pptx`, o "Modelo RAC - MES26"): título, tabelas com as cores de Var %, prints encaixados sem
@@ -128,7 +122,7 @@ histórico das demandas.
   exclui o RAC de uma unidade (🗑️ na linha) ou do mês inteiro, com confirmação; números e prints saem do banco.
 - **RAC — Batalhão e RAC GERAL** (Operações → RAC, em cada mês): o Batalhão é a **soma** dos RAC enviados (crimes das 6
   Cias; produtividade das Cias + FT) — no formato do RAC BTL oficial (sem inconsistências, 4 painéis, Produtividade RPM).
-  A P/3 envia os 4 painéis do Batalhão (a leitura confere com a soma das Cias) e digita a **Produtividade RPM** (mês
+  A P/3 envia os 4 painéis do Batalhão (só imagem) e digita a **Produtividade RPM** (mês
   anterior vem do RAC do Batalhão anterior; TOTAL GERAL em branco = TOTAL anterior + mês). **⬇️ Compilar RAC GERAL**
   gera um .pptx só: 1ª a 6ª Cia, FT (as que enviaram) e o Batalhão; avisa quem ainda não enviou.
 - **RAC — fechar o mês** (Operações → RAC → Batalhão e RAC GERAL): **📦 Fechar mês e arquivar no Drive** encerra o mês,
