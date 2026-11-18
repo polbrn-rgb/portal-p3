@@ -2655,35 +2655,64 @@ fieldset:has(> .erro-campo) > legend {
   gap: 10px;
 }
 
-.rac-linha {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 0;
-  border-top: 1px solid #e3e7ee;
-}
-
-.rac-linha h4 {
-  margin: 0;
-  font-size: 0.95rem;
-  color: var(--cor-secundaria);
-}
-
-.grade-rac {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 8px;
-}
-
-.grade-rac .campo {
-  gap: 4px;
-  font-size: 0.85rem;
+.formulario-rac fieldset {
   min-width: 0;
 }
 
-.grade-rac .campo input {
-  padding: 8px;
+.rac-fonte {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--cor-suave);
+}
+
+.tabela-rac {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabela-rac th,
+.tabela-rac td {
+  padding: 4px;
+  border-bottom: 1px solid #e3e7ee;
   text-align: center;
+  vertical-align: middle;
+}
+
+.tabela-rac thead th {
+  background: var(--cor-primaria);
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tabela-rac tbody th {
+  text-align: left;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.celula-rac {
+  gap: 2px;
+  font-weight: 400;
+}
+
+.celula-rac input {
+  min-height: 36px;
+  min-width: 56px;
+  padding: 4px;
+  text-align: center;
+}
+
+.celula-rac .erro-campo {
+  font-size: 0.75rem;
+  min-width: 90px;
+}
+
+.calc-rac {
+  font-weight: 600;
+  color: var(--cor-secundaria);
+  white-space: nowrap;
 }
 
 .rac-calculo {

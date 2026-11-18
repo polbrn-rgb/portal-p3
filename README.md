@@ -106,8 +106,9 @@ histórico das demandas.
   efetivo pelo portal (RE puxa graduação, nome completo, e-mail e celular do banco) ou marca "Sem efetivo pendente de
   EAP"; o motor grava na aba da Cia com "Validado por" em H3. A P/3 acompanha, gera o compilado e encerra.
 - **Operações → RAC**: a P/3 abre o RAC do **mês de referência** (o de setembro é feito em outubro) com o prazo das
-  Cias, muda o prazo, encerra/reabre e acompanha quem enviou. Na página da Cia/FT, aba **RAC**: crimes (ano anterior,
-  trimestral, mês e inconsistências), produtividade por pelotão, itens à parte e o comparativo. **Real, TOTAL e Var %
+  Cias, muda o prazo, encerra/reabre e acompanha quem enviou. Na página da Cia/FT, aba **RAC**: as mesmas tabelas da
+  apresentação, na mesma ordem (comparativo anual, com inconsistências, trimestral, produtividade mensal por pelotão e
+  os comparativos de produtividade mensal e anual); cada número é digitado uma vez só. **Real, TOTAL e Var %
   são calculados** (Var % com base zero mostra "—"); mês anterior/trimestral/ano anterior vêm dos RAC já enviados.
   Erro (vazio, inválido, inconsistência maior que o total) impede o envio; aviso (coluna copiada, número diferente do
   RAC já enviado) pede justificativa. Regras em `src/domain/rac.ts`.
