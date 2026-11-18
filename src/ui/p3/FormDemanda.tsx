@@ -30,6 +30,7 @@ import { cutucarMotor } from '../../lib/motor';
 import { irPara } from '../../lib/navegacao';
 import { useListas } from '../../lib/useListas';
 import { RespostasCias } from './RespostasCias';
+import { AgendaDaDemanda } from './Agenda';
 import { StatusAutomacao } from './StatusAutomacao';
 import { BaixarPdf } from '../BaixarPdf';
 import { useMeuResponsavel } from '../../lib/quemSou';
@@ -470,6 +471,7 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
 
       {existente && <StatusAutomacao demandaId={existente.id} />}
       {existente && <RespostasCias demandaId={existente.id} />}
+      {existente && <AgendaDaDemanda demandaId={existente.id} />}
 
       {erroGeral && (
         <p className="mensagem erro" role="alert">

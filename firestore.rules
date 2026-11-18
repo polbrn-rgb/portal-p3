@@ -428,6 +428,27 @@ service cloud.firestore {
       allow delete: if ehP3();
     }
 
+    // Agenda da P/3 no portal (eventos próprios; as datas do Numerador vêm das demandas).
+    function compromissoValido() {
+      let d = request.resource.data;
+      let dataISO = '^[0-9]{4}-[0-9]{2}-[0-9]{2}$';
+      return d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 200
+        && d.data is string && d.data.matches(dataISO)
+        && d.dataFim is string && d.dataFim.matches(dataISO) && d.dataFim >= d.data
+        && d.fimSerie is string && d.fimSerie >= d.data
+        && d.diaInteiro is bool
+        && d.repeticao in ['nao', 'diaria', 'semanal', 'mensal', 'anual']
+        && d.descricao is string && d.descricao.size() <= 5000
+        && d.excecoes is list && d.excecoes.size() <= 500
+        && d.criadoPor is string && d.criadoPor.size() > 0;
+    }
+
+    match /agenda/{compromissoId} {
+      allow read, delete: if ehP3();
+      allow create: if ehP3() && compromissoValido();
+      allow update: if ehP3() && compromissoValido() && request.resource.data.criadoPor == resource.data.criadoPor;
+    }
+
     // Cópia da agenda do CFP (gravada só pelo Apps Script).
     match /agendaCfp/{docId} {
       allow read: if ehP3() || ehPerfil('cfp');

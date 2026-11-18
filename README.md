@@ -129,6 +129,18 @@ histórico das demandas.
   gera o RAC GERAL e manda em partes para `racArquivo/{mês}`; o motor cria o .pptx na pasta de arquivo
   (`PASTA_RAC_ARQUIVO`), grava o link no mês (✅ com o link, ⏳ enquanto espera, ❌ com o motivo) e apaga do banco o
   arquivo e os prints do mês. Os números ficam como histórico (mês anterior, trimestral e ano anterior dos próximos RAC).
+- **Agenda** (abaixo de Aperfeiçoamento): agenda da P/3 dentro do portal, com visões **Dia**, **Semana** e **Mês**
+  (‹ › andam um dia/semana/mês; **Hoje** volta; a visão escolhida fica lembrada no aparelho). **+ Novo evento**: título,
+  dia inteiro (pode ter vários dias) ou com horário, repetição (todo dia/semana/mês/ano, com "até" opcional), local,
+  descrição, cor e o **nº da demanda do Numerador** (opcional; liga o evento à demanda). No Mês, clicar num dia o
+  seleciona (no celular os eventos do dia aparecem embaixo da grade) e o duplo clique cria evento de dia inteiro; no
+  Dia/Semana, clicar num horário cria o evento naquela hora. Excluir pede confirmação (evento que se repete: "só este
+  dia" ou "toda a série"). Fica gravado quem lançou/alterou (login individual). Eventos em `agenda` (só a P/3).
+  **Integração com o Numerador** (só leitura, muda-se pela demanda): **Prazo CPA**, **Prazo Cia** e **Início/Término
+  Btl** das demandas aparecem sozinhos, com link para abrir a demanda (concluída aparece riscada; excluída some). Na
+  tela da demanda, o quadro **📅 Agenda** mostra os eventos ligados a ela e **+ Agendar evento** abre a agenda com o
+  evento já ligado. A camada **Agenda do CFP** (desligada no início) mostra a cópia da agenda do CFP. Os botões
+  **Mostrar** ligam/desligam cada camada. A agenda do Google (prazos e CFP, pelo motor) continua funcionando igual.
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de
