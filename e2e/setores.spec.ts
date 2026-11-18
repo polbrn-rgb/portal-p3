@@ -1,4 +1,11 @@
 import { expect, test } from '@playwright/test';
+
+// Diagnóstico de falha intermitente no CI: mostra no log onde a tela estava.
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus) return;
+  const texto = await page.locator('body').innerText().catch(() => '(sem texto)');
+  console.log(`[diagnóstico ${info.project.name}] url=${page.url()}\n${texto.slice(0, 2500)}`);
+});
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
