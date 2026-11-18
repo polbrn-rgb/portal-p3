@@ -2552,3 +2552,91 @@ fieldset:has(> .erro-campo) > legend {
 .excluir-eap {
   margin-top: 8px;
 }
+
+/* Login: troca entre RE (individual) e a conta antiga da unidade */
+.troca-login {
+  text-align: center;
+  margin: 12px 0 0;
+}
+
+/* CFP: abas CFP / Sala de Operações */
+.abas-cfp-sala {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.abas-cfp-sala button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--cor-borda, #d0d7e2);
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.abas-cfp-sala button[aria-current='page'] {
+  background: var(--cor-destaque, #0b3d91);
+  border-color: var(--cor-destaque, #0b3d91);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Administrador → Acessos */
+.form-acesso {
+  display: grid;
+  gap: 10px;
+}
+
+.linha-dupla {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .linha-dupla {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.grupo-acessos {
+  margin-top: 12px;
+}
+
+.grupo-acessos summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lista-acessos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.item-acesso {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.item-acesso-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.acoes-acesso {
+  gap: 16px;
+}

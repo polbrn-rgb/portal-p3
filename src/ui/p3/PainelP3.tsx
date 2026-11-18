@@ -44,7 +44,8 @@ function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle
 }
 
 /** Toda tela da P/3: menu (lateral no computador, ☰ no celular) e o conteúdo ao lado. */
-export function PainelP3() {
+/** admin: 'direto' (chefe/encarregado), 'senha' (conta antiga da P/3) ou 'nao' (operador: sem a aba Administrador). */
+export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'nao' }) {
   const hash = useHash();
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
@@ -56,9 +57,9 @@ export function PainelP3() {
   }, []);
   return (
     <div className="layout-p3">
-      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} />
+      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} semAdmin={admin === 'nao'} />
       <div className="conteudo-p3">
-        <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} />
+        <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} admin={admin} />
       </div>
     </div>
   );
@@ -75,10 +76,20 @@ function abaDaRota(hash: string): AbaP3 {
   return 'numerador';
 }
 
-function ConteudoP3({ hash, pendentes, operacoes }: { hash: string; pendentes: AoVivo<Pendente[]>; operacoes: AoVivo<Operacao[]> }) {
+function ConteudoP3({
+  hash,
+  pendentes,
+  operacoes,
+  admin,
+}: {
+  hash: string;
+  pendentes: AoVivo<Pendente[]>;
+  operacoes: AoVivo<Operacao[]>;
+  admin: 'direto' | 'senha' | 'nao';
+}) {
 
   if (hash === '#/nova') return <NovaDemanda />;
-  if (hash.startsWith('#/admin')) return <Administrador rota={hash} />;
+  if (hash.startsWith('#/admin') && admin !== 'nao') return <Administrador rota={hash} direto={admin === 'direto'} />;
   if (hash === '#/pendentes/sei') return <FormPendente key="sei" tipo="sei" />;
   if (hash === '#/pendentes/ordem') return <FormPendente key="ordem" tipo="ordem_verbal" />;
   const destinar = /^#\/destinar\/([\w-]+)$/.exec(hash);

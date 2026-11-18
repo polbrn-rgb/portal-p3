@@ -2,6 +2,7 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { garantirContas } from '../scripts/contas-admin';
+import { emailDeLogin } from '../src/domain/acessos';
 import { TODAS_CONTAS } from '../src/domain/contas';
 import { SENHA_TESTE } from './dados';
 
@@ -12,6 +13,20 @@ export default async function globalSetup() {
   }
   const app = getApps()[0] ?? initializeApp({ projectId: 'demo-portal-p3' });
   await garantirContas(getAuth(app), TODAS_CONTAS, () => SENHA_TESTE);
+  // Logins individuais (por RE), como o motor cria: chefe da P/3 (admin), operador da P/3 e um CFP.
+  const auth = getAuth(app);
+  for (const [re, claims] of [
+    ['130155-1', { perfil: 'p3', re: '130155', admin: true }],
+    ['111111-1', { perfil: 'p3', re: '111111' }],
+    ['222222-2', { perfil: 'cfp', re: '222222' }],
+  ] as const) {
+    const email = emailDeLogin(re);
+    const uid = await auth
+      .getUserByEmail(email)
+      .then((u) => u.uid)
+      .catch(async () => (await auth.createUser({ email, password: SENHA_TESTE })).uid);
+    await auth.setCustomUserClaims(uid, claims);
+  }
   await getFirestore(app)
     .doc('efetivo/123456')
     .set({ re: '123456-7', posto: 'Cb PM', nomeGuerra: 'SILVA', telefone: '(11) 90000-0000' });

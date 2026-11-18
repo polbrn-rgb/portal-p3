@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-18';
+var VERSAO_LOGICA = '2026-11-19';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -227,6 +227,7 @@ function cabecalhoDoEfetivo(valores) {
       if (col.tel === undefined && /TELEFONE|CELULAR/.test(v)) col.tel = j;
       if (col.nome === undefined && (/NOME COMPLETO/.test(v) || v === 'NOME')) col.nome = j;
       if (col.email === undefined && /E-?MAIL/.test(v)) col.email = j;
+      if (col.opm === undefined && v === 'OPM') col.opm = j;
     });
     return { linha: i, largura: linha.length, col: col };
   }
@@ -254,7 +255,8 @@ function linhasDoEfetivo(valores) {
       nomeGuerra: String(l[col.guerra]).trim(),
       telefone: col.tel === undefined ? '' : String(l[col.tel]).trim(),
       nomeCompleto: col.nome === undefined ? '' : String(l[col.nome]).trim(),
-      email: col.email === undefined ? '' : String(l[col.email]).trim()
+      email: col.email === undefined ? '' : String(l[col.email]).trim(),
+      opm: col.opm === undefined ? '' : String(l[col.opm]).trim()
     });
   }
   return lista;
@@ -771,4 +773,37 @@ function intervalosBrancos(fundos, linhaInicial, colunaInicial) {
   return saida.map(function (r) {
     return letraDaColuna(r.c1 + col0) + (r.l1 + linhaInicial) + ':' + letraDaColuna(r.c2 + col0) + (r.l2 + linhaInicial);
   });
+}
+
+// ---------- Acessos individuais (login por RE) ----------
+// O mesmo cálculo está em src/domain/acessos.ts (emailDeLogin); o teste confere os dois.
+
+var DOMINIO_LOGIN_ACESSO = 'portal-p3.firebaseapp.com';
+
+function emailDeLoginAcesso(re) {
+  return 're' + normalizarRE(re) + '@' + DOMINIO_LOGIN_ACESSO;
+}
+
+/** Perfil gravado na conta (custom claims): é o que as regras do banco e o portal leem. */
+function claimsDoAcesso(a) {
+  var c = { perfil: a.perfil, re: normalizarRE(a.re) };
+  if (a.perfil === 'unidade') c.unidade = a.unidade;
+  if (a.perfil === 'p3' && a.admin === true) c.admin = true;
+  return c;
+}
+
+/** E-mail com o link de senha (primeiro acesso ou troca). */
+function htmlLinkSenha(a, link, primeiro) {
+  var nome = String(a.posto || '') + ' ' + String(a.nomeGuerra || a.nomeCompleto || '');
+  var esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#000;max-width:560px;">' +
+    '<p>' + esc(nome.trim()) + ',</p>' +
+    '<p>' + (primeiro
+      ? 'Seu acesso ao <b>Portal P3 (8º BPM/M)</b> foi criado. Para entrar, crie sua senha pelo botão abaixo.'
+      : 'Recebemos um pedido para trocar a sua senha do <b>Portal P3 (8º BPM/M)</b>.') + '</p>' +
+    '<p><a href="' + esc(link) + '" style="display:inline-block;background:#0b3d91;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">' +
+    (primeiro ? 'Criar minha senha' : 'Trocar minha senha') + '</a></p>' +
+    '<p>No portal, entre com o seu <b>RE</b> (com ou sem dígito) e a senha criada.</p>' +
+    '<p style="color:#555;font-size:12px;">O link vale por pouco tempo. Se não foi você que pediu, ignore este e-mail.</p>' +
+    '</div>';
 }

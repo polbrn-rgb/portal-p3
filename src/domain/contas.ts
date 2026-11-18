@@ -21,7 +21,8 @@ export interface Conta {
 }
 
 export type Sessao =
-  | { tipo: 'p3'; sigla: string }
+  /** admin: 'direto' (chefe/encarregado com login individual), 'senha' (conta antiga da P/3: pede a senha do Administrador), 'nao'. */
+  | { tipo: 'p3'; sigla: string; admin: 'direto' | 'senha' | 'nao' }
   | { tipo: 'unidade'; unidade: UnidadeId; sigla: string }
   | { tipo: SetorId; sigla: string }
   | { tipo: 'sem-perfil' };
@@ -59,7 +60,10 @@ export const TODAS_CONTAS: readonly Conta[] = [...CONTAS, CONTA_ADMIN];
 
 /** Traduz o perfil gravado no login (custom claims) para a sessão do portal. */
 export function sessaoDosClaims(claims: Record<string, unknown>): Sessao {
-  if (claims.perfil === 'p3') return { tipo: 'p3', sigla: 'P/3' };
+  if (claims.perfil === 'p3') {
+    const individual = typeof claims.re === 'string';
+    return { tipo: 'p3', sigla: 'P/3', admin: !individual ? 'senha' : claims.admin === true ? 'direto' : 'nao' };
+  }
   if (claims.perfil === 'unidade') {
     const unidade = UNIDADES.find((u) => u.id === claims.unidade);
     if (unidade) return { tipo: 'unidade', unidade: unidade.id, sigla: unidade.sigla };

@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-18';
+var VERSAO_MOTOR = '2026-11-19';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -211,13 +211,23 @@ function processarPendentes() {
  * Chamado pelo portal logo depois de salvar (app da web). Espera a vez se outra rodada estiver
  * trabalhando, para não deixar demanda para trás. Não recebe nem devolve dados: só faz o motor rodar.
  */
-function doPost() {
+function doPost(e) {
+  var p = (e && e.parameter) || {};
+  if (p.acao === 'senha') {
+    // "Esqueci minha senha" da tela de login: responde sempre igual (não revela se o RE existe).
+    try {
+      pedirTrocaDeSenha_(p.re);
+    } catch (err) {
+      console.error('Esqueci a senha: ' + err.message);
+    }
+    return ContentService.createTextOutput('ok');
+  }
   rodarMotor_(25000);
   return ContentService.createTextOutput('ok');
 }
 
-function doGet() {
-  return doPost();
+function doGet(e) {
+  return doPost(e);
 }
 
 function rodarMotor_(esperaMs) {
@@ -289,6 +299,11 @@ function rodarMotor_(esperaMs) {
       processarEmails_();
     } catch (e10) {
       console.error('E-mails do portal: ' + e10.message);
+    }
+    try {
+      processarAcessos_();
+    } catch (e11) {
+      console.error('Acessos: ' + e11.message);
     }
   } finally {
     trava.releaseLock();
@@ -406,7 +421,7 @@ function adicionarOperacao_(d) {
 
 function token_() {
   var cache = CacheService.getScriptCache();
-  var guardado = cache.get('token_firestore');
+  var guardado = cache.get('token_servico_v2');
   if (guardado) return guardado;
 
   var bruto = PropertiesService.getScriptProperties().getProperty('CHAVE_SERVICO');
@@ -417,7 +432,7 @@ function token_() {
   var cabecalho = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   var corpo = b64(JSON.stringify({
     iss: chave.client_email,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/cloud-platform',
     aud: 'https://oauth2.googleapis.com/token',
     iat: agora,
     exp: agora + 3600
@@ -428,7 +443,7 @@ function token_() {
     payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: cabecalho + '.' + corpo + '.' + assinatura }
   });
   var token = JSON.parse(resp.getContentText()).access_token;
-  cache.put('token_firestore', token, 3000);
+  cache.put('token_servico_v2', token, 3000);
   return token;
 }
 
@@ -776,7 +791,7 @@ function sincronizarEfetivo() {
       return {
         update: {
           name: caminhoDocs_() + '/efetivo/' + k,
-          fields: jsParaValor({ re: p.re, posto: p.posto, nomeGuerra: p.nomeGuerra, telefone: p.telefone, nomeCompleto: p.nomeCompleto, email: p.email }).mapValue.fields
+          fields: jsParaValor({ re: p.re, posto: p.posto, nomeGuerra: p.nomeGuerra, telefone: p.telefone, nomeCompleto: p.nomeCompleto, email: p.email, opm: p.opm }).mapValue.fields
         }
       };
     });
@@ -1440,4 +1455,88 @@ function htmlParaTexto_(html) {
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// ---------- Acessos individuais (login por RE) ----------
+// A aba Administrador grava acessos/{RE sem dígito} com sincronizar = true; aqui a conta do Firebase é criada
+// ou atualizada (perfil, bloqueio) pela API de contas (Identity Toolkit) com a chave da conta de serviço,
+// e o link de criar/trocar a senha vai pelo Gmail da P/3 para o e-mail funcional cadastrado.
+
+function contas_(caminho, corpo) {
+  var projeto = JSON.parse(PropertiesService.getScriptProperties().getProperty('CHAVE_SERVICO')).project_id;
+  var resp = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/projects/' + projeto + '/' + caminho, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + token_() },
+    payload: JSON.stringify(corpo || {}),
+    muteHttpExceptions: true
+  });
+  var json = {};
+  try { json = JSON.parse(resp.getContentText() || '{}'); } catch (err) { json = {}; }
+  if (resp.getResponseCode() !== 200) {
+    throw new Error('Contas ' + resp.getResponseCode() + ': ' + ((json.error && json.error.message) || resp.getContentText()));
+  }
+  return json;
+}
+
+function contaDoAcesso_(re) {
+  var r = contas_('accounts:lookup', { email: [emailDeLoginAcesso(re)] });
+  return r.users && r.users.length ? r.users[0] : null;
+}
+
+function enviarLinkSenha_(a, primeiro) {
+  var r = contas_('accounts:sendOobCode', { requestType: 'PASSWORD_RESET', email: emailDeLoginAcesso(a.re), returnOobLink: true });
+  if (!r.oobLink) throw new Error('o Firebase não devolveu o link de senha');
+  GmailApp.sendEmail(a.email, primeiro ? 'Portal P3 - crie sua senha' : 'Portal P3 - troca de senha',
+    'Abra este link para ' + (primeiro ? 'criar' : 'trocar') + ' sua senha do Portal P3: ' + r.oobLink, {
+      htmlBody: htmlLinkSenha(a, r.oobLink, primeiro),
+      name: 'P/3 - 8º BPM/M'
+    });
+}
+
+function processarAcessos_() {
+  consultar_('acessos', 'sincronizar', true, 20).forEach(function (x) {
+    var a = x.dados;
+    try {
+      var conta = contaDoAcesso_(a.re);
+      if (a.excluir) {
+        if (conta) contas_('accounts:delete', { localId: conta.localId });
+        firestore_('delete', caminhoDocs_() + '/acessos/' + x.id);
+        return;
+      }
+      if (!conta) {
+        conta = contas_('accounts', {
+          email: emailDeLoginAcesso(a.re),
+          password: Utilities.getUuid() + Utilities.getUuid(),
+          displayName: (String(a.posto || '') + ' ' + String(a.nomeGuerra || a.nomeCompleto || '')).trim()
+        });
+      }
+      contas_('accounts:update', {
+        localId: conta.localId,
+        customAttributes: JSON.stringify(claimsDoAcesso(a)),
+        disableUser: a.ativo === false,
+        displayName: (String(a.posto || '') + ' ' + String(a.nomeGuerra || a.nomeCompleto || '')).trim()
+      });
+      var campos = { sincronizar: false, enviarLink: false, status: 'ok', erro: '', uid: conta.localId };
+      if (a.enviarLink && a.ativo !== false) {
+        enviarLinkSenha_(a, true);
+        campos.linkEnviadoEm = new Date().toISOString();
+      }
+      gravarCampos_('acessos/' + x.id, campos);
+    } catch (err) {
+      gravarCampos_('acessos/' + x.id, { sincronizar: false, status: 'erro', erro: err.message });
+    }
+  });
+}
+
+/** "Esqueci minha senha": no máximo um link a cada 5 minutos por RE; só para acesso ativo. */
+function pedirTrocaDeSenha_(re) {
+  var chave = normalizarRE(re);
+  if (chave.length < 6) return;
+  var cache = CacheService.getScriptCache();
+  if (cache.get('senha_' + chave)) return;
+  cache.put('senha_' + chave, '1', 300);
+  var a = obterDoc_('acessos/' + chave);
+  if (!a || a.ativo === false || a.status !== 'ok' || !a.email) return;
+  enviarLinkSenha_(a, false);
 }

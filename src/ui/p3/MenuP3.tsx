@@ -14,8 +14,8 @@ const ITENS: { id: AbaP3; href: string; rotulo: string }[] = [
 ];
 
 /** Menu da P/3 (lateral no computador, ☰ no celular). */
-export function MenuP3({ ativa, pendentes, operacoes }: { ativa: AbaP3; pendentes?: number; operacoes?: number }) {
+export function MenuP3({ ativa, pendentes, operacoes, semAdmin = false }: { ativa: AbaP3; pendentes?: number; operacoes?: number; semAdmin?: boolean }) {
   const contadores: Partial<Record<AbaP3, number | undefined>> = { pendentes, operacoes };
-  const itens = ITENS.map((i) => ({ ...i, contador: contadores[i.id] }));
+  const itens = ITENS.filter((i) => !(semAdmin && i.id === 'admin')).map((i) => ({ ...i, contador: contadores[i.id] }));
   return <MenuLateral id="menu-p3" rotulo="Seções da P/3" titulo="Portal P3" itens={itens} ativa={ativa} />;
 }

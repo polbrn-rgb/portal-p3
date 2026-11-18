@@ -26,7 +26,10 @@ describe('contas', () => {
 
 describe('sessaoDosClaims', () => {
   test('P/3', () => {
-    expect(sessaoDosClaims({ perfil: 'p3' })).toEqual({ tipo: 'p3', sigla: 'P/3' });
+    expect(sessaoDosClaims({ perfil: 'p3' })).toEqual({ tipo: 'p3', sigla: 'P/3', admin: 'senha' });
+    // Login individual: só o chefe/encarregado (admin) vê o Administrador, e direto.
+    expect(sessaoDosClaims({ perfil: 'p3', re: '130155', admin: true })).toEqual({ tipo: 'p3', sigla: 'P/3', admin: 'direto' });
+    expect(sessaoDosClaims({ perfil: 'p3', re: '111111' })).toEqual({ tipo: 'p3', sigla: 'P/3', admin: 'nao' });
   });
 
   test('unidade válida', () => {
