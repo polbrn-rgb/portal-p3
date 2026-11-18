@@ -119,7 +119,7 @@ describe('Editar a solicitação de efetivo', () => {
 });
 
 describe('Resultados da Sala de Operações', () => {
-  test('Sala lê a operação e lança; Cia e CFP não', async () => {
+  test('Sala (e o CFP, que usa a página da Sala) lê a operação e lança; Cia não', async () => {
     const d = await operacao();
     await pedirPlanilha(p3, d.id);
     const sala = como('conta-sala', { perfil: 'sala' });
@@ -134,7 +134,7 @@ describe('Resultados da Sala de Operações', () => {
     const cia1 = como('conta-1cia', { perfil: 'unidade', unidade: '1cia' });
     const cfp = como('conta-cfp', { perfil: 'cfp' });
     await assertFails(getDoc(doc(cia1, 'resultados', `${d.id}_2026-11-20`)));
-    await assertFails(salvarResultado(cfp, { numero: d.id, dia: '2026-11-21', protocoloResultado: '1', valores: {}, salvoPor: 'x' }));
+    await assertSucceeds(salvarResultado(cfp, { numero: d.id, dia: '2026-11-22', protocoloResultado: '1', valores: {}, salvoPor: 'x' }));
   });
 });
 
