@@ -2,6 +2,8 @@ import {
   ampliacao,
   anosDasLinhas,
   binarizar,
+  canalUnico,
+  cinzaInvertido,
   caixaAno,
   caixaCelula,
   caixaNoPainel,
@@ -16,13 +18,14 @@ import {
   numeroLido,
   palavrasDoTsv,
   precisaMaisTentativas,
-  TENTATIVAS,
+  tentativasPara,
   votar,
   type Caixa,
   type ColunaLida,
   type Grade,
   type LeituraPainel,
   type Palavra,
+  type Tentativa,
 } from '../domain/racPrints';
 
 // Leitura (OCR) dos prints do painel no próprio aparelho, com o Tesseract.js carregado do CDN só quando
@@ -65,10 +68,24 @@ function carregarTesseract(): Promise<Tesseract> {
 }
 
 const BORDA = 24;
-function recorte(img: CanvasImageSource, c: Caixa, escala: number, limiar: number, canal: 'max' | 'min'): HTMLCanvasElement {
+/**
+ * Recorte como na calibração: primeiro o cinza (canal) no tamanho original, depois ampliado com suavização e,
+ * no modo preto e branco, o limiar. Fica com borda branca (o leitor lê melhor).
+ */
+function recorte(img: CanvasImageSource, c: Caixa, escala: number, modo: Tentativa['modo'], limiar: number, canal: 'max' | 'min' = 'max'): HTMLCanvasElement {
+  const origem = document.createElement('canvas');
+  origem.width = Math.max(1, c.largura);
+  origem.height = Math.max(1, c.altura);
+  const co = origem.getContext('2d', { willReadFrequently: true })!;
+  co.drawImage(img, c.x, c.y, c.largura, c.altura, 0, 0, origem.width, origem.height);
+  const px = co.getImageData(0, 0, origem.width, origem.height);
+  if (modo === 'cinza') cinzaInvertido(px.data);
+  else canalUnico(px.data, canal);
+  co.putImageData(px, 0, 0);
+
+  const w = Math.max(1, Math.round(origem.width * escala));
+  const h = Math.max(1, Math.round(origem.height * escala));
   const canvas = document.createElement('canvas');
-  const w = Math.max(1, Math.round(c.largura * escala));
-  const h = Math.max(1, Math.round(c.altura * escala));
   canvas.width = w + 2 * BORDA;
   canvas.height = h + 2 * BORDA;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
@@ -76,10 +93,12 @@ function recorte(img: CanvasImageSource, c: Caixa, escala: number, limiar: numbe
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, c.x, c.y, c.largura, c.altura, BORDA, BORDA, w, h);
-  const dados = ctx.getImageData(BORDA, BORDA, w, h);
-  binarizar(dados.data, canal, limiar);
-  ctx.putImageData(dados, BORDA, BORDA);
+  ctx.drawImage(origem, 0, 0, origem.width, origem.height, BORDA, BORDA, w, h);
+  if (modo === 'pb') {
+    const dados = ctx.getImageData(BORDA, BORDA, w, h);
+    binarizar(dados.data, limiar);
+    ctx.putImageData(dados, BORDA, BORDA);
+  }
   return canvas;
 }
 
@@ -120,30 +139,32 @@ export async function lerPainel(arquivo: Blob, mes: string): Promise<ResultadoLe
     // 1) Acha a tabela pelos nomes dos meses no print inteiro.
     const escalaBusca = W < 1500 ? 2 : 1;
     await t.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '' });
-    const busca = await t.recognize(recorte(img, { x: 0, y: 0, largura: W, altura: H }, escalaBusca, 110, 'max'), {}, { text: true, blocks: true, tsv: true });
+    const busca = await t.recognize(recorte(img, { x: 0, y: 0, largura: W, altura: H }, escalaBusca, 'pb', 110), {}, { text: true, blocks: true, tsv: true });
     const g: Grade | null = gradeDosMeses(palavras(busca.data, escalaBusca).map((p) => ({ ...p, x: p.x - 24 / escalaBusca, y: p.y - 24 / escalaBusca }))) ?? gradePadrao(W, H);
     if (!g) return { leitura: null, motivo: 'Não achei a tabela mês a mês no print. Envie o painel "Indicadores Criminais" inteiro. Confira e digite os números.' };
     if (g.b < COLUNA_MINIMA)
-      return { leitura: null, motivo: 'O print ficou pequeno demais para ler os números com segurança. Aumente o painel na tela antes do print, ou confira e digite os números.' };
+      return { leitura: null, motivo: 'O print ficou pequeno demais para ler os números com segurança (painel com menos de ~1000 px de largura). Aumente o zoom do navegador antes do print, ou confira e digite os números.' };
 
-    const ler = async (c: Caixa, escala: number, limiar: number, psm: string, canal: 'max' | 'min' = 'max', digitos = true) => {
-      await t.setParameters({ tessedit_pageseg_mode: psm, tessedit_char_whitelist: digitos ? '0123456789' : '' });
-      return (await t.recognize(recorte(img, c, ampliacao(escala, g), limiar, canal))).data.text;
+    const ler = async (c: Caixa, t0: Tentativa, canal: 'max' | 'min' = 'max', digitos = true) => {
+      await t.setParameters({ tessedit_pageseg_mode: t0.psm, tessedit_char_whitelist: digitos ? '0123456789' : '' });
+      return (await t.recognize(recorte(img, c, ampliacao(t0.escala, g), t0.modo, t0.limiar, canal))).data.text;
     };
+    const tentativas = tentativasPara(g);
     const lerNumero = async (c: Caixa) => {
       const lidas: (number | null)[] = [];
-      for (const [i, [escala, limiar, psm]] of TENTATIVAS.entries()) {
+      for (const [i, t0] of tentativas.entries()) {
         if (i === 2 && !precisaMaisTentativas(lidas)) break;
-        lidas.push(numeroLido(await ler(c, escala, limiar, psm)));
+        lidas.push(numeroLido(await ler(c, t0)));
       }
       return votar(lidas);
     };
 
     // 2) Filtros do painel e anos das linhas.
-    const companhia = ciaDoTexto(await ler(caixaNoPainel(g, FILTRO_COMPANHIA), 5, 200, '7', 'min', false));
-    const delito = delitoDoTexto(await ler(caixaNoPainel(g, FILTRO_INDICADOR), 5, 200, '7', 'min', false));
+    const filtro: Tentativa = { modo: 'pb', escala: 5, limiar: 200, psm: '7' };
+    const companhia = ciaDoTexto(await ler(caixaNoPainel(g, FILTRO_COMPANHIA), filtro, 'min', false));
+    const delito = delitoDoTexto(await ler(caixaNoPainel(g, FILTRO_INDICADOR), filtro, 'min', false));
     const textosAnos: string[] = [];
-    for (let linha = 0; linha < 3; linha++) textosAnos.push(await ler(caixaAno(g, linha), 4, 110, '7'));
+    for (let linha = 0; linha < 3; linha++) textosAnos.push(await ler(caixaAno(g, linha), { modo: 'pb', escala: 4, limiar: 110, psm: '7' }));
     const anos = anosDasLinhas(textosAnos, Number(mes.slice(0, 4)));
 
     // 3) As 4 células do RAC.

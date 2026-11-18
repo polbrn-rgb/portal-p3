@@ -46,7 +46,7 @@ const DY_LINHAS = [0.1285, 0.2734, 0.4081]; // centro das linhas 2024/2025/2026
 const MEIA_ALTURA = 0.0465;
 const MARGEM = 0.08;
 export const COLUNA_REFERENCIA = 149.6; // largura da coluna nos prints de set/2026 (as tentativas foram calibradas nela)
-export const COLUNA_MINIMA = 110; // menor que isso, os números ficam pequenos demais para ler com segurança
+export const COLUNA_MINIMA = 80; // menor que isso (painel com menos de ~1000 px de largura), não lê: risco de perder dígito
 // Painel inteiro em relação à coluna (para achar as caixas de filtro).
 const COLUNA_POR_PAINEL = 2 * 0.04022;
 const JANEIRO_POR_PAINEL = 0.0408 + 0.04022;
@@ -123,14 +123,16 @@ export function caixaNoPainel(g: Grade, [fx0, fy0, fx1, fy1]: Fracao): Caixa {
 /** Ampliação do recorte: as tentativas foram calibradas com a coluna de 149,6 px. */
 export const ampliacao = (escala: number, g: Grade) => (escala * COLUNA_REFERENCIA) / g.b;
 
-/** Tentativas de leitura de cada célula: [escala, limiar, modo de página do Tesseract]. */
-export const TENTATIVAS: readonly [number, number, string][] = [
-  [4, 110, '7'],
-  [4, 110, '8'],
-  [5, 90, '7'],
-  [3, 130, '7'],
-  [4, 110, '10'],
-];
+/** Tentativas de leitura de cada célula (modo do recorte, ampliação, limiar do preto e branco, modo de página). */
+export type Tentativa = { modo: 'pb' | 'cinza'; escala: number; limiar: number; psm: string };
+const pb = (escala: number, limiar: number, psm: string): Tentativa => ({ modo: 'pb', escala, limiar, psm });
+const cinza = (escala: number, psm: string): Tentativa => ({ modo: 'cinza', escala, limiar: 0, psm });
+/** Print grande (coluna ≥ 120 px): preto e branco. 24 painéis reais: 95/96 no recorte e na tela cheia, 92/96 com zoom. */
+export const TENTATIVAS_GRANDE: readonly Tentativa[] = [pb(4, 110, '7'), pb(4, 110, '8'), pb(5, 90, '7'), pb(3, 130, '7'), pb(4, 110, '10')];
+/** Print menor (notebook, coluna 80–120 px): cinza primeiro. Nos mesmos painéis a 72%: 93/96; a 60%: 84/96. */
+export const TENTATIVAS_PEQUENO: readonly Tentativa[] = [cinza(4, '7'), cinza(4, '8'), pb(4, 110, '7'), cinza(6, '7'), pb(5, 90, '7')];
+export const COLUNA_PEQUENA = 120;
+export const tentativasPara = (g: Grade) => (g.b < COLUNA_PEQUENA ? TENTATIVAS_PEQUENO : TENTATIVAS_GRANDE);
 
 export function numeroLido(texto: string): number | null {
   const t = texto.trim();
@@ -184,15 +186,35 @@ export function delitoDoTexto(texto: string): DelitoId | null {
   return null;
 }
 
-/** Pixels RGBA -> texto preto em fundo branco: canal "max" para números claros/coloridos no fundo escuro,
- *  "min" para o texto branco das caixas de filtro (cinza). */
-export function binarizar(rgba: Uint8ClampedArray, canal: 'max' | 'min', limiar: number): void {
+/** Deixa os pixels RGBA em cinza pelo canal mais claro ("max": números coloridos) ou mais escuro ("min": texto branco no cinza). */
+export function canalUnico(rgba: Uint8ClampedArray, canal: 'max' | 'min'): void {
   for (let i = 0; i < rgba.length; i += 4) {
     const v = canal === 'max' ? Math.max(rgba[i], rgba[i + 1], rgba[i + 2]) : Math.min(rgba[i], rgba[i + 1], rgba[i + 2]);
-    const cor = v > limiar ? 0 : 255;
+    rgba[i] = rgba[i + 1] = rgba[i + 2] = v;
+    rgba[i + 3] = 255;
+  }
+}
+
+/** Cinza -> texto preto em fundo branco: acima do limiar vira preto. */
+export function binarizar(rgba: Uint8ClampedArray, limiar: number): void {
+  for (let i = 0; i < rgba.length; i += 4) {
+    const cor = rgba[i] > limiar ? 0 : 255;
     rgba[i] = rgba[i + 1] = rgba[i + 2] = cor;
     rgba[i + 3] = 255;
   }
+}
+
+/** Canal mais claro, contraste esticado (o mais escuro vira 0 e o mais claro 255) e invertido: texto escuro no claro, sem perder o contorno. */
+export function cinzaInvertido(rgba: Uint8ClampedArray): void {
+  canalUnico(rgba, 'max');
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    min = Math.min(min, rgba[i]);
+    max = Math.max(max, rgba[i]);
+  }
+  const faixa = max - min || 1;
+  for (let i = 0; i < rgba.length; i += 4) rgba[i] = rgba[i + 1] = rgba[i + 2] = 255 - Math.round(((rgba[i] - min) * 255) / faixa);
 }
 
 // ---------- uso no RAC ----------
