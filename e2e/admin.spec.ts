@@ -17,7 +17,7 @@ test('aba Administrador: senha própria, sub-abas e manutenção das listas do n
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
   const subabas = page.getByRole('navigation', { name: 'Administrador' });
-  await expect(subabas.getByRole('link')).toHaveText(['Numeração', 'Listas do numerador', 'Assinaturas de e-mail', 'Zerar portal']);
+  await expect(subabas.getByRole('link')).toHaveText(['Numeração', 'Acessos', 'Listas do numerador', 'Assinaturas de e-mail', 'Zerar portal']);
   await expect(page.getByRole('heading', { name: 'Numeração' })).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 
