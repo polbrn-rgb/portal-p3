@@ -16,6 +16,8 @@ export const COLECOES_ZERAR = [
   'respostasIcc',
   'racMeses',
   'racs',
+  'racPrints',
+  'racPrintsDados',
   'arquivos',
   'fotosTds',
   'fotosTdsDados',

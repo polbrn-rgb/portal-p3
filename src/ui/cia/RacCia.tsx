@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { salvarRac } from '../../data/rac';
+import { observarPrintsDoRac, salvarPrintRac, type PrintRac } from '../../data/racPrints';
 import { formatarData, hojeISO } from '../../domain/datas';
 import {
   colunasPelotao,
@@ -27,13 +28,18 @@ import {
   valorDoCampo,
   variacao,
   type Alerta,
+  type DelitoId,
   type RacDados,
   type RacMes,
   type RacSalvo,
   type SituacaoRac,
 } from '../../domain/rac';
+import { conferirPrints, preencherDoPrint, slotsDaUnidade, type ColunaLida, type LeituraPainel, type SlotPrint } from '../../domain/racPrints';
 import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
+import { reduzirFoto } from '../../lib/imagem';
+import { lerPainel, OCR_LIGADO } from '../../lib/ocrRac';
+import { useAoVivo } from '../../lib/useAoVivo';
 import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
@@ -96,7 +102,8 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
   const enviado = salvo?.status === 'enviado';
   const m = mesesDoRac(d.mes);
   const [ano, ret, ant, atu] = [m.anoAnterior, m.mesRetrasado, m.mesAnterior, m.atual].map(rotuloCurto);
-  const alertas = conferirRac(d, historico);
+  const prints = useAoVivo<PrintRac[]>((ok, e) => observarPrintsDoRac(db, p.mes.mes, p.unidade, ok, e), [p.mes.mes, p.unidade]);
+  const alertas = [...conferirRac(d, historico), ...conferirPrints(d, prints.valor ?? [])];
   const erros = new Map(alertas.filter((a) => a.nivel === 'erro').map((a) => [a.campo, a]));
   const avisos = alertas.filter((a) => a.nivel === 'aviso');
   const s = situacaoRac(salvo, p.mes.prazo, hojeISO());
@@ -109,7 +116,7 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
     if (!tentou) return undefined;
     const a = erros.get(campo);
     if (!a) return undefined;
-    return valorDoCampo(d, campo) === null ? 'Preencha (se não houve, 0).' : a.mensagem;
+    return !campo.startsWith('prints.') && valorDoCampo(d, campo) === null ? 'Preencha (se não houve, 0).' : a.mensagem;
   };
   const num = (campo: string, rotulo: string) => (
     <Campo key={campo} rotulo={rotulo} obrigatorio erro={erroDe(campo)}>
@@ -157,6 +164,16 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
         <p className="mensagem erro" role="alert">
           Falta preencher ou corrigir {faltam === 1 ? '1 campo' : `${faltam} campos`}.
         </p>
+      )}
+
+      {slotsDaUnidade(p.unidade).length > 0 && (
+        <PrintsRac
+          unidade={p.unidade}
+          mes={d.mes}
+          prints={prints.valor ?? []}
+          erroDe={erroDe}
+          aoLer={(delito, l) => setD((x) => preencherDoPrint(x, delito, l))}
+        />
       )}
 
       {temCrimes(p.unidade) && (
@@ -276,6 +293,74 @@ function Avisos(p: { avisos: Alerta[]; d: RacDados; tentou: boolean; mudar: (id:
           </div>
         );
       })}
+    </fieldset>
+  );
+}
+
+const COLUNAS_LIDAS: ColunaLida[] = ['anoAnterior', 'mesRetrasado', 'mesAnterior', 'atual'];
+
+/** Os 7 prints do painel. Nos de "Indicadores Criminais" os números são lidos no próprio aparelho. */
+function PrintsRac(p: {
+  unidade: UnidadeId;
+  mes: string;
+  prints: PrintRac[];
+  erroDe: (campo: string) => string | undefined;
+  aoLer: (delito: DelitoId, l: LeituraPainel) => void;
+}) {
+  const [estado, setEstado] = useState<Partial<Record<SlotPrint, string>>>({});
+  const m = mesesDoRac(p.mes);
+  const marcar = (slot: SlotPrint, texto: string) => setEstado((e) => ({ ...e, [slot]: texto }));
+
+  async function escolher(slot: SlotPrint, delito: DelitoId, painel: boolean, arquivo: File | undefined) {
+    if (!arquivo) return;
+    marcar(slot, 'Preparando…');
+    try {
+      const foto = await reduzirFoto(arquivo);
+      let leitura: LeituraPainel | null = null;
+      if (painel && OCR_LIGADO) {
+        marcar(slot, 'Lendo os números do print…');
+        leitura = await lerPainel(arquivo, p.mes).catch(() => null);
+      }
+      marcar(slot, 'Enviando…');
+      await salvarPrintRac(db, p.mes, p.unidade, slot, foto, leitura);
+      if (leitura) p.aoLer(delito, leitura);
+      marcar(slot, painel && OCR_LIGADO && !leitura ? 'Enviado. Não deu para ler os números: confira e digite abaixo.' : 'Enviado.');
+    } catch {
+      marcar(slot, 'Não foi possível enviar. Escolha uma imagem (print) e tente de novo.');
+    }
+  }
+
+  return (
+    <fieldset className="cartao grupo">
+      <legend>Prints do painel (Coordenadoria Operacional)</legend>
+      <p className="pendente-detalhe">
+        Envie o print inteiro do painel. Nos de Indicadores Criminais o portal lê os números de {rotuloCurto(m.anoAnterior)}, {rotuloCurto(m.mesRetrasado)},{' '}
+        {rotuloCurto(m.mesAnterior)} e {rotuloCurto(m.atual)} e preenche os crimes que estiverem vazios.
+      </p>
+      <div className="grade-prints">
+        {slotsDaUnidade(p.unidade).map((s) => {
+          const salvo = p.prints.find((x) => x.slot === s.id);
+          const l = salvo?.leitura;
+          return (
+            <div key={s.id} className="print-rac">
+              <Campo rotulo={s.rotulo} obrigatorio erro={p.erroDe(`prints.${s.id}`)}>
+                <input type="file" accept="image/*" onChange={(e) => void escolher(s.id, s.delito, s.tipo === 'painel', e.target.files?.[0])} />
+              </Campo>
+              {salvo?.miniatura && <img src={`data:image/jpeg;base64,${salvo.miniatura}`} alt={`Print enviado: ${s.rotulo}`} />}
+              {estado[s.id] && <p className="rac-calculo">{estado[s.id]}</p>}
+              {l && Object.keys(l.valores).length > 0 && (
+                <p className="rac-calculo">
+                  Lido:{' '}
+                  {COLUNAS_LIDAS.filter((c) => l.valores[c])
+                    .map((c) => `${rotuloCurto(m[c])} ${l.valores[c]!.valor}${l.valores[c]!.confira ? ' ⚠️' : ''}`)
+                    .join(' · ')}
+                  {COLUNAS_LIDAS.some((c) => l.valores[c]?.confira) ? ' (⚠️ confira)' : ''}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </fieldset>
   );
 }

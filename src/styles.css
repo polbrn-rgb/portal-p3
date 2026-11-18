@@ -2702,3 +2702,27 @@ fieldset:has(> .erro-campo) > legend {
   background: #fff6e0;
   color: #7a5200;
 }
+
+.grade-prints {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.print-rac {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.print-rac img {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e3e7ee;
+}
+
+.print-rac input[type='file'] {
+  min-height: 0;
+  padding: 8px;
+}

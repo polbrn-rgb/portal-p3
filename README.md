@@ -111,6 +111,12 @@ histórico das demandas.
   são calculados** (Var % com base zero mostra "—"); mês anterior/trimestral/ano anterior vêm dos RAC já enviados.
   Erro (vazio, inválido, inconsistência maior que o total) impede o envio; aviso (coluna copiada, número diferente do
   RAC já enviado) pede justificativa. Regras em `src/domain/rac.ts`.
+  **Prints (7 por Cia)**: 4 painéis "Indicadores Criminais" + 2 mapas de veículo + Painel de Roubos, enviados na
+  própria tela (reduzidos no aparelho, ficam em `racPrints`/`racPrintsDados`). Nos painéis, o portal lê no aparelho
+  (Tesseract.js, carregado do CDN só nessa hora) os números do mês, do anterior, do retrasado e do ano anterior e
+  preenche os crimes vazios; também lê a Cia e o indicador do filtro. Leitura incerta aparece com ⚠️. Print de outra
+  Cia/indicador ou número digitado diferente do print vira aviso com justificativa. Calibração em
+  `src/domain/racPrints.ts` (24 prints reais de set/2026: 95 de 96 números certos, nenhum errado sem ⚠️).
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de

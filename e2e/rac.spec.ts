@@ -2,6 +2,18 @@ import { expect, test } from '@playwright/test';
 import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
+// Imagem PNG mínima (1×1) para os 7 prints; no emulador a leitura automática fica desligada.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+const PRINTS = [
+  'Roubo de veículo — Indicadores Criminais',
+  'Roubo de veículo — Painel de Roubo e Furto de Veículo',
+  'Furto de veículo — Indicadores Criminais',
+  'Furto de veículo — Painel de Roubo e Furto de Veículo',
+  'Roubo outros — Indicadores Criminais',
+  'Roubo outros — Painel de Roubos',
+  'Furto outros — Indicadores Criminais',
+];
+
 test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envia; a P/3 acompanha', async ({ page }, info) => {
   const celular = info.project.name === 'celular';
   const ano = 2030 + (Math.floor(Date.now() / 1000) % 40) * 2 + (celular ? 1 : 0); // um mês novo por execução e por tela
@@ -48,6 +60,13 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   // Pessoas abordadas por pelotão: o TOTAL vai para o comparativo.
   await page.getByRole('group', { name: 'Pessoas Abordadas' }).first().locator('input').first().fill('647');
   await expect(page.getByRole('group', { name: 'Pessoas Abordadas' }).first().getByText('TOTAL 647')).toBeVisible();
+
+  // Sem os 7 prints não envia; depois de enviar, aparece a miniatura de cada um.
+  await page.getByRole('button', { name: 'Enviar à P/3' }).click();
+  await expect(page.getByText(`Envie o print: ${PRINTS[0]}.`)).toBeVisible();
+  for (const [i, rotulo] of PRINTS.entries())
+    await page.getByLabel(new RegExp(`^${rotulo}`)).setInputFiles({ name: `print${i}.png`, mimeType: 'image/png', buffer: PNG });
+  for (const rotulo of PRINTS) await expect(page.getByRole('img', { name: `Print enviado: ${rotulo}` })).toBeVisible({ timeout: 15000 });
 
   await page.getByRole('button', { name: 'Enviar à P/3' }).click();
   await expect(page.getByText('RAC enviado para a P/3.')).toBeVisible({ timeout: 15000 });
