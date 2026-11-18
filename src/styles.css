@@ -2342,6 +2342,15 @@ fieldset:has(> .erro-campo) > legend {
 
 .admin-topo .subabas {
   margin: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* No celular as sub-abas do Administrador quebram em linhas, sem uma cobrir a outra. */
+.admin-topo .subabas a {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  padding: 4px 10px;
 }
 
 .lista-itens {
