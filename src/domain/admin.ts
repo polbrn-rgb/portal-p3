@@ -14,6 +14,8 @@ export const COLECOES_ZERAR = [
   'eapRespostas',
   'iccs',
   'respostasIcc',
+  'racMeses',
+  'racs',
   'arquivos',
   'fotosTds',
   'fotosTdsDados',
