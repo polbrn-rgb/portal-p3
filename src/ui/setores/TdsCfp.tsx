@@ -21,6 +21,7 @@ import {
 import { db } from '../../lib/firebase';
 import { reduzirFoto, type FotoReduzida } from '../../lib/imagem';
 import { useAoVivo } from '../../lib/useAoVivo';
+import { meuRE } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 const CHAVE_RE = 'portalp3.reCfp';
@@ -38,7 +39,7 @@ function lerRE(): string {
 
 /** Aba TDS da página do CFP: até 5 fotos por mês das instruções dadas durante o serviço. */
 export function TdsCfp() {
-  const [re, setRe] = useState(lerRE);
+  const [re, setRe] = useState(() => meuRE() ?? lerRE());
   const chave = normalizarRE(re);
   // undefined = ainda não buscou; null = não está no banco
   const [policial, setPolicial] = useState<Policial | null | undefined>(undefined);
@@ -177,7 +178,7 @@ export function TdsCfp() {
 
       <div className="cartao grupo">
         <Campo rotulo="Seu RE" obrigatorio erro={erros.re}>
-          <input inputMode="numeric" autoComplete="off" value={re} placeholder="123456-7" onChange={(e) => setRe(e.target.value)} />
+          <input inputMode="numeric" autoComplete="off" value={re} readOnly={Boolean(meuRE())} placeholder="123456-7" onChange={(e) => setRe(e.target.value)} />
         </Campo>
         {chave.length >= 5 && policial === undefined && <p className="carregando">Buscando o RE…</p>}
         {policial && (

@@ -21,6 +21,7 @@ import {
 } from '../../domain/efetivo';
 import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
+import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.respondidoPor';
@@ -80,7 +81,7 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
   const [errosNovo, setErrosNovo] = useState<ErrosPolicial>({ extras: {} });
   const setErroNovo = (re: string) => setErrosNovo({ extras: {}, ...(re ? { re } : {}) });
   const [errosEnvio, setErrosEnvio] = useState<ErrosResposta>({});
-  const [nome, setNome] = useState(lerNome);
+  const [nome, setNome] = useState(() => quemSou() ?? lerNome());
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -269,7 +270,7 @@ export function PreencherEfetivo({ s }: { s: SolicitacaoEfetivo }) {
           ))}
         </ul>
         <Campo rotulo="Enviado por" erro={errosEnvio.nome && !nome.trim() ? errosEnvio.nome : undefined} obrigatorio>
-          <input value={nome} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
+          <input value={nome} readOnly={Boolean(quemSou())} placeholder="Posto/graduação e nome" onChange={(e) => setNome(e.target.value)} />
         </Campo>
       </div>
 

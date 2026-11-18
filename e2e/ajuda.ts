@@ -14,6 +14,9 @@ export async function entrar(page: Page, unidade: string, senha: string) {
 /** Login individual por RE. */
 export async function entrarRE(page: Page, re: string, senha: string) {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Entrar', exact: true }).waitFor();
+  const pessoal = page.getByRole('button', { name: 'Entrar com RE e senha pessoal' });
+  if (await pessoal.isVisible()) await pessoal.click();
   await page.getByLabel('RE').fill(re);
   await page.getByLabel('Senha').fill(senha);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();

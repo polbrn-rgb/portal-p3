@@ -5,6 +5,9 @@ import {
   acessoVazio,
   ehAdminRE,
   emailDeLogin,
+  identificacaoDoLogin,
+  reDoLogin,
+  responsavelDoRE,
   montarAcesso,
   reBase,
   situacaoAcesso,
@@ -106,5 +109,27 @@ describe('cadastro', () => {
     expect(situacaoAcesso(a({ status: 'ok', sincronizar: false, ativo: false })).texto).toBe('Bloqueado');
     expect(situacaoAcesso(a({ status: 'erro', sincronizar: false, erro: 'x' })).texto).toBe('Erro: x');
     expect(situacaoAcesso(a({})).texto).toContain('Criando');
+  });
+});
+
+describe('quem está logado', () => {
+  test('RE e identificação só para login individual', () => {
+    expect(reDoLogin('re194899@portal-p3.firebaseapp.com')).toBe('194899');
+    expect(reDoLogin('8bpmmp3+1cia@gmail.com')).toBeNull();
+    expect(reDoLogin('re194899@outro.com')).toBeNull();
+    expect(identificacaoDoLogin('re194899@portal-p3.firebaseapp.com', 'Sd PM ABDO')).toBe('Sd PM ABDO (RE 194899)');
+    expect(identificacaoDoLogin('re194899@portal-p3.firebaseapp.com', '')).toBe('RE 194899');
+    expect(identificacaoDoLogin('8bpmmp3+1cia@gmail.com', 'Conta 1ª Cia')).toBeNull();
+  });
+
+  test('Responsável do numerador pelo RE de quem está logado (tabela de assinaturas)', () => {
+    const lista = [
+      { nome: 'Sd Priscila', re: '200000-1' },
+      { nome: 'Cap Filipi', re: '130155-1' },
+      { nome: 'Sem RE', re: '' },
+    ];
+    expect(responsavelDoRE(lista, '130155')).toBe('Cap Filipi');
+    expect(responsavelDoRE(lista, '999999')).toBeNull();
+    expect(responsavelDoRE(lista, null)).toBeNull();
   });
 });

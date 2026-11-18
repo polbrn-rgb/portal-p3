@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, irParaAbaCia, marcarDestino, sair, sobraLateral } from './ajuda';
+import { entrar, entrarRE, irParaAbaCia, marcarDestino, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Fluxo completo: P/3 cria para a 3ª Cia -> 3ª Cia responde -> P/3 devolve -> Cia corrige -> P/3 aceita.
@@ -69,4 +69,35 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await linkDaDemanda().click();
   await page.getByRole('article', { name: 'Resposta 3ª CIA' }).getByRole('button', { name: 'Aceitar' }).click();
   await expect(page.getByRole('article', { name: 'Resposta 3ª CIA' })).toContainText('Aceito');
+});
+
+// Login individual: "Respondido por" vem do login (travado) e chega assim na P/3.
+test('Cia com login por RE: Respondido por vem preenchido com quem está logado', async ({ page }, info) => {
+  test.setTimeout(60_000);
+  const assunto = `Login RE teste ${info.project.name} ${Date.now()}`;
+  const linkDaDemanda = () => page.getByRole('link', { name: new RegExp(assunto) });
+
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.getByRole('link', { name: '+ Nova demanda' }).click();
+  await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await page.getByLabel('Categoria').selectOption('Escoltas');
+  await marcarDestino(page, '3ª CIA');
+  await page.getByLabel('Prazo CPA').fill('2099-12-31');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await page.getByRole('link', { name: 'Ver lista' }).click();
+  await sair(page);
+
+  await entrarRE(page, '333333-3', SENHA_TESTE);
+  await linkDaDemanda().click();
+  const quem = page.getByLabel('Respondido por');
+  await expect(quem).toHaveValue('Sd PM TESTE (RE 333333)');
+  await expect(quem).not.toBeEditable();
+  await page.getByLabel('Resposta').fill('Feito.');
+  await page.getByRole('button', { name: 'Enviar resposta' }).click();
+  await expect(page.getByRole('heading', { name: '3ª CIA' })).toBeVisible();
+  await sair(page);
+
+  await entrar(page, 'p3', SENHA_TESTE);
+  await linkDaDemanda().click();
+  await expect(page.getByRole('article', { name: 'Resposta 3ª CIA' })).toContainText('Sd PM TESTE (RE 333333)');
 });

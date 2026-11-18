@@ -25,6 +25,7 @@ import type { UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { irPara } from '../../lib/navegacao';
+import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.respondidoPor';
@@ -92,7 +93,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
     Object.fromEntries(campos.map((c) => [c.id, p.envio?.valores[c.id] !== undefined ? String(p.envio.valores[c.id]) : ''])),
   );
   const [linhas, setLinhas] = useState<LinhaLista[]>(() => (d.lista && p.envio ? linhasDosValores(d, p.unidade, p.envio.valores) : []));
-  const [nome, setNome] = useState(p.envio?.respondidoPor || lerNome());
+  const [nome, setNome] = useState(quemSou() ?? (p.envio?.respondidoPor || lerNome()));
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -169,7 +170,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
       ))}
       <div className="cartao grupo">
         <Campo rotulo="Preenchido por" obrigatorio erro={erros.__nome}>
-          <input value={nome} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
+          <input value={nome} readOnly={Boolean(quemSou())} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
         </Campo>
       </div>
       {erro && (
@@ -193,7 +194,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
 export function ConfirmarDocumentoDireto(p: { documento: DocumentoMensal; unidade: UnidadeId; mesRef: string; envio?: EnvioMensal }) {
   const d = p.documento;
   const aba = d.direto?.abas[p.unidade];
-  const [nome, setNome] = useState(p.envio?.respondidoPor || lerNome());
+  const [nome, setNome] = useState(quemSou() ?? (p.envio?.respondidoPor || lerNome()));
   const [erroNome, setErroNome] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -256,7 +257,7 @@ export function ConfirmarDocumentoDireto(p: { documento: DocumentoMensal; unidad
       )}
       <div className="cartao grupo">
         <Campo rotulo="Preenchido por" obrigatorio erro={erroNome}>
-          <input value={nome} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
+          <input value={nome} readOnly={Boolean(quemSou())} placeholder="Posto/graduação e nome" autoComplete="name" onChange={(e) => setNome(e.target.value)} />
         </Campo>
       </div>
       {erro && (
