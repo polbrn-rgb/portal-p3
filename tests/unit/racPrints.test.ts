@@ -3,6 +3,9 @@ import { racVazio } from '../../src/domain/rac';
 import {
   anosDasLinhas,
   binarizar,
+  canalUnico,
+  cinzaInvertido,
+  COLUNA_MINIMA,
   caixaCelula,
   celulasDoMes,
   ciaDoTexto,
@@ -20,6 +23,9 @@ import {
   preencherDoPrint,
   SLOTS_PRINT,
   slotsDaUnidade,
+  tentativasPara,
+  TENTATIVAS_GRANDE,
+  TENTATIVAS_PEQUENO,
   votar,
   type LeituraPainel,
   type PrintSalvo,
@@ -64,13 +70,26 @@ describe('geometria do painel', () => {
     expect(palavrasDoTsv(tsv)).toEqual([{ texto: 'janeiro', x: 140, y: 820, largura: 56, altura: 14 }]);
   });
   test('preto e branco: número colorido no fundo escuro e texto branco na caixa cinza', () => {
-    const px = new Uint8ClampedArray([40, 200, 40, 255, 30, 30, 30, 255, 230, 230, 230, 255, 160, 160, 160, 255]);
-    const a = new Uint8ClampedArray(px);
-    binarizar(a, 'max', 110);
+    const px = () => new Uint8ClampedArray([40, 200, 40, 255, 30, 30, 30, 255, 230, 230, 230, 255, 160, 160, 160, 255]);
+    const a = px();
+    canalUnico(a, 'max');
+    binarizar(a, 110);
     expect([a[0], a[4], a[8], a[12]]).toEqual([0, 255, 0, 0]);
-    const b = new Uint8ClampedArray(px);
-    binarizar(b, 'min', 200);
+    const b = px();
+    canalUnico(b, 'min');
+    binarizar(b, 200);
     expect([b[0], b[4], b[8], b[12]]).toEqual([255, 255, 0, 255]);
+  });
+  test('cinza invertido: contraste esticado, número escuro no fundo claro', () => {
+    const a = new Uint8ClampedArray([40, 200, 40, 255, 30, 30, 30, 255, 115, 0, 0, 255]);
+    cinzaInvertido(a);
+    expect([a[0], a[4], a[8]]).toEqual([0, 255, 127]);
+  });
+  test('print menor (notebook) usa as tentativas em cinza; abaixo do mínimo não lê', () => {
+    expect(tentativasPara({ a: 0, b: 150, yCabecalho: 0 })).toBe(TENTATIVAS_GRANDE);
+    expect(tentativasPara({ a: 0, b: 108, yCabecalho: 0 })).toBe(TENTATIVAS_PEQUENO);
+    expect(TENTATIVAS_PEQUENO[0].modo).toBe('cinza');
+    expect(COLUNA_MINIMA).toBe(80);
   });
 });
 

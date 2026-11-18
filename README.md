@@ -119,7 +119,8 @@ histórico das demandas.
   Cia/indicador ou número digitado diferente do print vira aviso com justificativa. A tabela é achada pelos nomes
   dos meses, então serve recorte do painel, tela cheia ou zoom; sem leitura, a tela diz o motivo. Calibração em
   `src/domain/racPrints.ts` (24 prints reais de set/2026: 95 de 96 números certos no recorte e na tela cheia, 92 de 96
-  com zoom; nenhum errado sem ⚠️; print pequeno demais não é lido).
+  com zoom, 93 de 96 no tamanho de notebook, 84 de 96 a 60%; nenhum errado sem ⚠️; painel com menos de ~1000 px de
+  largura não é lido).
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de
