@@ -12,11 +12,16 @@ import {
   updateDoc,
   where,
   type Firestore,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { fimDaSerie, normalizarCompromisso, validarCompromisso, type Compromisso, type DadosCompromisso } from '../domain/agenda';
 import { somarDias } from '../domain/datas';
 import type { Demanda } from '../domain/demanda';
 import { paraDemanda } from './demandas';
+
+function paraCompromisso(x: QueryDocumentSnapshot): Compromisso {
+  return { excecoes: [], ...(x.data() as Omit<Compromisso, 'id'>), id: x.id };
+}
 
 // Eventos da agenda da P/3 (coleção "agenda"). Só a P/3 lê e grava.
 export const COLECAO_AGENDA = 'agenda';
@@ -70,7 +75,7 @@ export function observarCompromissos(
     (s) =>
       aoMudar(
         s.docs
-          .map((x) => ({ excecoes: [], ...x.data(), id: x.id }) as Compromisso)
+          .map(paraCompromisso)
           .filter((c) => c.data <= ate),
       ),
     aoFalhar,
@@ -129,7 +134,7 @@ export function observarCompromissosDaDemanda(
 ): () => void {
   return onSnapshot(
     query(collection(db, COLECAO_AGENDA), where('demandaId', '==', demandaId)),
-    (s) => aoMudar(s.docs.map((x) => ({ excecoes: [], ...x.data(), id: x.id }) as Compromisso).sort((a, b) => (a.data < b.data ? -1 : 1))),
+    (s) => aoMudar(s.docs.map(paraCompromisso).sort((a, b) => (a.data < b.data ? -1 : 1))),
     aoFalhar,
   );
 }
