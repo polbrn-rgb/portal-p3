@@ -272,6 +272,32 @@ service cloud.firestore {
         && !(resource.data.status == 'enviado' && request.resource.data.status == 'rascunho');
     }
 
+    // Prints do RAC (id = mes_unidade_slot): a Cia grava/troca os dela com o mês aberto; a P/3 lê.
+    function printRacValido(id, campos) {
+      let r = request.resource.data;
+      return r.keys().hasOnly(campos)
+        && r.slot in ['rvPainel', 'rvMapa', 'fvPainel', 'fvMapa', 'roPainel', 'roMapa', 'foPainel']
+        && id == r.mes + '_' + r.unidadeId + '_' + r.slot
+        && get(/databases/$(database)/documents/racMeses/$(r.mes)).data.status == 'aberto';
+    }
+
+    match /racPrints/{id} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create, update: if ehDaMinhaUnidade(request.resource.data)
+        && (resource == null || ehDaMinhaUnidade(resource.data))
+        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'miniatura', 'leitura', 'tamanho', 'enviadoEm'])
+        && request.resource.data.miniatura is string && request.resource.data.miniatura.size() <= 60000
+        && request.resource.data.enviadoEm == request.time;
+    }
+
+    match /racPrintsDados/{id} {
+      allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
+      allow create, update: if ehDaMinhaUnidade(request.resource.data)
+        && (resource == null || ehDaMinhaUnidade(resource.data))
+        && printRacValido(id, ['mes', 'unidadeId', 'slot', 'dados'])
+        && request.resource.data.dados is string && request.resource.data.dados.size() <= 900000;
+    }
+
     // Banco de efetivo (busca por RE): copiado da planilha pelo motor.
     // O CFP (e a P/3) cadastram à mão quem não está no banco; o motor leva para a aba BD Efetivo.
     // Só cria: quem já está no banco não é alterado pelo portal.
