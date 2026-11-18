@@ -9,8 +9,13 @@ import {
   conferirPrints,
   delitoDoTexto,
   motivoDoErroDoPrint,
+  ampliacao,
+  caixaNoPainel,
   ehPainelPadrao,
-  GRADE,
+  FILTRO_COMPANHIA,
+  gradeDosMeses,
+  gradePadrao,
+  palavrasDoTsv,
   precisaMaisTentativas,
   preencherDoPrint,
   SLOTS_PRINT,
@@ -30,16 +35,33 @@ describe('geometria do painel', () => {
     expect(ehPainelPadrao(1175, 664)).toBe(false); // mapa
     expect(ehPainelPadrao(0, 0)).toBe(false);
   });
-  test('a célula fica dentro da metade esquerda da coluna do mês, entre as linhas da grade', () => {
-    const W = 1864;
-    const H = 774;
-    const c = caixaCelula(W, H, 9, 1); // setembro, 2ª linha
-    const inicio = GRADE.x0 + 8 * 2 * GRADE.meiaColuna;
-    expect(c.x).toBeGreaterThan(W * inicio);
-    expect(c.x + c.largura).toBeLessThan(W * (inicio + GRADE.meiaColuna));
-    expect(c.y).toBeGreaterThan(H * 0.917);
-    expect(c.y + c.altura).toBeLessThan(H * 0.945);
-    expect(c.largura).toBeGreaterThan(40);
+  test('recorte padrão: a célula fica na metade esquerda da coluna do mês, entre as linhas da grade', () => {
+    const g = gradePadrao(1864, 774)!;
+    expect(g.b).toBeCloseTo(149.94, 1);
+    const c = caixaCelula(g, 9, 1); // setembro, linha de 2025
+    const inicio = 0.0408 + 8 * 2 * 0.04022;
+    expect(c.x).toBeGreaterThan(1864 * inicio);
+    expect(c.x + c.largura).toBeLessThan(1864 * (inicio + 0.04022));
+    expect(c.y).toBeGreaterThan(774 * 0.917);
+    expect(c.y + c.altura).toBeLessThan(774 * 0.945);
+    expect(gradePadrao(1920, 1080)).toBeNull(); // tela cheia: precisa achar os meses
+  });
+  test('tela cheia com zoom: a tabela é achada pelos nomes dos meses (posições lidas num print real)', () => {
+    const p = (texto: string, cx: number, cy = 827) => ({ texto, x: cx - 30, y: cy - 8, largura: 60, altura: 16 });
+    const g = gradeDosMeses([p('janeiro', 168), p('Março', 452), p('abril', 594), p('maio', 736), p('junho', 878), p('julho', 1020), p('outubro', 1446), p('novembro', 1589), p('dezembro', 1730), p('PROJEÇÃO', 1300, 900)])!;
+    expect(g.b).toBeCloseTo(142.0, 0); // 0,95 × 149,6
+    expect(g.a).toBeCloseTo(168, 0);
+    expect(g.yCabecalho).toBe(827);
+    expect(ampliacao(4, g)).toBeCloseTo(4.21, 1);
+    expect(gradeDosMeses([p('janeiro', 168), p('janeiro', 170)])).toBeNull(); // 1 mês só não dá a escala
+    // As caixas de filtro saem do painel achado pela grade.
+    const f = caixaNoPainel(gradePadrao(1864, 774)!, FILTRO_COMPANHIA);
+    expect(Math.abs(f.x - 0.267 * 1864)).toBeLessThan(2);
+    expect(Math.abs(f.y - 0.254 * 774)).toBeLessThan(2);
+  });
+  test('palavras do TSV do leitor', () => {
+    const tsv = 'level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t1\t1\t1\t1\t1\t140\t820\t56\t14\t91\tjaneiro\n4\t1\t1\t1\t1\t0\t0\t0\t9\t9\t-1\t';
+    expect(palavrasDoTsv(tsv)).toEqual([{ texto: 'janeiro', x: 140, y: 820, largura: 56, altura: 14 }]);
   });
   test('preto e branco: número colorido no fundo escuro e texto branco na caixa cinza', () => {
     const px = new Uint8ClampedArray([40, 200, 40, 255, 30, 30, 30, 255, 230, 230, 230, 255, 160, 160, 160, 255]);

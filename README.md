@@ -115,8 +115,10 @@ histórico das demandas.
   própria tela (reduzidos no aparelho, ficam em `racPrints`/`racPrintsDados`). Nos painéis, o portal lê no aparelho
   (Tesseract.js, carregado do CDN só nessa hora) os números do mês, do anterior, do retrasado e do ano anterior e
   preenche os crimes vazios; também lê a Cia e o indicador do filtro. Leitura incerta aparece com ⚠️. Print de outra
-  Cia/indicador ou número digitado diferente do print vira aviso com justificativa. Calibração em
-  `src/domain/racPrints.ts` (24 prints reais de set/2026: 95 de 96 números certos, nenhum errado sem ⚠️).
+  Cia/indicador ou número digitado diferente do print vira aviso com justificativa. A tabela é achada pelos nomes
+  dos meses, então serve recorte do painel, tela cheia ou zoom; sem leitura, a tela diz o motivo. Calibração em
+  `src/domain/racPrints.ts` (24 prints reais de set/2026: 95 de 96 números certos no recorte e na tela cheia, 92 de 96
+  com zoom; nenhum errado sem ⚠️; print pequeno demais não é lido).
 - **CFP**: as mesmas missões que o CFP vê na página dele (da agenda do CFP) e o botão **Recado para o CFP**: o texto
   aparece no alto da página do CFP como **Recado do Cmt do P3** (ficam os 10 mais novos; a P/3 pode apagar).
 - **CFP → TDS** (fotos de instrução durante o serviço): na página do CFP, aba **TDS**, cada CFP digita o RE (o banco de

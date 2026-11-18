@@ -32,34 +32,96 @@ export type LeituraPainel = {
 };
 
 export type Caixa = { x: number; y: number; largura: number; altura: number };
-type Fracao = [number, number, number, number]; // x0, y0, x1, y1 em fração da imagem
+type Fracao = [number, number, number, number]; // x0, y0, x1, y1 em fração do painel
 
-export const GRADE = { x0: 0.0408, meiaColuna: 0.04022, linhas: [0.903, 0.931, 0.957], meiaAltura: 0.009, margem: 0.005 };
+/**
+ * Onde está a tabela no print: a = centro da coluna de janeiro, b = largura de uma coluna de mês,
+ * yCabecalho = centro da linha dos nomes dos meses (tudo em pixels da imagem enviada).
+ * Achada pelos nomes dos meses que o leitor encontra, então funciona com margem, tela cheia e zoom.
+ */
+export type Grade = { a: number; b: number; yCabecalho: number };
+
+// Medidas tiradas dos 24 prints reais (em larguras de coluna, a partir do cabeçalho dos meses).
+const DY_LINHAS = [0.1285, 0.2734, 0.4081]; // centro das linhas 2024/2025/2026
+const MEIA_ALTURA = 0.0465;
+const MARGEM = 0.08;
+export const COLUNA_REFERENCIA = 149.6; // largura da coluna nos prints de set/2026 (as tentativas foram calibradas nela)
+export const COLUNA_MINIMA = 110; // menor que isso, os números ficam pequenos demais para ler com segurança
+// Painel inteiro em relação à coluna (para achar as caixas de filtro).
+const COLUNA_POR_PAINEL = 2 * 0.04022;
+const JANEIRO_POR_PAINEL = 0.0408 + 0.04022;
+const ALTURA_POR_LARGURA = 774 / 1864;
+const LINHA0_POR_ALTURA = 0.903;
+
 export const FILTRO_COMPANHIA: Fracao = [0.267, 0.254, 0.36, 0.272];
 export const FILTRO_INDICADOR: Fracao = [0.393, 0.254, 0.49, 0.272];
 
-/** O painel tem proporção fixa (~2,4 : 1). Outro formato: não lê (a Cia digita). */
+/** Print recortado no painel (proporção ~2,4 : 1), como as Cias mandaram em set/2026. */
 export const ehPainelPadrao = (largura: number, altura: number) => altura > 0 && largura / altura >= 2.2 && largura / altura <= 2.65;
 
-function caixa(largura: number, altura: number, [x0, y0, x1, y1]: Fracao): Caixa {
-  const x = Math.round(largura * x0);
-  const y = Math.round(altura * y0);
-  return { x, y, largura: Math.round(largura * x1) - x, altura: Math.round(altura * y1) - y };
+/** Grade quando o print é só o painel (sem achar os nomes dos meses). */
+export function gradePadrao(largura: number, altura: number): Grade | null {
+  if (!ehPainelPadrao(largura, altura)) return null;
+  const b = COLUNA_POR_PAINEL * largura;
+  return { a: JANEIRO_POR_PAINEL * largura, b, yCabecalho: LINHA0_POR_ALTURA * altura - DY_LINHAS[0] * b };
 }
-export const caixaFiltro = (largura: number, altura: number, f: Fracao) => caixa(largura, altura, f);
+
+const NUM_MES: Record<string, number> = {
+  janeiro: 1, fevereiro: 2, marco: 3, abril: 4, maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
+};
+export type Palavra = { texto: string; x: number; y: number; largura: number; altura: number };
+
+/** Palavras do TSV do Tesseract (colunas: ... left, top, width, height, conf, text). */
+export function palavrasDoTsv(tsv: string): Palavra[] {
+  return tsv
+    .split('\n')
+    .map((l) => l.split('\t'))
+    .filter((c) => c.length >= 12 && c[11].trim() !== '' && /^\d+$/.test(c[6]))
+    .map((c) => ({ texto: c[11], x: Number(c[6]), y: Number(c[7]), largura: Number(c[8]), altura: Number(c[9]) }));
+}
+
+/** Ajusta uma reta pelos nomes dos meses achados (precisa de 2 meses diferentes). */
+export function gradeDosMeses(palavras: readonly Palavra[]): Grade | null {
+  const pts = palavras
+    .map((p) => ({ m: NUM_MES[p.texto.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')], x: p.x + p.largura / 2, y: p.y + p.altura / 2 }))
+    .filter((p) => p.m !== undefined);
+  if (new Set(pts.map((p) => p.m)).size < 2) return null;
+  const mm = pts.reduce((s, p) => s + p.m, 0) / pts.length;
+  const xm = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const b = pts.reduce((s, p) => s + (p.m - mm) * (p.x - xm), 0) / pts.reduce((s, p) => s + (p.m - mm) ** 2, 0);
+  if (!(b > 0)) return null;
+  const ys = pts.map((p) => p.y).sort((x, y) => x - y);
+  return { a: xm - b * (mm - 1), b, yCabecalho: ys[Math.floor((ys.length - 1) / 2)] };
+}
+
+function retangulo(x0: number, y0: number, x1: number, y1: number): Caixa {
+  const x = Math.round(x0);
+  const y = Math.round(y0);
+  return { x, y, largura: Math.round(x1) - x, altura: Math.round(y1) - y };
+}
 
 /** Célula do valor (metade esquerda da coluna do mês) numa das 3 linhas de anos. */
-export function caixaCelula(largura: number, altura: number, mes: number, linha: number): Caixa {
-  const g = GRADE;
-  const xa = g.x0 + (mes - 1) * 2 * g.meiaColuna;
-  const y = g.linhas[linha];
-  return caixa(largura, altura, [xa + g.margem, y - g.meiaAltura, xa + g.meiaColuna - g.margem, y + g.meiaAltura]);
+export function caixaCelula(g: Grade, mes: number, linha: number): Caixa {
+  const cx = g.a + g.b * (mes - 1);
+  const cy = g.yCabecalho + DY_LINHAS[linha] * g.b;
+  return retangulo(cx - 0.5 * g.b + MARGEM * g.b, cy - MEIA_ALTURA * g.b, cx - MARGEM * g.b, cy + MEIA_ALTURA * g.b);
 }
 /** Rótulo do ano à esquerda de cada linha. */
-export function caixaAno(largura: number, altura: number, linha: number): Caixa {
-  const y = GRADE.linhas[linha];
-  return caixa(largura, altura, [0.003, y - GRADE.meiaAltura, GRADE.x0 - 0.001, y + GRADE.meiaAltura]);
+export function caixaAno(g: Grade, linha: number): Caixa {
+  const inicio = g.a - 0.5 * g.b;
+  const cy = g.yCabecalho + DY_LINHAS[linha] * g.b;
+  return retangulo(inicio - 0.47 * g.b, cy - MEIA_ALTURA * g.b, inicio - 0.01 * g.b, cy + MEIA_ALTURA * g.b);
 }
+/** Caixa de filtro do painel (fração do painel), a partir da grade. */
+export function caixaNoPainel(g: Grade, [fx0, fy0, fx1, fy1]: Fracao): Caixa {
+  const larg = g.b / COLUNA_POR_PAINEL;
+  const alt = larg * ALTURA_POR_LARGURA;
+  const x0 = g.a - JANEIRO_POR_PAINEL * larg;
+  const y0 = g.yCabecalho + DY_LINHAS[0] * g.b - LINHA0_POR_ALTURA * alt;
+  return retangulo(x0 + fx0 * larg, y0 + fy0 * alt, x0 + fx1 * larg, y0 + fy1 * alt);
+}
+/** Ampliação do recorte: as tentativas foram calibradas com a coluna de 149,6 px. */
+export const ampliacao = (escala: number, g: Grade) => (escala * COLUNA_REFERENCIA) / g.b;
 
 /** Tentativas de leitura de cada célula: [escala, limiar, modo de página do Tesseract]. */
 export const TENTATIVAS: readonly [number, number, string][] = [

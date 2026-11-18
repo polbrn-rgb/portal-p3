@@ -319,14 +319,20 @@ function PrintsRac(p: {
       const foto = await reduzirFoto(arquivo);
       etapa = 'enviar';
       let leitura: LeituraPainel | null = null;
+      let motivo = '';
       if (painel && OCR_LIGADO) {
-        marcar(slot, 'Lendo os números do print…');
-        leitura = await lerPainel(arquivo, p.mes).catch(() => null);
+        marcar(slot, 'Lendo os números do print… (pode levar alguns segundos)');
+        const r = await lerPainel(arquivo, p.mes).catch((e: unknown) => {
+          console.error('Leitura do print do RAC:', e);
+          return { leitura: null, motivo: 'Não foi possível ler os números deste print. Confira e digite os números.' };
+        });
+        leitura = r.leitura;
+        motivo = r.motivo ?? '';
       }
       marcar(slot, 'Enviando…');
       await salvarPrintRac(db, p.mes, p.unidade, slot, foto, leitura);
       if (leitura) p.aoLer(delito, leitura);
-      marcar(slot, painel && OCR_LIGADO && !leitura ? 'Enviado. Não deu para ler os números: confira e digite abaixo.' : 'Enviado.');
+      marcar(slot, motivo ? `Enviado. ${motivo}` : 'Enviado.');
     } catch (e) {
       console.error('Print do RAC:', e);
       marcar(slot, motivoDoErroDoPrint(etapa, e));
