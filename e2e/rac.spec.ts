@@ -15,6 +15,7 @@ const PRINTS = [
 ];
 
 test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envia; a P/3 acompanha', async ({ page }, info) => {
+  test.setTimeout(90_000); // teste longo: 2 logins da P/3, 1 da Cia e 137 campos
   const celular = info.project.name === 'celular';
   const ano = 2030 + (Math.floor(Date.now() / 1000) % 40) * 2 + (celular ? 1 : 0); // um mês novo por execução e por tela
   const titulo = `RAC MAIO/${ano}`;
