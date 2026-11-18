@@ -139,6 +139,29 @@ implantação e `npm run deploy:regras`.
 - O PDF fica guardado no próprio banco do portal (em partes), sem precisar do Drive nem de plano pago.
 - Rode **diagnostico**: a linha *Modelo da planilha da ICC* deve ficar ✅.
 
+## Publicação automática pelo GitHub (sem copiar e colar)
+
+Depois de configurado, todo merge na `main` que mexer em `apps-script/` envia o **Motor.gs**, o **Logica.gs** e o
+**appsscript.json** para o projeto e já faz a **Nova versão** da implantação (a URL continua a mesma).
+Acompanhe em GitHub → **Actions → publicar Apps Script** (✅ = publicado).
+
+> Atenção: a publicação deixa o projeto **igual ao GitHub**. Arquivos que só existem no editor (ex.: um
+> `Logica.html` criado por engano) são apagados. A propriedade `CHAVE_SERVICO` e os gatilhos não mudam.
+
+Configuração (uma vez só, no computador, com a conta **8bpmmp3@gmail.com**):
+
+1. Abra https://script.google.com/home/usersettings e **ative** a "API do Google Apps Script".
+2. No terminal do VS Code (na pasta `portal-p3`): `npx @google/clasp@2.4.2 login` → o navegador abre → entre com
+   **8bpmmp3@gmail.com** → **Permitir**. Isso cria o arquivo `.clasprc.json` na sua pasta de usuário
+   (Windows: `C:\Users\Admin\.clasprc.json`).
+3. No GitHub: repositório → **Settings → Secrets and variables → Actions → New repository secret**:
+   - `CLASPRC_JSON`: cole o conteúdo inteiro do `.clasprc.json`.
+   - `SCRIPT_ID`: no editor do Apps Script, **⚙️ Configurações do projeto → ID do script**.
+4. GitHub → **Actions → publicar Apps Script → Run workflow** para a primeira publicação. Depois rode
+   **diagnostico** no editor: a linha *Arquivos do script* deve mostrar a versão nova.
+
+O `.clasprc.json` dá acesso à conta: nunca coloque no repositório, só no segredo do GitHub.
+
 ## Atalho de e-mail (Aperfeiçoamento → EAP e próximos)
 
 - No portal, **Administrador → Assinaturas de e-mail**: para cada Responsável do numerador, RE (busca no banco de

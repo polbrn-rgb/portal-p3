@@ -8,3 +8,7 @@ playwright-report
 chave-servico.json
 *-firebase-adminsdk-*.json
 senhas-iniciais.txt
+
+# Apps Script (clasp): credenciais e ID ficam só nos segredos do GitHub
+.clasprc.json
+apps-script/.clasp.json
