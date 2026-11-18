@@ -1,6 +1,23 @@
 import { expect, test } from '@playwright/test';
 import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { comCampo, racVazio, valorDoCampo, type RacDados } from '../src/domain/rac';
 import { SENHA_TESTE } from './dados';
+
+const admin = () => getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-portal-p3' }));
+
+/** Rascunho com tudo 0, menos os campos que o teste digita na tela (menos carga no CI que 137 digitações). */
+function rascunhoComZeros(unidade: '1cia' | '3cia', mes: string, deixarVazios: string[]): RacDados {
+  let d = racVazio(unidade, mes);
+  const campos = [
+    ...Object.keys(d.crimes).flatMap((c) => Object.keys(d.crimes[c as keyof RacDados['crimes']]).map((k) => `crimes.${c}.${k}`)),
+    ...Object.keys(d.pelotoes).flatMap((l) => Object.keys(d.pelotoes[l]).map((c) => `pelotoes.${l}.${c}`)),
+    ...Object.keys(d.producao).flatMap((p) => Object.keys(d.producao[p as keyof RacDados['producao']]).map((k) => `producao.${p}.${k}`)),
+  ];
+  for (const c of campos) if (!deixarVazios.includes(c) && valorDoCampo(d, c) === null) d = comCampo(d, c, 0);
+  return d;
+}
 
 // Imagem PNG mínima (1×1) para os 7 prints; no emulador a leitura automática fica desligada.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
@@ -36,18 +53,23 @@ test('RAC: a P/3 abre o mês, a Cia preenche (o portal calcula e confere) e envi
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await sair(page);
 
+  // A Cia já tem um rascunho salvo com quase tudo em 0 (o resto ela digita abaixo).
+  const vazios = ['crimes.furtoVeiculo.atual', 'crimes.furtoVeiculo.inconsistencias', 'pelotoes.pessoasAbordadas.pelA'];
+  const d = rascunhoComZeros(unidade, `${ano}-05`, vazios);
+  await admin()
+    .doc(`racs/${ano}-05_${unidade}`)
+    .set({ mes: d.mes, unidadeId: unidade, crimes: d.crimes, pelotoes: d.pelotoes, producao: d.producao, justificativas: {}, status: 'rascunho', preenchidoPor: '', salvoEm: FieldValue.serverTimestamp() });
+
   await entrar(page, unidade, SENHA_TESTE);
   await irParaAbaCia(page, 'RAC');
   await page.getByRole('link', { name: new RegExp(titulo) }).click();
   await expect(page.getByRole('heading', { name: `RAC – ${nomeUnidade} – MAIO/${ano}` })).toBeVisible();
+  await expect(page.getByText('📝 Rascunho')).toBeVisible();
 
-  // Enviar vazio: avisa quanto falta.
+  // Enviar com campos vazios: avisa quanto falta (os 3 números e quem preencheu).
   await page.getByRole('button', { name: 'Enviar à P/3' }).click();
-  await expect(page.getByText(/Falta preencher ou corrigir \d+ campos/)).toBeVisible();
-
-  const numeros = page.locator('.formulario-rac input[inputmode="numeric"]');
-  expect(await numeros.count()).toBe(137); // 45 de crimes, 60 por pelotão, 4 à parte e 28 do comparativo
-  for (const campo of await numeros.all()) await campo.fill('0');
+  await expect(page.getByText('Falta preencher ou corrigir 4 campos (se não houve, coloque 0).')).toBeVisible();
+  expect(await page.locator('.formulario-rac input[inputmode="numeric"]').count()).toBe(137); // 45 de crimes, 60 por pelotão, 4 à parte e 28 do comparativo
 
   // Inconsistências maiores que o total do mês: erro; corrigido, o Real aparece calculado na tabela.
   const mesTitulo = `mai/${String(ano).slice(2)}`;

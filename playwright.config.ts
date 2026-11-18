@@ -6,6 +6,8 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
+  // CI com emuladores e 2 navegadores ao mesmo tempo: gravações podem levar alguns segundos.
+  expect: { timeout: process.env.CI ? 10_000 : 5_000 },
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://localhost:4173',
