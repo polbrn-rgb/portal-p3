@@ -11,6 +11,7 @@ import { useAoVivo, type AoVivo } from '../../lib/useAoVivo';
 import { MissoesCfp } from '../setores/PainelCfp';
 import { Recados } from '../setores/Recados';
 import { Administrador } from './Administrador';
+import { Agenda } from './Agenda';
 import { Aperfeicoamento } from './Aperfeicoamento';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { ControleOperacoes } from './ControleOperacoes';
@@ -77,6 +78,7 @@ function abaDaRota(hash: string): AbaP3 {
   if (hash.startsWith('#/cfp')) return 'cfp';
   if (hash === '#/sala') return 'sala';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
+  if (hash.startsWith('#/agenda')) return 'agenda';
   return 'numerador';
 }
 
@@ -137,6 +139,7 @@ function ConteudoP3({
       </>
     );
   }
+  if (hash.startsWith('#/agenda')) return <Agenda rota={hash} />;
   if (hash === '#/sala') {
     return (
       <>

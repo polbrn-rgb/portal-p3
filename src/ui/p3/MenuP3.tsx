@@ -1,12 +1,13 @@
 import { MenuLateral } from '../MenuLateral';
 
-export type AbaP3 = 'numerador' | 'pendentes' | 'operacoes' | 'aperfeicoamento' | 'cfp' | 'sala' | 'painel' | 'admin';
+export type AbaP3 = 'numerador' | 'pendentes' | 'operacoes' | 'aperfeicoamento' | 'agenda' | 'cfp' | 'sala' | 'painel' | 'admin';
 
 const ITENS: { id: AbaP3; href: string; rotulo: string }[] = [
   { id: 'numerador', href: '#/demandas', rotulo: 'Numerador' },
   { id: 'pendentes', href: '#/pendentes', rotulo: 'Demandas Pendentes' },
   { id: 'operacoes', href: '#/operacoes', rotulo: 'Operações' },
   { id: 'aperfeicoamento', href: '#/aperfeicoamento', rotulo: 'Aperfeiçoamento' },
+  { id: 'agenda', href: '#/agenda', rotulo: 'Agenda' },
   { id: 'cfp', href: '#/cfp', rotulo: 'CFP' },
   { id: 'sala', href: '#/sala', rotulo: 'Sala de Operações' },
   { id: 'painel', href: '#/painel', rotulo: 'Painel' },

@@ -25,6 +25,7 @@ export const COLECOES_ZERAR = [
   'recadosCfp',
   'recadosSala',
   'emails',
+  'agenda',
 ] as const;
 
 /**
