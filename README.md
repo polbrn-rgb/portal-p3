@@ -52,6 +52,15 @@ numerador antigo (2150 → a próxima será a 2151). Pelo terminal também funci
 único (é o id da demanda) e aparece pequeno na tela de "Demanda registrada". O nº do documento é dado no cadastro e
 não muda se a demanda for editada. Vai para as listas, para as Cias e para a coluna "Nº Documento" do backup.
 
+## Numerador das Cias e da Força Tática
+
+Cada Cia/FT tem a aba **Numerador** no menu. É independente: **não distribui** para ninguém, só numera o que a
+própria página faz e, se tiver prazo, coloca o evento na **Agenda** da Cia (laranja; fica verde com ✔ ao concluir).
+
+Número no mesmo formato da P/3, com a seção da Cia: `OFÍCIO 8BPMM-001/103/27` (1ª Cia = 103, 2ª = 203 … 6ª = 603,
+Força Tática = 703). A sequência é por Cia e por tipo de saída e volta para 001 todo ano (ano da data de entrada).
+Contadores em `contadoresCia/{cia}_{ano}_{TIPO}`; demandas em `demandasCia`. Uma Cia não vê o numerador da outra.
+
 ## Aba Administrador
 
 Conta própria `8bpmmp3+admin@gmail.com` (criada pelo `npm run usuarios`; trocar a senha: `npm run usuarios -- --nova-senha admin`).
