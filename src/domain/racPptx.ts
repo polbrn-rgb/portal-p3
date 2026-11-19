@@ -169,17 +169,15 @@ function trocarTabela(slide: string, t: Tabela): string {
 // ---------- prints ----------
 
 const CAIXA_PRINT = { x: 228600, y: 975000, largura: 8686800, altura: 4050000 };
+const SLIDE = { largura: 9144000, altura: 5143500 }; // tamanho do slide do modelo (16:9)
 
-/** Encaixa a imagem na área abaixo do título, sem deformar, centralizada. */
-export function encaixarPrint(largura: number, altura: number) {
-  const k = Math.min(CAIXA_PRINT.largura / largura, CAIXA_PRINT.altura / altura);
-  const cx = Math.round(largura * k);
-  const cy = Math.round(altura * k);
-  return { x: CAIXA_PRINT.x + Math.round((CAIXA_PRINT.largura - cx) / 2), y: CAIXA_PRINT.y + Math.round((CAIXA_PRINT.altura - cy) / 2), cx, cy };
+/** A imagem ocupa o slide inteiro, de ponta a ponta, esticada (sem cortes). */
+export function encaixarPrint() {
+  return { x: 0, y: 0, cx: SLIDE.largura, cy: SLIDE.altura };
 }
 
-function comPrint(slide: string, rId: string, img: ImagemPrint): string {
-  const { x, y, cx, cy } = encaixarPrint(img.largura, img.altura);
+function comPrint(slide: string, rId: string): string {
+  const { x, y, cx, cy } = encaixarPrint();
   const pic =
     `<p:pic><p:nvPicPr><p:cNvPr id="9001" name="Print do painel"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
     `<p:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
@@ -253,7 +251,7 @@ export function montarApresentacao(modelo: Arquivos, unidades: readonly RacParaS
           const nome = `rac_print_${++img}.jpeg`;
           out.set(`ppt/media/${nome}`, p.jpeg);
           rels = rels.replace('</Relationships>', `<Relationship Id="rIdPrint" Type="${REL_IMAGEM}" Target="../media/${nome}"/></Relationships>`);
-          xml = comPrint(xml, 'rIdPrint', p);
+          xml = comPrint(xml, 'rIdPrint');
         } else xml = semPrint(xml);
       }
       slides.push(xml);

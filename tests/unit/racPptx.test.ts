@@ -26,12 +26,7 @@ describe('peças da apresentação', () => {
   test('tamanho do JPEG e encaixe do print sem deformar', () => {
     expect(dimensoesJpeg(JPEG)).toEqual({ largura: 1861, altura: 774 });
     expect(dimensoesJpeg(new Uint8Array([1, 2, 3]))).toBeNull();
-    const p = encaixarPrint(1861, 774); // painel: limitado pela largura
-    expect(p.cx).toBe(8686800);
-    expect(Math.round((p.cx / p.cy) * 100)).toBe(Math.round((1861 / 774) * 100));
-    const mapa = encaixarPrint(1175, 664); // mapa: limitado pela altura e centralizado
-    expect(mapa.cy).toBe(4050000);
-    expect(mapa.x).toBeGreaterThan(228600);
+    expect(encaixarPrint()).toEqual({ x: 0, y: 0, cx: 9144000, cy: 5143500 }); // slide inteiro, esticado
   });
   test('texto da célula: mantém a fonte do modelo, centraliza e escapa XML', () => {
     const tc = '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="l"/><a:endParaRPr b="1"><a:latin typeface="Calibri"/></a:endParaRPr></a:p></a:txBody><a:tcPr anchor="b"></a:tcPr></a:tc>';
