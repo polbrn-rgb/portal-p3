@@ -15,6 +15,8 @@ import {
   andar,
   CAMADAS,
   CAMADAS_PADRAO,
+  CAMADAS_SETOR,
+  CAMADAS_SETOR_PADRAO,
   compromissoVazio,
   CORES,
   dataPorExtenso,
@@ -25,6 +27,7 @@ import {
   itensDasDemandas,
   itensDoCfp,
   itensDoDia,
+  itensDosPrazos,
   itensDosCompromissos,
   mesmoMes,
   minutos,
@@ -38,11 +41,14 @@ import {
   type Camada,
   type Compromisso,
   type DadosCompromisso,
+  type DonoAgenda,
   type ErrosCompromisso,
+  type PrazoP3,
   type ItemAgenda,
   type Visao,
 } from '../../domain/agenda';
 import { formatarData, hojeISO } from '../../domain/datas';
+import { UNIDADES } from '../../domain/unidades';
 import type { Demanda } from '../../domain/demanda';
 import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
@@ -72,27 +78,40 @@ function guardar(chave: string, valor: unknown) {
 }
 
 const ehVisao = (v: unknown): v is Visao => VISOES.some((x) => x.id === v);
-const ehCamadas = (v: unknown): v is Camada[] => Array.isArray(v) && v.every((c) => CAMADAS.some((x) => x.id === c));
+const ehCamadasDe = (lista: { id: Camada }[]) => (v: unknown): v is Camada[] =>
+  Array.isArray(v) && v.every((c) => lista.some((x) => x.id === c));
 
 type Formulario = { inicial: DadosCompromisso; existente?: Compromisso };
 
-/** Aba Agenda da P/3: visões Dia, Semana e Mês, eventos próprios e as datas do Numerador. */
-export function Agenda({ rota }: { rota: string }) {
-  const [visao, setVisao] = useState<Visao>(() => lerGuardado('agenda.visao', 'mes', ehVisao));
-  const [camadas, setCamadas] = useState<Camada[]>(() => lerGuardado('agenda.camadas', CAMADAS_PADRAO, ehCamadas));
+/**
+ * Agenda: visões Dia, Semana e Mês e eventos próprios. Na P/3 (dono 'p3') mostra também as datas do Numerador
+ * e a agenda do CFP; nas Cias/FT e na Sala, cada uma tem a sua (independente) com os prazos dados pela P/3.
+ */
+export function Agenda({ rota, dono = 'p3', prazos = [] }: { rota: string; dono?: DonoAgenda; prazos?: PrazoP3[] }) {
+  const ehP3 = dono === 'p3';
+  const listaCamadas = ehP3 ? CAMADAS : CAMADAS_SETOR;
+  const chave = ehP3 ? 'agenda' : `agenda.${dono}`;
+  const [visao, setVisao] = useState<Visao>(() => lerGuardado(`${chave}.visao`, 'mes', ehVisao));
+  const [camadas, setCamadas] = useState<Camada[]>(() =>
+    lerGuardado(`${chave}.camadas`, ehP3 ? CAMADAS_PADRAO : CAMADAS_SETOR_PADRAO, ehCamadasDe(listaCamadas)),
+  );
   const [dia, setDia] = useState(hojeISO);
   const [aberto, setAberto] = useState<ItemAgenda | null>(null);
   const [form, setForm] = useState<Formulario | null>(null);
   const hoje = hojeISO();
 
   const { de, ate } = periodoDaVisao(visao, dia);
-  const comp = useAoVivo<Compromisso[]>((ok, erro) => observarCompromissos(db, de, ate, ok, erro), [de, ate], 'Não foi possível carregar a agenda.');
+  const comp = useAoVivo<Compromisso[]>((ok, erro) => observarCompromissos(db, de, ate, ok, erro, dono), [de, ate, dono], 'Não foi possível carregar a agenda.');
   const dem = useAoVivo<Demanda[]>(
-    (ok, erro) => observarDemandasDoPeriodo(db, de, ate, ok, erro),
-    [de, ate],
+    (ok, erro) => {
+      if (ehP3) return observarDemandasDoPeriodo(db, de, ate, ok, erro);
+      ok([]);
+      return () => undefined;
+    },
+    [de, ate, ehP3],
     'Não foi possível carregar as datas do Numerador.',
   );
-  const comCfp = camadas.includes('cfp');
+  const comCfp = ehP3 && camadas.includes('cfp');
   const cfp = useAoVivo<AgendaCfp | null>(
     (ok, erro) => {
       if (comCfp) return observarAgendaCfp(db, ok, erro);
@@ -104,7 +123,7 @@ export function Agenda({ rota }: { rota: string }) {
   );
 
   // Vindo da tela da demanda ("📅 Agendar"): abre o evento novo já ligado a ela.
-  const daDemanda = /^#\/agenda\/demanda\/([\w-]+)$/.exec(rota)?.[1];
+  const daDemanda = ehP3 ? /^#\/agenda\/demanda\/([\w-]+)$/.exec(rota)?.[1] : undefined;
   useEffect(() => {
     if (!daDemanda) return;
     let vivo = true;
@@ -126,18 +145,19 @@ export function Agenda({ rota }: { rota: string }) {
       ...itensDosCompromissos(comp.valor ?? [], de, ate),
       ...itensDasDemandas(dem.valor ?? [], de, ate),
       ...itensDoCfp(cfp.valor?.eventos ?? [], de, ate),
+      ...(ehP3 ? [] : itensDosPrazos(prazos, de, ate)),
     ];
     return todos.filter((i) => camadas.includes(i.camada));
-  }, [comp.valor, dem.valor, cfp.valor, camadas, de, ate]);
+  }, [comp.valor, dem.valor, cfp.valor, prazos, ehP3, camadas, de, ate]);
 
   const trocarVisao = (v: Visao) => {
     setVisao(v);
-    guardar('agenda.visao', v);
+    guardar(`${chave}.visao`, v);
   };
   const trocarCamada = (c: Camada) => {
     const nova = camadas.includes(c) ? camadas.filter((x) => x !== c) : [...camadas, c];
     setCamadas(nova);
-    guardar('agenda.camadas', nova);
+    guardar(`${chave}.camadas`, nova);
   };
   const abrirDia = (d: string) => {
     setDia(d);
@@ -187,7 +207,7 @@ export function Agenda({ rota }: { rota: string }) {
 
       <fieldset className="agenda-camadas">
         <legend>Mostrar</legend>
-        {CAMADAS.map((c) => (
+        {listaCamadas.map((c) => (
           <label key={c.id} className={`agenda-camada cor-${c.cor}`}>
             <input type="checkbox" checked={camadas.includes(c.id)} onChange={() => trocarCamada(c.id)} />
             <span>{c.rotulo}</span>
@@ -226,6 +246,7 @@ export function Agenda({ rota }: { rota: string }) {
       {aberto && (
         <DetalheItem
           item={aberto}
+          dono={dono}
           aoFechar={() => setAberto(null)}
           aoEditar={(c) => {
             setAberto(null);
@@ -233,7 +254,7 @@ export function Agenda({ rota }: { rota: string }) {
           }}
         />
       )}
-      {form && <FormCompromisso key={form.existente?.id ?? 'novo'} {...form} aoFechar={fecharForm} />}
+      {form && <FormCompromisso key={form.existente?.id ?? 'novo'} {...form} dono={dono} aoFechar={fecharForm} />}
     </section>
   );
 }
@@ -491,8 +512,20 @@ function useEsc(fechar: () => void, travado = false) {
 }
 
 const ROTULO_CAMADA = Object.fromEntries(CAMADAS.map((c) => [c.id, c.rotulo])) as Record<Camada, string>;
+const ROTULO_CAMADA_SETOR = Object.fromEntries(CAMADAS_SETOR.map((c) => [c.id, c.rotulo])) as Partial<Record<Camada, string>>;
 
-function DetalheItem({ item: i, aoFechar, aoEditar }: { item: ItemAgenda; aoFechar: () => void; aoEditar: (c: Compromisso) => void }) {
+function DetalheItem({
+  item: i,
+  dono,
+  aoFechar,
+  aoEditar,
+}: {
+  item: ItemAgenda;
+  dono: DonoAgenda;
+  aoFechar: () => void;
+  aoEditar: (c: Compromisso) => void;
+}) {
+  const ehP3 = dono === 'p3';
   const [confirmar, setConfirmar] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [falha, setFalha] = useState('');
@@ -505,8 +538,8 @@ function DetalheItem({ item: i, aoFechar, aoEditar }: { item: ItemAgenda; aoFech
     setOcupado(true);
     setFalha('');
     try {
-      if (soEste && i.ocorrencia) await excluirOcorrencia(db, c.id, i.ocorrencia, quemSou() ?? 'P/3');
-      else await excluirCompromisso(db, c.id);
+      if (soEste && i.ocorrencia) await excluirOcorrencia(db, c.id, i.ocorrencia, quemSou() ?? autorPadrao(dono), dono);
+      else await excluirCompromisso(db, c.id, dono);
       aoFechar();
     } catch {
       setFalha('Não foi possível excluir. Tente de novo.');
@@ -518,7 +551,7 @@ function DetalheItem({ item: i, aoFechar, aoEditar }: { item: ItemAgenda; aoFech
   return (
     <div className="fundo-dialogo" onClick={() => !ocupado && aoFechar()}>
       <div className={`dialogo agenda-detalhe cor-${i.cor}`} role="dialog" aria-modal="true" aria-labelledby="titulo-evento" onClick={(e) => e.stopPropagation()}>
-        <span className="agenda-detalhe-camada">{ROTULO_CAMADA[i.camada]}</span>
+        <span className="agenda-detalhe-camada">{(ehP3 ? ROTULO_CAMADA : ROTULO_CAMADA_SETOR)[i.camada]}</span>
         <h3 id="titulo-evento" className={i.concluido ? 'concluido' : undefined}>
           {i.titulo}
         </h3>
@@ -529,8 +562,13 @@ function DetalheItem({ item: i, aoFechar, aoEditar }: { item: ItemAgenda; aoFech
         {c && repete && <p>🔁 {REPETICOES.find((r) => r.id === c.repeticao)?.rotulo}{c.repetirAte ? ` até ${formatarData(c.repetirAte)}` : ''}</p>}
         {i.local && <p>📍 {i.local}</p>}
         {i.descricao && <p className="agenda-detalhe-texto">{i.descricao}</p>}
-        {i.concluido && <p>✅ Demanda concluída no Numerador</p>}
-        {i.demandaId && (
+        {i.concluido && <p>{i.camada === 'prazoP3' ? '✅ Já respondido/enviado' : '✅ Demanda concluída no Numerador'}</p>}
+        {i.href && (
+          <a className="botao secundario" href={i.href} onClick={aoFechar}>
+            📄 {i.rotuloLink ?? 'Abrir'}
+          </a>
+        )}
+        {ehP3 && i.demandaId && (
           <a className="botao secundario" href={`#/demanda/${i.demandaId}`}>
             📄 Abrir demanda {i.demandaNumero} no Numerador
           </a>
@@ -541,7 +579,8 @@ function DetalheItem({ item: i, aoFechar, aoEditar }: { item: ItemAgenda; aoFech
           </a>
         )}
         {c && <p className="agenda-detalhe-quem">Lançado por {c.criadoPor}{c.atualizadoPor ? ` · alterado por ${c.atualizadoPor}` : ''}</p>}
-        {!c && i.camada !== 'cfp' && <p className="agenda-detalhe-quem">Vem do Numerador: para mudar a data, edite a demanda.</p>}
+        {!c && i.camada === 'prazoP3' && <p className="agenda-detalhe-quem">Prazo definido pela P/3: não dá para mudar aqui.</p>}
+        {!c && i.camada !== 'cfp' && i.camada !== 'prazoP3' && <p className="agenda-detalhe-quem">Vem do Numerador: para mudar a data, edite a demanda.</p>}
         {falha && (
           <p className="mensagem erro" role="alert">
             {falha}
@@ -589,7 +628,14 @@ function DetalheItem({ item: i, aoFechar, aoEditar }: { item: ItemAgenda; aoFech
 
 // ---------- Criar / editar ----------
 
-function FormCompromisso({ inicial, existente, aoFechar }: Formulario & { aoFechar: () => void }) {
+/** Quem lançou, quando a conta não tem login individual. */
+function autorPadrao(dono: DonoAgenda): string {
+  if (dono === 'p3') return 'P/3';
+  if (dono === 'sala') return 'Sala de Operações';
+  return UNIDADES.find((u) => u.id === dono)?.sigla ?? dono;
+}
+
+function FormCompromisso({ inicial, existente, dono, aoFechar }: Formulario & { dono: DonoAgenda; aoFechar: () => void }) {
   const [d, setD] = useState<DadosCompromisso>(inicial);
   const [numeroTexto, setNumeroTexto] = useState(inicial.demandaNumero ? String(inicial.demandaNumero) : '');
   const [erros, setErros] = useState<ErrosCompromisso>({});
@@ -616,13 +662,13 @@ function FormCompromisso({ inicial, existente, aoFechar }: Formulario & { aoFech
     setFalha('');
     setOcupado(true);
     try {
-      const dados = await ligarDemanda(d);
+      const dados = dono === 'p3' ? await ligarDemanda(d) : d;
       const encontrados = validarCompromisso(dados);
       setErros(encontrados);
       if (Object.keys(encontrados).length) return setOcupado(false);
-      const quem = quemSou() ?? 'P/3';
-      if (existente) await atualizarCompromisso(db, existente.id, dados, quem);
-      else await criarCompromisso(db, dados, quem);
+      const quem = quemSou() ?? autorPadrao(dono);
+      if (existente) await atualizarCompromisso(db, existente.id, dados, quem, dono);
+      else await criarCompromisso(db, dados, quem, dono);
       aoFechar();
     } catch {
       setFalha('Não foi possível salvar. Tente de novo.');
@@ -718,6 +764,7 @@ function FormCompromisso({ inicial, existente, aoFechar }: Formulario & { aoFech
             </label>
           ))}
         </fieldset>
+        {dono === 'p3' && (
         <Campo rotulo="Demanda do Numerador (nº)" erro={erros.demandaNumero}>
           <input
             inputMode="numeric"
@@ -730,7 +777,8 @@ function FormCompromisso({ inicial, existente, aoFechar }: Formulario & { aoFech
             onBlur={() => void ligarDemanda(d).catch(() => undefined)}
           />
         </Campo>
-        {d.demandaId && d.demandaNumero && (
+        )}
+        {dono === 'p3' && d.demandaId && d.demandaNumero && (
           <p className="agenda-ligada">
             🔗 Nº {d.demandaNumero} — {d.demandaTitulo}
           </p>

@@ -14,7 +14,7 @@ import {
   type Firestore,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { fimDaSerie, normalizarCompromisso, validarCompromisso, type Compromisso, type DadosCompromisso } from '../domain/agenda';
+import { fimDaSerie, normalizarCompromisso, validarCompromisso, type Compromisso, type DadosCompromisso, type DonoAgenda } from '../domain/agenda';
 import { somarDias } from '../domain/datas';
 import type { Demanda } from '../domain/demanda';
 import { paraDemanda } from './demandas';
@@ -26,6 +26,13 @@ function paraCompromisso(x: QueryDocumentSnapshot): Compromisso {
 
 // Eventos da agenda da P/3 (coleção "agenda"). Só a P/3 lê e grava.
 export const COLECAO_AGENDA = 'agenda';
+// Agendas das Cias/FT e da Sala (coleção "agendaSetores", campo "dono"): cada uma só lê e grava a sua.
+export const COLECAO_AGENDA_SETORES = 'agendaSetores';
+
+const colecaoDe = (dono: DonoAgenda) => (dono === 'p3' ? COLECAO_AGENDA : COLECAO_AGENDA_SETORES);
+/** A agenda da P/3 liga eventos ao Numerador; as das Cias não. */
+const semDemanda = (d: DadosCompromisso, dono: DonoAgenda): DadosCompromisso =>
+  dono === 'p3' ? d : { ...d, demandaId: '', demandaNumero: null, demandaTitulo: '' };
 /** Início/Término Btl: procura operações que começaram até X dias antes da tela (e ainda estão correndo). */
 const DIAS_OPERACAO_LONGA = 120;
 
@@ -34,11 +41,12 @@ function erroDeValidacao(dados: DadosCompromisso): void {
   if (erros.length) throw new Error(erros[0]);
 }
 
-export async function criarCompromisso(db: Firestore, dados: DadosCompromisso, criadoPor: string): Promise<string> {
+export async function criarCompromisso(db: Firestore, dados: DadosCompromisso, criadoPor: string, dono: DonoAgenda = 'p3'): Promise<string> {
   erroDeValidacao(dados);
-  const d = normalizarCompromisso(dados);
-  const ref = await addDoc(collection(db, COLECAO_AGENDA), {
+  const d = normalizarCompromisso(semDemanda(dados, dono));
+  const ref = await addDoc(collection(db, colecaoDe(dono)), {
     ...d,
+    ...(dono === 'p3' ? {} : { dono }),
     fimSerie: fimDaSerie(d),
     excecoes: [],
     criadoPor,
@@ -48,19 +56,19 @@ export async function criarCompromisso(db: Firestore, dados: DadosCompromisso, c
   return ref.id;
 }
 
-export async function atualizarCompromisso(db: Firestore, id: string, dados: DadosCompromisso, por: string): Promise<void> {
+export async function atualizarCompromisso(db: Firestore, id: string, dados: DadosCompromisso, por: string, dono: DonoAgenda = 'p3'): Promise<void> {
   erroDeValidacao(dados);
-  const d = normalizarCompromisso(dados);
-  await updateDoc(doc(db, COLECAO_AGENDA, id), { ...d, fimSerie: fimDaSerie(d), atualizadoPor: por, atualizadoEm: serverTimestamp() });
+  const d = normalizarCompromisso(semDemanda(dados, dono));
+  await updateDoc(doc(db, colecaoDe(dono), id), { ...d, fimSerie: fimDaSerie(d), atualizadoPor: por, atualizadoEm: serverTimestamp() });
 }
 
-export async function excluirCompromisso(db: Firestore, id: string): Promise<void> {
-  await deleteDoc(doc(db, COLECAO_AGENDA, id));
+export async function excluirCompromisso(db: Firestore, id: string, dono: DonoAgenda = 'p3'): Promise<void> {
+  await deleteDoc(doc(db, colecaoDe(dono), id));
 }
 
 /** Evento que se repete: apaga só um dia da série. */
-export async function excluirOcorrencia(db: Firestore, id: string, dia: string, por: string): Promise<void> {
-  await updateDoc(doc(db, COLECAO_AGENDA, id), { excecoes: arrayUnion(dia), atualizadoPor: por, atualizadoEm: serverTimestamp() });
+export async function excluirOcorrencia(db: Firestore, id: string, dia: string, por: string, dono: DonoAgenda = 'p3'): Promise<void> {
+  await updateDoc(doc(db, colecaoDe(dono), id), { excecoes: arrayUnion(dia), atualizadoPor: por, atualizadoEm: serverTimestamp() });
 }
 
 /** Eventos (e séries) que ainda aparecem a partir de `de`; os que começam depois de `ate` ficam de fora. */
@@ -70,9 +78,14 @@ export function observarCompromissos(
   ate: string,
   aoMudar: (lista: Compromisso[]) => void,
   aoFalhar: (erro: Error) => void,
+  dono: DonoAgenda = 'p3',
 ): () => void {
+  const q =
+    dono === 'p3'
+      ? query(collection(db, COLECAO_AGENDA), where('fimSerie', '>=', de))
+      : query(collection(db, COLECAO_AGENDA_SETORES), where('dono', '==', dono), where('fimSerie', '>=', de));
   return onSnapshot(
-    query(collection(db, COLECAO_AGENDA), where('fimSerie', '>=', de)),
+    q,
     (s) =>
       aoMudar(
         s.docs

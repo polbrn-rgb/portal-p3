@@ -27,6 +27,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "agendaSetores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dono",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fimSerie",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
