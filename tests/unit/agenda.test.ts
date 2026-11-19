@@ -9,6 +9,7 @@ import {
   itensDoCfp,
   itensDoDia,
   itensDosCompromissos,
+  itensDosPrazos,
   normalizarCompromisso,
   ocorrencias,
   periodoDaVisao,
@@ -237,5 +238,23 @@ describe('na tela', () => {
     expect(quandoDoItem(item('x', {}))).toBe('09:00 – 10:00');
     expect(quandoDoItem(item('x', { diaInteiro: true }))).toBe('Dia inteiro');
     expect(quandoDoItem(item('x', { diaInteiro: true, fim: '2026-11-20' }))).toBe('18/11 – 20/11');
+  });
+});
+
+describe('prazos da P/3 na agenda das Cias', () => {
+  test('viram eventos de dia inteiro, só os do período, com o link da tela', () => {
+    const itens = itensDosPrazos(
+      [
+        { chave: 'enc-1', titulo: 'Prazo · 12/2026', data: '2026-11-20', concluido: false, href: '#/enc/1', rotuloLink: 'Abrir demanda' },
+        { chave: 'eap-1', titulo: 'EAP', data: '2026-11-25', concluido: true },
+        { chave: 'fora', titulo: 'Longe', data: '2027-01-10', concluido: false },
+        { chave: 'sem', titulo: 'Sem data', data: '', concluido: false },
+      ],
+      '2026-11-15',
+      '2026-11-30',
+    );
+    expect(itens.map((i) => i.chave)).toEqual(['p3-enc-1', 'p3-eap-1']);
+    expect(itens[0]).toMatchObject({ camada: 'prazoP3', diaInteiro: true, inicio: '2026-11-20', fim: '2026-11-20', href: '#/enc/1', concluido: false });
+    expect(itens[1].concluido).toBe(true);
   });
 });

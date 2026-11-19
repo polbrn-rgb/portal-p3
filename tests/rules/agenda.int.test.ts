@@ -6,6 +6,7 @@ import {
   atualizarCompromisso,
   buscarDemandaPorNumero,
   COLECAO_AGENDA,
+  COLECAO_AGENDA_SETORES,
   criarCompromisso,
   excluirCompromisso,
   excluirOcorrencia,
@@ -104,6 +105,41 @@ describe('Agenda da P/3', () => {
       await assertFails(addDoc(collection(outro, COLECAO_AGENDA), base));
       await assertFails(excluirCompromisso(outro, id));
     }
+  });
+});
+
+describe('Agendas das Cias e da Sala (independentes)', () => {
+  test('cada Cia e a Sala só veem e mexem na sua; a P/3 e o CFP não entram', async () => {
+    const cia1 = como('conta-1cia', { perfil: 'unidade', unidade: '1cia' });
+    const cia2 = como('conta-2cia', { perfil: 'unidade', unidade: '2cia' });
+    const sala = como('conta-sala', { perfil: 'sala' });
+    const cfp = como('conta-cfp', { perfil: 'cfp' });
+
+    const id1 = await criarCompromisso(cia1, evento({ titulo: 'Da 1ª' }), '1ª CIA', '1cia');
+    const idSala = await criarCompromisso(sala, evento({ titulo: 'Da Sala' }), 'Sala', 'sala');
+    await criarCompromisso(p3, evento({ titulo: 'Da P/3' }), 'P/3');
+
+    const da1 = await quando<Compromisso[]>((ok, e) => observarCompromissos(cia1, '2026-11-01', '2026-11-30', ok, e, '1cia'), (l) => l.length > 0);
+    expect(da1.map((c) => c.titulo)).toEqual(['Da 1ª']); // não vê a da P/3 nem a da Sala
+    const daSala = await quando<Compromisso[]>((ok, e) => observarCompromissos(sala, '2026-11-01', '2026-11-30', ok, e, 'sala'), (l) => l.length > 0);
+    expect(daSala.map((c) => c.titulo)).toEqual(['Da Sala']);
+
+    await atualizarCompromisso(cia1, id1, evento({ titulo: 'Mudada' }), 'Sd', '1cia');
+    await excluirOcorrencia(cia1, id1, '2026-11-18', 'Sd', '1cia');
+
+    for (const outro of [cia2, sala, cfp, p3]) {
+      await assertFails(getDoc(doc(outro, COLECAO_AGENDA_SETORES, id1)));
+      await assertFails(excluirCompromisso(outro, id1, '1cia'));
+    }
+    await assertFails(getDoc(doc(cia1, COLECAO_AGENDA_SETORES, idSala)));
+    // Não dá para gravar na agenda de outra Cia nem trocar o dono.
+    await assertFails(criarCompromisso(cia2, evento(), '2ª CIA', '1cia'));
+    await assertFails(criarCompromisso(cfp, evento(), 'CFP', 'sala'));
+    await assertFails(updateDoc(doc(cia1, COLECAO_AGENDA_SETORES, id1), { dono: '2cia' }));
+    // A da P/3 continua fechada para as Cias.
+    await assertFails(getDocs(collection(cia1, COLECAO_AGENDA)));
+
+    await assertSucceeds(excluirCompromisso(cia1, id1, '1cia'));
   });
 });
 

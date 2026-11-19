@@ -1,4 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { PrazoP3 } from '../../domain/agenda';
+import { Agenda } from '../p3/Agenda';
 import { numeroExibido } from '../../domain/numeracao';
 import { observarEapDaUnidade } from '../../data/eap';
 import { observarSolicitacoesDaUnidade } from '../../data/efetivo';
@@ -23,7 +25,7 @@ import { BaixarPdf } from '../BaixarPdf';
 import { Campo } from '../Campo';
 import { MenuLateral } from '../MenuLateral';
 import { observarEnviosDaUnidade } from '../../data/documentosMensais';
-import { DOCUMENTOS, mesReferencia, type EnvioMensal } from '../../domain/documentosMensais';
+import { DOCUMENTOS, mesReferencia, prazoDoDocumento, type EnvioMensal } from '../../domain/documentosMensais';
 import { ConfirmarDocumentoDireto, contarPendentesDocs, documentosDaUnidade, FormDocumentoCia, ListaDocumentosCia } from './DocumentosCia';
 import { EapsDaCia, ResponderEap } from './EapCia';
 import { observarIccsAbertas, observarRespostasIccDaUnidade } from '../../data/icc';
@@ -41,9 +43,10 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac';
+type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda';
 
 function abaDaRota(hash: string): AbaCia | undefined {
+  if (hash === '#/agenda') return 'agenda';
   if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash === '#/rac' || hash.startsWith('#/rac/')) return 'rac';
@@ -116,6 +119,25 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   ];
   const docAberto = /^#\/documentos\/([\w-]+)$/.exec(hash)?.[1];
 
+  // Tudo o que a P/3 deu como prazo para esta Cia vai para a agenda dela (só leitura).
+  const prazos = useMemo(
+    () =>
+      prazosDaP3({
+        unidade,
+        mesRef,
+        encs: encs.valor ?? [],
+        solicitacoes: solicitacoes.valor ?? [],
+        eaps: eaps.valor ?? [],
+        envios: envios.valor ?? [],
+        iccs: iccs.valor ?? [],
+        respostasIcc: respostasIcc.valor ?? [],
+        racMeses: racMeses.valor ?? [],
+        racs: racs.valor ?? [],
+      }),
+    [unidade, mesRef, encs.valor, solicitacoes.valor, eaps.valor, envios.valor, iccs.valor, respostasIcc.valor, racMeses.valor, racs.valor],
+  );
+  itens.push({ id: 'agenda', href: '#/agenda', rotulo: 'Agenda', contador: 0 });
+
   return (
     <div className="layout-p3">
       <MenuLateral id="menu-unidade" rotulo="Seções da Cia" titulo={sigla} itens={itens} ativa={ativa} />
@@ -124,6 +146,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   );
 
   function conteudo(): ReactNode {
+    if (ativa === 'agenda') return <Agenda rota={hash} dono={unidade} prazos={prazos} />;
     if (ativa === 'rac') {
       if (racMeses.carregando || racs.carregando) return <p className="carregando">Carregando…</p>;
       const m = racAberto ? racMeses.valor?.find((x) => x.mes === racAberto) : undefined;
@@ -207,6 +230,92 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       />
     );
   }
+}
+
+function prazosDaP3(p: {
+  unidade: UnidadeId;
+  mesRef: string;
+  encs: Encaminhamento[];
+  solicitacoes: SolicitacaoEfetivo[];
+  eaps: RespostaEap[];
+  envios: EnvioMensal[];
+  iccs: Icc[];
+  respostasIcc: RespostaIcc[];
+  racMeses: RacMes[];
+  racs: RacSalvo[];
+}): PrazoP3[] {
+  const lista: PrazoP3[] = [];
+  for (const e of p.encs) {
+    if (!e.prazoCia || e.status === 'cancelado') continue;
+    lista.push({
+      chave: `enc-${e.id}`,
+      titulo: `Prazo · ${numeroExibido(e)} — ${e.saida}`,
+      data: e.prazoCia,
+      concluido: e.status === 'respondido' || e.status === 'aceito',
+      descricao: e.observacao || undefined,
+      href: `#/enc/${e.id}`,
+      rotuloLink: 'Abrir demanda',
+    });
+  }
+  for (const s of p.solicitacoes) {
+    if (!s.prazo) continue;
+    lista.push({
+      chave: `efetivo-${s.id}`,
+      titulo: `Efetivo · Nº ${s.numero} — ${s.saida}`,
+      data: s.prazo,
+      concluido: s.status === 'respondida',
+      href: `#/efetivo/${s.id}`,
+      rotuloLink: 'Preencher efetivo',
+    });
+  }
+  for (const r of p.eaps) {
+    if (!r.prazo) continue;
+    lista.push({
+      chave: `eap-${r.id}`,
+      titulo: `EAP · ${r.titulo}`,
+      data: r.prazo,
+      concluido: r.status === 'enviada',
+      href: `#/eap/${r.id}`,
+      rotuloLink: 'Abrir EAP',
+    });
+  }
+  for (const d of documentosDaUnidade(p.unidade, p.mesRef)) {
+    lista.push({
+      chave: `doc-${p.mesRef}-${d.id}`,
+      titulo: `Documento Mensal · ${d.nome}`,
+      data: prazoDoDocumento(d, p.mesRef),
+      concluido: p.envios.some((e) => e.docId === d.id),
+      href: `#/documentos/${d.id}`,
+      rotuloLink: 'Abrir documento',
+    });
+  }
+  for (const i of p.iccs) {
+    if (!i.prazo) continue;
+    lista.push({
+      chave: `icc-${i.id}`,
+      titulo: `ICC nº ${i.numero}`,
+      data: i.prazo,
+      concluido: p.respostasIcc.some((r) => r.iccId === i.id),
+      href: '#/aperfeicoamento',
+      rotuloLink: 'Abrir Aperfeiçoamento',
+    });
+  }
+  for (const m of p.racMeses) {
+    if (!m.prazo) continue;
+    lista.push({
+      chave: `rac-${m.mes}`,
+      titulo: `RAC ${formatarMes(m.mes)}`,
+      data: m.prazo,
+      concluido: p.racs.some((r) => r.mes === m.mes && r.status === 'enviado'),
+      href: `#/rac/${m.mes}`,
+      rotuloLink: 'Abrir RAC',
+    });
+  }
+  return lista;
+}
+
+function formatarMes(mes: string): string {
+  return `${mes.slice(5, 7)}/${mes.slice(0, 4)}`;
 }
 
 function ListaUnidade(p: {

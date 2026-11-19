@@ -8,6 +8,7 @@ import { PainelCfp } from './setores/PainelCfp';
 import { PainelSala } from './setores/PainelSala';
 import { Recados } from './setores/Recados';
 import { Topo } from './Topo';
+import { Agenda } from './p3/Agenda';
 
 export function Inicio({ sessao }: { sessao: Sessao }) {
   return (
@@ -23,6 +24,8 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
         <>
           <Recados setor="sala" />
           <PainelSala />
+          {/* Agenda própria da Sala (a do CFP não tem; quem entra pelo login do CFP não vê esta). */}
+          <Agenda rota="" dono="sala" />
         </>
       )}
       {sessao.tipo === 'cfp' && <PaginasCfp />}

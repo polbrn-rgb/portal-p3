@@ -4,6 +4,7 @@ import { diasEntre, ehDataISO, somarDias } from './datas';
 import type { Demanda } from './demanda';
 import type { MissaoCfp } from '../data/missoes';
 import { numeroExibido } from './numeracao';
+import type { UnidadeId } from './unidades';
 
 export type Visao = 'dia' | 'semana' | 'mes';
 export const VISOES: { id: Visao; rotulo: string }[] = [
@@ -33,7 +34,7 @@ export const CORES: { id: CorAgenda; rotulo: string }[] = [
 ];
 
 /** Camadas que dá para ligar/desligar (como as agendas da lateral do Google). */
-export type Camada = 'compromisso' | 'prazoCPA' | 'prazoCia' | 'periodo' | 'cfp';
+export type Camada = 'compromisso' | 'prazoCPA' | 'prazoCia' | 'periodo' | 'cfp' | 'prazoP3';
 export const CAMADAS: { id: Camada; rotulo: string; cor: CorAgenda }[] = [
   { id: 'compromisso', rotulo: 'Eventos da P/3', cor: 'azul' },
   { id: 'prazoCPA', rotulo: 'Prazo CPA', cor: 'vermelho' },
@@ -42,6 +43,50 @@ export const CAMADAS: { id: Camada; rotulo: string; cor: CorAgenda }[] = [
   { id: 'cfp', rotulo: 'Agenda do CFP', cor: 'verde' },
 ];
 export const CAMADAS_PADRAO: Camada[] = ['compromisso', 'prazoCPA', 'prazoCia', 'periodo'];
+
+/**
+ * Agenda de cada Cia/FT e da Sala de Operações: independente da agenda da P/3 (não vê os eventos dela).
+ * Tem os eventos próprios e, só leitura, os prazos que a P/3 deu para aquela página.
+ */
+export type DonoAgenda = 'p3' | UnidadeId | 'sala';
+export const CAMADAS_SETOR: { id: Camada; rotulo: string; cor: CorAgenda }[] = [
+  { id: 'compromisso', rotulo: 'Meus eventos', cor: 'azul' },
+  { id: 'prazoP3', rotulo: 'Prazos da P/3', cor: 'laranja' },
+];
+export const CAMADAS_SETOR_PADRAO: Camada[] = ['compromisso', 'prazoP3'];
+
+/** Um prazo que a P/3 deu para a Cia (demanda, efetivo, EAP, ICC, RAC, documento mensal). */
+export type PrazoP3 = {
+  chave: string;
+  titulo: string;
+  data: string;
+  /** Já respondido/enviado: aparece riscado. */
+  concluido: boolean;
+  descricao?: string;
+  /** Tela onde a Cia resolve o prazo. */
+  href?: string;
+  rotuloLink?: string;
+};
+
+export function itensDosPrazos(prazos: PrazoP3[], de: string, ate: string): ItemAgenda[] {
+  return prazos
+    .filter((p) => ehDataISO(p.data) && p.data >= de && p.data <= ate)
+    .map((p) => ({
+      chave: `p3-${p.chave}`,
+      camada: 'prazoP3' as const,
+      titulo: p.titulo,
+      inicio: p.data,
+      fim: p.data,
+      diaInteiro: true,
+      horaInicio: '',
+      horaFim: '',
+      cor: 'laranja' as const,
+      concluido: p.concluido,
+      descricao: p.descricao,
+      href: p.href,
+      rotuloLink: p.rotuloLink,
+    }));
+}
 
 export const LIMITE_TITULO = 200;
 export const LIMITE_DESCRICAO = 5000;
@@ -312,6 +357,9 @@ export type ItemAgenda = {
   demandaId?: string;
   demandaNumero?: string;
   pastaUrl?: string;
+  /** Prazo da P/3 (agenda das Cias): tela onde a Cia resolve. */
+  href?: string;
+  rotuloLink?: string;
 };
 
 export function itensDosCompromissos(lista: Compromisso[], de: string, ate: string): ItemAgenda[] {

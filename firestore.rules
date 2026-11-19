@@ -451,6 +451,21 @@ service cloud.firestore {
       allow update: if ehP3() && compromissoValido() && request.resource.data.criadoPor == resource.data.criadoPor;
     }
 
+    // Agenda de cada Cia/FT e da Sala de Operações: cada uma só vê e mexe na sua (a P/3 não entra).
+    function ehDonoDaAgenda(dono) {
+      return logado() && dono is string
+        && ((request.auth.token.perfil == 'unidade' && request.auth.token.get('unidade', '') == dono)
+          || (request.auth.token.perfil == 'sala' && dono == 'sala'));
+    }
+
+    match /agendaSetores/{compromissoId} {
+      allow read, delete: if ehDonoDaAgenda(resource.data.dono);
+      allow create: if ehDonoDaAgenda(request.resource.data.dono) && compromissoValido();
+      allow update: if ehDonoDaAgenda(resource.data.dono) && compromissoValido()
+        && request.resource.data.dono == resource.data.dono
+        && request.resource.data.criadoPor == resource.data.criadoPor;
+    }
+
     // Cópia da agenda do CFP (gravada só pelo Apps Script).
     match /agendaCfp/{docId} {
       allow read: if ehP3() || ehPerfil('cfp');
