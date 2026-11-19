@@ -2122,6 +2122,24 @@ fieldset:has(> .erro-campo) > legend {
   margin-top: 2px;
 }
 
+.botao-apagar-foto {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 6px;
+}
+
+.confirmar-foto {
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #fdf2f2;
+}
+
+.confirmar-foto p {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+}
+
 .tirar-foto {
   position: absolute;
   top: 4px;

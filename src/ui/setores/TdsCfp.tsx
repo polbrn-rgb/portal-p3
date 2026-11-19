@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { buscarPolicial } from '../../data/efetivo';
-import { cadastrarPolicial, enviarFotosTds, observarFotosDoCfp } from '../../data/tds';
+import { apagarFotosTds, cadastrarPolicial, enviarFotosTds, observarFotosDoCfp } from '../../data/tds';
 import { formatarData, hojeISO } from '../../domain/datas';
 import { normalizarRE, type Policial } from '../../domain/efetivo';
 import {
@@ -51,6 +51,8 @@ export function TdsCfp() {
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const [etapa, setEtapa] = useState('');
+  const [confirmarId, setConfirmarId] = useState('');
+  const [apagandoId, setApagandoId] = useState('');
   const urls = useRef<string[]>([]);
 
   const mes = mesDe(data || hojeISO());
@@ -96,6 +98,20 @@ export function TdsCfp() {
     setEscolhidas((atual) => [...atual, ...novas]);
     setErros((e) => ({ ...e, fotos: undefined }));
     setAviso('');
+  }
+
+  async function apagarEnviada(id: string) {
+    setErro('');
+    setAviso('');
+    setApagandoId(id);
+    try {
+      await apagarFotosTds(db, [id]);
+      setConfirmarId('');
+      setAviso('Foto apagada. A vaga está livre de novo para outra foto neste mês.');
+    } catch {
+      setErro('Não foi possível apagar a foto. Verifique a conexão e tente de novo.');
+    }
+    setApagandoId('');
   }
 
   function tirar(url: string) {
@@ -283,6 +299,32 @@ export function TdsCfp() {
                   <span className="legenda-foto">
                     {formatarData(f.data)} · {f.assunto}
                   </span>
+                  {confirmarId === f.id ? (
+                    <div className="confirmar-foto" role="alertdialog" aria-label={`Confirmar exclusão da foto ${f.vaga}`}>
+                      <p>Apagar esta foto? Depois você pode mandar outra no lugar.</p>
+                      <div className="acoes-linha">
+                        <button className="botao secundario" type="button" disabled={!!apagandoId} onClick={() => setConfirmarId('')}>
+                          Cancelar
+                        </button>
+                        <button className="botao perigo" type="button" disabled={!!apagandoId} onClick={() => apagarEnviada(f.id)}>
+                          {apagandoId === f.id ? 'Apagando…' : 'Sim, apagar'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="botao secundario botao-apagar-foto"
+                      type="button"
+                      disabled={!!apagandoId || !!etapa}
+                      onClick={() => {
+                        setErro('');
+                        setAviso('');
+                        setConfirmarId(f.id);
+                      }}
+                    >
+                      🗑️ Apagar
+                    </button>
+                  )}
                 </li>
               ))}
           </ul>

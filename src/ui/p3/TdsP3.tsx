@@ -39,6 +39,8 @@ export function TdsP3() {
   const [baixadas, setBaixadas] = useState<{ mes: string; ids: string[] } | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const [apagando, setApagando] = useState(false);
+  const [confirmarId, setConfirmarId] = useState('');
+  const [apagandoId, setApagandoId] = useState('');
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   // Só oferece apagar o que foi baixado (e ainda está no sistema).
@@ -47,6 +49,7 @@ export function TdsP3() {
   function trocarMes(m: string) {
     setMes(m);
     setConfirmando(false);
+    setConfirmarId('');
     setErro('');
     setAviso('');
   }
@@ -83,6 +86,20 @@ export function TdsP3() {
       setErro('Não foi possível apagar. Tente de novo.');
     }
     setApagando(false);
+  }
+
+  async function apagarUma(id: string) {
+    setApagandoId(id);
+    setErro('');
+    setAviso('');
+    try {
+      await apagarFotosTds(db, [id]);
+      setConfirmarId('');
+      setAviso('Foto apagada do sistema.');
+    } catch {
+      setErro('Não foi possível apagar a foto. Tente de novo.');
+    }
+    setApagandoId('');
   }
 
   return (
@@ -170,6 +187,32 @@ export function TdsP3() {
                 <span className="legenda-foto">
                   {formatarData(f.data)} · {f.assunto}
                 </span>
+                {confirmarId === f.id ? (
+                  <div className="confirmar-foto" role="alertdialog" aria-label={`Confirmar exclusão da foto ${f.vaga} de ${g.cfp.nomeGuerra}`}>
+                    <p>Apagar esta foto do sistema? Não dá para desfazer.</p>
+                    <div className="acoes-linha">
+                      <button className="botao secundario" type="button" disabled={!!apagandoId} onClick={() => setConfirmarId('')}>
+                        Cancelar
+                      </button>
+                      <button className="botao perigo" type="button" disabled={!!apagandoId} onClick={() => apagarUma(f.id)}>
+                        {apagandoId === f.id ? 'Apagando…' : 'Sim, apagar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="botao secundario botao-apagar-foto"
+                    type="button"
+                    disabled={!!apagandoId || apagando || !!baixando}
+                    onClick={() => {
+                      setErro('');
+                      setAviso('');
+                      setConfirmarId(f.id);
+                    }}
+                  >
+                    🗑️ Apagar
+                  </button>
+                )}
               </li>
             ))}
           </ul>
