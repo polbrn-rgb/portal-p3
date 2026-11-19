@@ -111,9 +111,7 @@ describe('Agenda da P/3', () => {
 describe('Agendas das Cias e da Sala (independentes)', () => {
   test('cada Cia e a Sala só veem e mexem na sua; a P/3 e o CFP não entram', async () => {
     const cia1 = como('conta-1cia', { perfil: 'unidade', unidade: '1cia' });
-    const cia2 = como('conta-2cia', { perfil: 'unidade', unidade: '2cia' });
     const sala = como('conta-sala', { perfil: 'sala' });
-    const cfp = como('conta-cfp', { perfil: 'cfp' });
 
     const id1 = await criarCompromisso(cia1, evento({ titulo: 'Da 1ª' }), '1ª CIA', '1cia');
     const idSala = await criarCompromisso(sala, evento({ titulo: 'Da Sala' }), 'Sala', 'sala');
@@ -127,17 +125,23 @@ describe('Agendas das Cias e da Sala (independentes)', () => {
     await atualizarCompromisso(cia1, id1, evento({ titulo: 'Mudada' }), 'Sd', '1cia');
     await excluirOcorrencia(cia1, id1, '2026-11-18', 'Sd', '1cia');
 
-    for (const outro of [cia2, sala, cfp, p3]) {
-      await assertFails(getDoc(doc(outro, COLECAO_AGENDA_SETORES, id1)));
-      await assertFails(excluirCompromisso(outro, id1, '1cia'));
+    // Cada verificação de "negado" num cliente novo, sem ouvinte aberto: o emulador às vezes derruba a conexão
+    // quando a mesma conta tem ouvinte e leva um "negado" ("client is offline" / RESOURCE_EXHAUSTED).
+    let n = 0;
+    const novo = (claims: Record<string, string>) => como(`isolado-${n++}`, claims);
+    const outros: Record<string, string>[] = [{ perfil: 'unidade', unidade: '2cia' }, { perfil: 'sala' }, { perfil: 'cfp' }, { perfil: 'p3' }];
+    for (const c of outros) {
+      await assertFails(getDoc(doc(novo(c), COLECAO_AGENDA_SETORES, id1)));
+      await assertFails(excluirCompromisso(novo(c), id1, '1cia'));
     }
-    await assertFails(getDoc(doc(cia1, COLECAO_AGENDA_SETORES, idSala)));
+    const c1 = { perfil: 'unidade', unidade: '1cia' };
+    await assertFails(getDoc(doc(novo(c1), COLECAO_AGENDA_SETORES, idSala)));
     // Não dá para gravar na agenda de outra Cia nem trocar o dono.
-    await assertFails(criarCompromisso(cia2, evento(), '2ª CIA', '1cia'));
-    await assertFails(criarCompromisso(cfp, evento(), 'CFP', 'sala'));
-    await assertFails(updateDoc(doc(cia1, COLECAO_AGENDA_SETORES, id1), { dono: '2cia' }));
+    await assertFails(criarCompromisso(novo({ perfil: 'unidade', unidade: '2cia' }), evento(), '2ª CIA', '1cia'));
+    await assertFails(criarCompromisso(novo({ perfil: 'cfp' }), evento(), 'CFP', 'sala'));
+    await assertFails(updateDoc(doc(novo(c1), COLECAO_AGENDA_SETORES, id1), { dono: '2cia' }));
     // A da P/3 continua fechada para as Cias.
-    await assertFails(getDocs(collection(cia1, COLECAO_AGENDA)));
+    await assertFails(getDocs(collection(novo(c1), COLECAO_AGENDA)));
 
     await assertSucceeds(excluirCompromisso(cia1, id1, '1cia'));
   });
