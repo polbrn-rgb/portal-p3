@@ -466,6 +466,47 @@ service cloud.firestore {
         && request.resource.data.criadoPor == resource.data.criadoPor;
     }
 
+    // Numerador de cada Cia/FT: independente (não distribui). Cada Cia só vê e mexe nas suas demandas.
+    function ehDaCia(unidade) {
+      return logado() && request.auth.token.perfil == 'unidade'
+        && request.auth.token.get('unidade', '') == unidade;
+    }
+
+    function demandaCiaValida() {
+      let d = request.resource.data;
+      return d.saida is string && d.saida.size() > 0 && d.saida.size() <= 200
+        && d.tipoSaida is string && d.tipoSaida.size() > 0
+        && d.dataEntrada is string && d.dataEntrada.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.prazo is string && d.observacao is string && d.observacao.size() <= 5000
+        && d.status in ['em_aberto', 'concluida'];
+    }
+
+    match /demandasCia/{demandaId} {
+      allow read, delete: if ehDaCia(resource.data.unidadeId);
+      // O número tem que ser o que o contador da Cia acabou de dar (na mesma gravação).
+      allow create: if ehDaCia(request.resource.data.unidadeId) && demandaCiaValida()
+        && request.resource.data.status == 'em_aberto'
+        && request.resource.data.contadorId.split('_')[0] == request.resource.data.unidadeId
+        && demandaId == request.resource.data.contadorId + '_' + string(request.resource.data.sequencia)
+        && getAfter(/databases/$(database)/documents/contadoresCia/$(request.resource.data.contadorId)).data.ultimo
+          == request.resource.data.sequencia;
+      // O número, o tipo, a Cia e a data de entrada não mudam.
+      allow update: if ehDaCia(resource.data.unidadeId) && demandaCiaValida()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['saida', 'origem', 'numeroOrigem', 'prazo', 'responsavel', 'observacao', 'status', 'agendaId', 'atualizadoPor', 'atualizadoEm']);
+    }
+
+    // Contador de cada Cia/tipo/ano: só avança de 1 em 1 (começar de outro número é pelo Administrador).
+    match /contadoresCia/{contadorId} {
+      allow read: if ehDaCia(contadorId.split('_')[0]);
+      allow create: if ehDaCia(request.resource.data.unidadeId) && contadorId.split('_')[0] == request.resource.data.unidadeId
+        && request.resource.data.keys().hasOnly(['ultimo', 'unidadeId']) && request.resource.data.ultimo == 1;
+      allow update: if ehDaCia(resource.data.unidadeId)
+        && request.resource.data.unidadeId == resource.data.unidadeId
+        && request.resource.data.keys().hasOnly(['ultimo', 'unidadeId'])
+        && request.resource.data.ultimo == resource.data.ultimo + 1;
+    }
+
     // Cópia da agenda do CFP (gravada só pelo Apps Script).
     match /agendaCfp/{docId} {
       allow read: if ehP3() || ehPerfil('cfp');

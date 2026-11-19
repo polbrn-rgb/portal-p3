@@ -36,6 +36,9 @@ import { PreencherEfetivo, SolicitacoesEfetivo } from './EfetivoCia';
 import { observarRacMesesAbertos, observarRacsDaUnidade } from '../../data/rac';
 import type { RacMes, RacSalvo } from '../../domain/rac';
 import { contarPendentesRac, FormRacCia, ListaRacCia } from './RacCia';
+import { observarDemandasCia } from '../../data/numeradorCia';
+import type { DemandaCia } from '../../domain/numeradorCia';
+import { FormNumeradorCia, ListaNumeradorCia } from './NumeradorCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'pendentes', rotulo: 'Pendentes' },
@@ -43,10 +46,11 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda';
+type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda' | 'numerador';
 
 function abaDaRota(hash: string): AbaCia | undefined {
   if (hash === '#/agenda') return 'agenda';
+  if (hash === '#/numerador' || hash.startsWith('#/numerador/')) return 'numerador';
   if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash === '#/rac' || hash.startsWith('#/rac/')) return 'rac';
@@ -89,6 +93,12 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   const racs = useAoVivo<RacSalvo[]>((ok, erro) => observarRacsDaUnidade(db, unidade, ok, erro), [unidade]);
   const temRac = (racMeses.valor ?? []).length > 0;
   const racAberto = /^#\/rac\/(\d{4}-\d{2})$/.exec(hash)?.[1];
+  const numerador = useAoVivo<DemandaCia[]>(
+    (ok, erro) => observarDemandasCia(db, unidade, ok, erro),
+    [unidade],
+    'Não foi possível carregar o Numerador.',
+  );
+  const numeradorAberto = /^#\/numerador\/(.+)$/.exec(hash)?.[1];
   const itens = [
     ...ABAS.map((a) => ({
       id: a.id as AbaCia,
@@ -136,6 +146,12 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       }),
     [unidade, mesRef, encs.valor, solicitacoes.valor, eaps.valor, envios.valor, iccs.valor, respostasIcc.valor, racMeses.valor, racs.valor],
   );
+  itens.push({
+    id: 'numerador',
+    href: '#/numerador',
+    rotulo: 'Numerador',
+    contador: (numerador.valor ?? []).filter((d) => d.status === 'em_aberto' && !!d.prazo && d.prazo < hoje).length,
+  });
   itens.push({ id: 'agenda', href: '#/agenda', rotulo: 'Agenda', contador: 0 });
 
   return (
@@ -147,6 +163,23 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
 
   function conteudo(): ReactNode {
     if (ativa === 'agenda') return <Agenda rota={hash} dono={unidade} prazos={prazos} />;
+    if (ativa === 'numerador') {
+      if (numeradorAberto === 'nova') return <FormNumeradorCia key="nova" unidade={unidade} />;
+      if (numeradorAberto) {
+        if (numerador.carregando) return <p className="carregando">Carregando…</p>;
+        const d = numerador.valor?.find((x) => x.id === numeradorAberto);
+        if (d) return <FormNumeradorCia key={d.id} unidade={unidade} existente={d} />;
+        return (
+          <section className="painel">
+            <p className="mensagem erro" role="alert">
+              Demanda não encontrada.
+            </p>
+            <a href="#/numerador">Voltar</a>
+          </section>
+        );
+      }
+      return <ListaNumeradorCia unidade={unidade} lista={numerador.valor ?? []} carregando={numerador.carregando} erro={numerador.erro} />;
+    }
     if (ativa === 'rac') {
       if (racMeses.carregando || racs.carregando) return <p className="carregando">Carregando…</p>;
       const m = racAberto ? racMeses.valor?.find((x) => x.mes === racAberto) : undefined;
