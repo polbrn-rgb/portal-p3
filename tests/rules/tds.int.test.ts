@@ -63,7 +63,6 @@ describe('TDS', () => {
     await enviarFotosTds(cfp, envio, [foto(1)], [1]);
     await assertFails(updateDoc(doc(cfp, 'fotosTds', '2026-11_123456_1'), { assunto: 'Outro' }));
     await assertFails(setDoc(doc(cfp, 'fotosTdsDados', '2026-11_123456_1'), { dados: 'b3V0cmE=' }));
-    await assertFails(deleteDoc(doc(cfp, 'fotosTds', '2026-11_123456_1')));
     await assertFails(setDoc(doc(cfp, 'fotosTdsDados', '2026-11_123456_2'), { dados: 'eA==' })); // sem o resumo
     await assertFails(loteValido(cfp, '2026-11_123456_2', { data: '2026-12-01' })); // data fora do mês do id
     await assertFails(loteValido(cfp, '2026-11_123456_2', { vaga: 3 })); // vaga diferente do id
@@ -87,6 +86,18 @@ describe('TDS', () => {
     expect((await getDocs(collection(p3, 'fotosTds'))).size).toBe(0);
     expect((await getDocs(collection(p3, 'fotosTdsDados'))).size).toBe(0);
     // Apagadas, as vagas voltam.
+    expect(await enviarFotosTds(cfp, envio, [foto(3)], [1])).toBe(1);
+  });
+
+  test('o CFP apaga as fotos que mandou (para trocar ou cancelar); a Cia e a Sala não apagam', async () => {
+    await enviarFotosTds(cfp, envio, [foto(1), foto(2)], [1, 2]);
+    await assertFails(deleteDoc(doc(cia(), 'fotosTds', '2026-11_123456_1')));
+    await assertFails(deleteDoc(doc(sala(), 'fotosTdsDados', '2026-11_123456_1')));
+    await apagarFotosTds(cfp, ['2026-11_123456_1']);
+    const restantes = await getDocs(collection(p3, 'fotosTds'));
+    expect(restantes.docs.map((d) => d.id)).toEqual(['2026-11_123456_2']);
+    expect((await getDocs(collection(p3, 'fotosTdsDados'))).size).toBe(1);
+    // A vaga apagada volta para o CFP.
     expect(await enviarFotosTds(cfp, envio, [foto(3)], [1])).toBe(1);
   });
 });

@@ -385,14 +385,16 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/fotosTdsDados/$(id)).data.dados.size() == f.tamanho;
     }
 
+    // Apagar: a P/3 apaga qualquer foto; o CFP apaga as próprias para trocar ou cancelar (a tela só mostra o RE digitado).
     match /fotosTds/{id} {
       allow read: if ehP3() || ehPerfil('cfp');
       allow create: if fotoTdsValida(id);
-      allow delete: if ehP3();
+      allow delete: if ehP3() || ehPerfil('cfp');
     }
 
     match /fotosTdsDados/{id} {
-      allow read, delete: if ehP3();
+      allow read: if ehP3();
+      allow delete: if ehP3() || ehPerfil('cfp');
       allow create: if ehPerfil('cfp')
         && request.resource.data.keys().hasOnly(['dados'])
         && request.resource.data.dados is string
