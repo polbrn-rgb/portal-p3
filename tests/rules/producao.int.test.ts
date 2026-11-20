@@ -37,8 +37,8 @@ const lancamento = (extra: Partial<Parameters<typeof salvarProducao>[1]> = {}) =
   unidade: '1cia' as const,
   data: '2026-11-20',
   pelotao: 'pelA' as const,
-  itens: { ...itensZerados(), pessoasAbordadas: 40, flagrante: 1, ocorrenciasComPrisao: 1, entorpecentesKg: 0.25 },
-  taloes: [{ numero: '20261120510801', data: '2026-11-20' }],
+  itens: { ...itensZerados(), pessoasAbordadas: 40, flagrante: 1, ocorrenciasComPrisao: 1, maconhaKg: 0.25, carrosRemovidos: 2 },
+  taloes: [{ numero: '20261120510801', bopc: 'XY1234', data: '2026-11-20' }],
   por: 'Sd PM SALA (RE 111111)',
   ...extra,
 });
@@ -51,6 +51,7 @@ describe('produção diária dos pelotões', () => {
     const [l] = await uma((ok, e) => observarProducaoDaCia(cia('1cia'), '1cia', '2026-11', ok, e));
     expect(l).toMatchObject({ pelotao: 'pelA', lancadoPor: 'Sd PM SALA (RE 111111)', atualizadoPor: 'Cb PM OUTRO (RE 222222)' });
     expect(l.itens.pessoasAbordadas).toBe(45);
+    expect(l.taloes).toEqual([{ numero: '20261120510801', bopc: 'XY1234', data: '2026-11-20' }]);
     expect(l.lancadoEm).toBeInstanceOf(Date);
   });
 

@@ -5,6 +5,7 @@ import {
   abasDaProducao,
   avisosProducao,
   diaDaSemanaPorExtenso,
+  ehDecimal,
   GRUPOS_PRODUCAO,
   ITENS_PRODUCAO,
   lerQuantidade,
@@ -33,7 +34,7 @@ import { useAoVivo } from '../../lib/useAoVivo';
 import { baixarXlsx } from '../../lib/xlsx';
 import { Campo } from '../Campo';
 
-// Aba "Sala de Operações" da Cia/FT: cada pelotão lança, no fim do turno, a produção do dia (e os talões),
+// Aba "Sala de Operações" da Cia/FT: cada pelotão lança, no fim do turno, a produção do dia (e os flagrantes: talão e BOPC),
 // e o resumo do mês mostra os totais por pelotão e os turnos que ficaram sem lançamento.
 
 const ehMes = (m: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
@@ -138,7 +139,7 @@ const textosDe = (itens?: Itens): Record<ItemId, string> =>
 function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelotao: PelotaoId; existente?: Producao }) {
   const [textos, setTextos] = useState<Record<ItemId, string>>(() => textosDe(p.existente?.itens));
   const [taloes, setTaloes] = useState<Talao[]>(() => p.existente?.taloes ?? []);
-  const [novoTalao, setNovoTalao] = useState<Talao>({ numero: '', data: p.data });
+  const [novoTalao, setNovoTalao] = useState<Talao>({ numero: '', bopc: '', data: p.data });
   const [erroTalao, setErroTalao] = useState('');
   const [erros, setErros] = useState<ErrosProducao>({});
   const [ocupado, setOcupado] = useState(false);
@@ -157,8 +158,8 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
     const e = validarTalao(novoTalao, taloes);
     setErroTalao(e);
     if (e) return;
-    setTaloes((t) => [...t, { numero: normalizarTalao(novoTalao.numero), data: novoTalao.data }]);
-    setNovoTalao((t) => ({ ...t, numero: '' }));
+    setTaloes((t) => [...t, { numero: normalizarTalao(novoTalao.numero), bopc: normalizarTalao(novoTalao.bopc), data: novoTalao.data }]);
+    setNovoTalao((t) => ({ ...t, numero: '', bopc: '' }));
   }
 
   function aoTeclarTalao(e: KeyboardEvent<HTMLInputElement>) {
@@ -174,8 +175,8 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
     const r = validarProducao({ data: p.data, pelotao: p.pelotao, textos, taloes }, p.unidade, hojeISO());
     setErros(r.erros);
     if (!r.itens) return;
-    if (novoTalao.numero.trim()) {
-      setErroTalao('Toque em "Incluir talão" (ou apague o número) antes de salvar.');
+    if (novoTalao.numero.trim() || novoTalao.bopc.trim()) {
+      setErroTalao('Toque em "Incluir flagrante" (ou apague os números) antes de salvar.');
       return;
     }
     setOcupado(true);
@@ -246,8 +247,10 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
       ))}
 
       <fieldset className="cartao grupo">
-        <legend>Talões das ocorrências</legend>
-        <p className="item-info">Anote o número do talão de cada ocorrência do turno, com o dia em que aconteceu. A P/3 usa para colher os dados oficiais.</p>
+        <legend>Flagrantes de delito</legend>
+        <p className="item-info">
+          Preencher em caso de flagrante de delito: o nº do talão, o nº do BOPC e o dia da ocorrência. A P/3 usa para colher os dados oficiais.
+        </p>
         <div className="grade-producao">
           <Campo rotulo="Nº do talão" erro={erroTalao || erros.taloes}>
             <input
@@ -258,6 +261,18 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
               onChange={(e) => {
                 const v = e.target.value;
                 setNovoTalao((t) => ({ ...t, numero: v }));
+              }}
+            />
+          </Campo>
+          <Campo rotulo="Nº do BOPC">
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              value={novoTalao.bopc}
+              onKeyDown={aoTeclarTalao}
+              onChange={(e) => {
+                const v = e.target.value;
+                setNovoTalao((t) => ({ ...t, bopc: v }));
               }}
             />
           </Campo>
@@ -275,20 +290,20 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
         </div>
         <div className="acoes-linha">
           <button className="botao secundario" type="button" onClick={incluirTalao}>
-            + Incluir talão
+            + Incluir flagrante
           </button>
         </div>
         {taloes.length > 0 && (
-          <ul className="lista-taloes" aria-label="Talões anotados">
+          <ul className="lista-taloes" aria-label="Flagrantes anotados">
             {taloes.map((t) => (
               <li key={t.numero}>
                 <span>
-                  <strong>{t.numero}</strong> · {formatarData(t.data)}
+                  Talão <strong>{t.numero}</strong> · BOPC {t.bopc ? <strong>{t.bopc}</strong> : <em>a completar</em>} · {formatarData(t.data)}
                 </span>
                 <button
                   className="botao-tirar-talao"
                   type="button"
-                  aria-label={`Tirar o talão ${t.numero}`}
+                  aria-label={`Tirar o flagrante do talão ${t.numero}`}
                   onClick={() => setTaloes((l) => l.filter((x) => x.numero !== t.numero))}
                 >
                   ×
@@ -362,7 +377,7 @@ function ResumoDoMes({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) 
     .flatMap((l) => l.taloes.map((t) => ({ ...t, pelotao: l.pelotao })))
     .sort((a, b) => a.data.localeCompare(b.data) || a.numero.localeCompare(b.numero));
   const dias = [...new Set(lista.map((l) => l.data))].sort().reverse();
-  const fmt = (v: number, id: ItemId) => (v ? textoQuantidade(v, id === 'entorpecentesKg') : '—');
+  const fmt = (v: number, id: ItemId) => (v ? textoQuantidade(v, ehDecimal(id)) : '—');
 
   return (
     <section className="painel">
@@ -457,15 +472,16 @@ function ResumoDoMes({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) 
             ))}
           </ul>
 
-          <h3 className="titulo-secao">Talões do mês ({taloes.length})</h3>
+          <h3 className="titulo-secao">Flagrantes do mês ({taloes.length})</h3>
           {taloes.length === 0 ? (
-            <p className="vazio">Nenhum talão anotado.</p>
+            <p className="vazio">Nenhum flagrante anotado.</p>
           ) : (
-            <ul className="lista-taloes" aria-label="Talões do mês">
+            <ul className="lista-taloes" aria-label="Flagrantes do mês">
               {taloes.map((t) => (
                 <li key={`${t.numero}_${t.pelotao}`}>
                   <span>
-                    <strong>{t.numero}</strong> · {formatarData(t.data)} · {pels.find((x) => x.id === t.pelotao)?.rotulo ?? t.pelotao}
+                    Talão <strong>{t.numero}</strong> · BOPC {t.bopc || '—'} · {formatarData(t.data)} ·{' '}
+                    {pels.find((x) => x.id === t.pelotao)?.rotulo ?? t.pelotao}
                   </span>
                 </li>
               ))}
