@@ -600,7 +600,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['unidadeId', 'data', 'mes', 'pelotao', 'itens', 'taloes', 'lancadoPor', 'lancadoEm', 'atualizadoPor', 'atualizadoEm'])
         && d.data is string && d.data.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && d.mes is string && d.mes.matches('^[0-9]{4}-[0-9]{2}$') && d.data.matches(d.mes + '-[0-9]{2}')
-        && d.pelotao in ['pelA', 'pelB', 'pelC', 'pelD', 're', 'rpm']
+        && d.pelotao in ['pelA', 'pelB', 'pelC', 'pelD']
         && (d.unidadeId != 'ft' || d.pelotao in ['pelA', 'pelB'])
         && id == d.unidadeId + '_' + d.data + '_' + d.pelotao
         && itensProducaoValidos(d.itens)

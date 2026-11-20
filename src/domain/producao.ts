@@ -1,6 +1,7 @@
 // Produção diária dos pelotões, lançada pela Sala de Operações de cada Cia/FT no fim do turno.
 //
-// - Cias, turno de 12x36: Pel A e Pel C de dia, Pel B e Pel D de noite. RE e RPM à parte.
+// - Cias, turno de 12x36: Pel A e Pel C de dia, Pel B e Pel D de noite. A Ronda Escolar e a RPM
+//   entram no resultado do pelotão (não têm lançamento à parte).
 // - Força Tática: Pel A e Pel B de dia, em dias alternados (não tem turno da noite).
 // - Um lançamento por pelotão por dia de serviço (o turno da noite usa a data em que começou).
 // - O resultado da BCS entra no resultado do pelotão.
@@ -15,7 +16,7 @@ import { UNIDADES, type UnidadeId } from './unidades';
 type Celula = string | number;
 export type AbaPlanilha = { nome: string; linhas: Celula[][] };
 
-export type PelotaoId = 'pelA' | 'pelB' | 'pelC' | 'pelD' | 're' | 'rpm';
+export type PelotaoId = 'pelA' | 'pelB' | 'pelC' | 'pelD';
 export type Turno = 'dia' | 'noite' | '';
 
 export const PELOTOES: readonly { id: PelotaoId; rotulo: string; turno: Turno }[] = [
@@ -23,8 +24,6 @@ export const PELOTOES: readonly { id: PelotaoId; rotulo: string; turno: Turno }[
   { id: 'pelB', rotulo: 'Pel B', turno: 'noite' },
   { id: 'pelC', rotulo: 'Pel C', turno: 'dia' },
   { id: 'pelD', rotulo: 'Pel D', turno: 'noite' },
-  { id: 're', rotulo: 'RE', turno: '' },
-  { id: 'rpm', rotulo: 'RPM', turno: '' },
 ];
 
 /** Força Tática: Pel A e Pel B trabalham de dia, em dias alternados (não há turno da noite). */
@@ -33,12 +32,12 @@ const PELOTOES_FT: readonly { id: PelotaoId; rotulo: string; turno: Turno }[] = 
   { id: 'pelB', rotulo: 'Pel B', turno: 'dia' },
 ];
 
-/** Pelotões de cada unidade (os mesmos do RAC: Cia com Pel A–D, RE e RPM; FT com Pel A e B). */
+/** Pelotões de cada unidade: Cia com Pel A–D (Ronda Escolar e RPM entram no pelotão); FT com Pel A e B. */
 export function pelotoesDa(unidade: UnidadeId) {
   return unidade === 'ft' ? PELOTOES_FT : PELOTOES;
 }
 
-/** Turno do pelotão na unidade ('' = RE/RPM, sem turno fixo). */
+/** Turno do pelotão na unidade. */
 export function turnoDo(id: string, unidade: UnidadeId): Turno {
   return pelotoesDa(unidade).find((p) => p.id === id)?.turno ?? '';
 }
