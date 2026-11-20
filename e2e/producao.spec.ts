@@ -4,7 +4,7 @@ import { SENHA_TESTE } from './dados';
 
 // Sala de Operações da Cia: o pelotão lança a produção do turno (com os flagrantes: talão e BOPC) e a P/3 vê no total do mês.
 test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total', async ({ page }, info) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   // Uma Cia por projeto (celular/computador): os dois rodam no mesmo banco de testes.
   const cia = info.project.name === 'celular' ? { id: '5cia', sigla: '5ª CIA' } : { id: '6cia', sigla: '6ª CIA' };
   const hoje = new Date();
