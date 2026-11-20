@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, irParaAbaCia } from './ajuda';
+import { entrar, entrarRE, irParaAbaCia, sair } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -53,6 +53,20 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   await expect(page.getByText('3 foto(s) importada(s).')).toBeVisible();
   await expect(page.getByRole('img', { name: `Operação — Praça ${assunto}` })).toHaveCount(3);
   await expect(page.getByText(/Importada por 4ª CIA em/).first()).toBeVisible();
+
+  // O CGP da 4ª Cia (acesso por RE) vê só a página dele: a missão, o recado e as fotos; não exclui missão.
+  await sair(page);
+  await entrarRE(page, '444444-4', SENHA_TESTE);
+  await expect(page.getByRole('heading', { name: 'CGP 4ª CIA' })).toBeVisible();
+  await expect(page.locator('#menu-unidade')).toHaveCount(0);
+  await expect(page.getByRole('article', { name: assunto })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Excluir do CGP' })).toHaveCount(0);
+  await expect(page.getByText(`Recado ${assunto}`)).toBeVisible();
+  await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Importação de fotos' }).click();
+  await expect(page.getByRole('img', { name: `Operação — Praça ${assunto}` })).toHaveCount(3);
+  await sair(page);
+  await entrar(page, '4cia', SENHA_TESTE);
+  await irParaAbaCia(page, 'CGP');
 
   // Excluir do CGP: a demanda volta a poder ser enviada
   await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Missões' }).click();

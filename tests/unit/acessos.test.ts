@@ -76,6 +76,8 @@ describe('Cia pela coluna OPM do banco', () => {
 describe('cadastro', () => {
   test('obrigatórios: RE, nome, posto, e-mail válido, acesso e Cia', () => {
     expect(validarAcesso(dados())).toEqual({});
+    expect(validarAcesso(dados({ perfil: 'cgp', unidade: '' }))).toHaveProperty('unidade');
+    expect(montarAcesso(dados({ perfil: 'cgp', unidade: '2cia' }), { novo: true }).unidade).toBe('2cia');
     expect(validarAcesso(dados({ email: 'Sem e-mail' }))).toHaveProperty('email');
     expect(validarAcesso(dados({ re: '123' }))).toHaveProperty('re');
     expect(validarAcesso(dados({ perfil: '' }))).toHaveProperty('perfil');
@@ -94,6 +96,7 @@ describe('cadastro', () => {
     expect(motor.claimsDoAcesso({ perfil: 'unidade', unidade: '2cia', re: '194899-7', admin: false })).toEqual({ perfil: 'unidade', unidade: '2cia', re: '194899' });
     expect(motor.claimsDoAcesso({ perfil: 'p3', re: '130155-1', admin: true })).toEqual({ perfil: 'p3', re: '130155', admin: true });
     expect(motor.claimsDoAcesso({ perfil: 'cfp', re: '222222-2', admin: true })).toEqual({ perfil: 'cfp', re: '222222' });
+    expect(motor.claimsDoAcesso({ perfil: 'cgp', unidade: 'ft', re: '444444-4' })).toEqual({ perfil: 'cgp', unidade: 'ft', re: '444444' });
   });
 
   test('e-mail do link: botão, RE e sem HTML do nome', () => {

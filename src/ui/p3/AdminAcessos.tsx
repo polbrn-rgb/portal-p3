@@ -9,6 +9,7 @@ import {
   reBase,
   rotuloAcesso,
   situacaoAcesso,
+  perfilComCia,
   unidadeDaOpm,
   validarAcesso,
   type Acesso,
@@ -31,6 +32,7 @@ export function AdminAcessos({ db }: { db: Firestore }) {
 
   const grupos = [
     ...UNIDADES.map((u) => ({ titulo: u.sigla, filtro: (a: Acesso) => a.perfil === 'unidade' && a.unidade === u.id })),
+    ...UNIDADES.map((u) => ({ titulo: `CGP ${u.sigla}`, filtro: (a: Acesso) => a.perfil === 'cgp' && a.unidade === u.id })),
     { titulo: 'CFP', filtro: (a: Acesso) => a.perfil === 'cfp' },
     { titulo: 'Sala de Operações', filtro: (a: Acesso) => a.perfil === 'sala' },
     { titulo: 'P/3', filtro: (a: Acesso) => a.perfil === 'p3' },
@@ -211,7 +213,7 @@ function FormAcesso({ db, existente, aoTerminar }: { db: Firestore; existente: A
             </select>
           </Campo>
           {d.perfil && <p className="pendente-detalhe">{PERFIS_ACESSO.find((p) => p.id === d.perfil)?.ajuda}</p>}
-          {d.perfil === 'unidade' && (
+          {perfilComCia(d.perfil) && (
             <Campo rotulo="Cia" obrigatorio erro={erros.unidade}>
               <select value={d.unidade} onChange={(e) => mudar('unidade', e.target.value as UnidadeId | '')}>
                 <option value="">Escolha…</option>

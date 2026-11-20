@@ -8,8 +8,13 @@ import {
   excluirMissaoCgp,
   JaEnviadaAoCgp,
   lerFotoCgp,
+  observarFotosCgp,
+  observarMissoesCgp,
+  observarRecadosCgp,
   type RecadoCgp,
 } from '../../data/cgp';
+import { useHash } from '../../lib/navegacao';
+import { useAoVivo } from '../../lib/useAoVivo';
 import {
   diasDoPeriodo,
   idMissaoCgp,
@@ -137,8 +142,44 @@ export function subAbaCgp(hash: string): SubAba {
   return 'missoes';
 }
 
-/** Página do CGP dentro da Cia: Missões, Fotos e Recados. */
+/** Quem entra com o acesso de CGP (por RE): só a página do CGP da Cia dele. */
+export function PaginaCgp({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) {
+  const hash = useHash();
+  const missoes = useAoVivo<MissaoCgp[]>((ok, erro) => observarMissoesCgp(db, unidade, ok, erro), [unidade], 'Não foi possível carregar as missões.');
+  const recados = useAoVivo<RecadoCgp[]>((ok, erro) => observarRecadosCgp(db, unidade, ok, erro), [unidade]);
+  const naAbaFotos = hash.startsWith('#/cgp/fotos');
+  const fotos = useAoVivo<FotoCgp[]>(
+    (ok, erro) => {
+      if (!naAbaFotos) {
+        ok([]);
+        return () => undefined;
+      }
+      return observarFotosCgp(db, unidade, ok, erro);
+    },
+    [unidade, naAbaFotos],
+    'Não foi possível carregar as fotos.',
+  );
+  return (
+    <>
+      <h2 className="titulo-aba-cia">{sigla}</h2>
+      <PainelCgp
+        unidade={unidade}
+        hash={hash}
+        missoes={missoes.valor ?? []}
+        carregando={missoes.carregando}
+        erro={missoes.erro}
+        recados={recados.valor ?? []}
+        fotos={fotos.valor ?? []}
+        carregandoFotos={fotos.carregando}
+        ehCgp
+      />
+    </>
+  );
+}
+
+/** Página do CGP: Missões, Fotos e Recados. Na Cia (administra) ou no acesso do próprio CGP (ehCgp). */
 export function PainelCgp(p: {
+  ehCgp?: boolean;
   unidade: UnidadeId;
   hash: string;
   missoes: MissaoCgp[];
@@ -162,14 +203,25 @@ export function PainelCgp(p: {
         {link('fotos', '#/cgp/fotos', 'Importação de fotos')}
         {link('recados', '#/cgp/recados', 'Recados')}
       </nav>
-      {aba === 'missoes' && <MissoesCgp unidade={p.unidade} lista={p.missoes} carregando={p.carregando} erro={p.erro} />}
+      {aba === 'missoes' && <MissoesCgp unidade={p.unidade} lista={p.missoes} carregando={p.carregando} erro={p.erro} podeExcluir={!p.ehCgp} />}
       {aba === 'fotos' && <FotosCgp unidade={p.unidade} fotos={p.fotos} carregando={p.carregandoFotos} />}
-      {aba === 'recados' && <RecadosCgp unidade={p.unidade} recados={p.recados} />}
+      {aba === 'recados' &&
+        (p.ehCgp ? (
+          p.recados.length ? (
+            <ListaRecadosCgp unidade={p.unidade} recados={p.recados} podeApagar={false} />
+          ) : (
+            <section className="painel">
+              <p className="vazio">Nenhum recado da Cia.</p>
+            </section>
+          )
+        ) : (
+          <RecadosCgp unidade={p.unidade} recados={p.recados} />
+        ))}
     </>
   );
 }
 
-function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boolean; erro: string }) {
+function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boolean; erro: string; podeExcluir: boolean }) {
   const [dia, setDia] = useState(hojeISO);
   const [aExcluir, setAExcluir] = useState('');
   const [aviso, setAviso] = useState('');
@@ -198,7 +250,7 @@ function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boo
         <span className="pendente-detalhe">
           {m.origem === 'numerador' ? 'Numerador da Cia' : 'Demanda da P/3'} · enviada por {m.criadoPor}
         </span>
-        {aExcluir === m.id ? (
+        {!p.podeExcluir ? null : aExcluir === m.id ? (
           <div className="acoes-linha" role="alertdialog" aria-label={`Confirmar exclusão de ${m.numero}`}>
             <span>Tirar do CGP?</span>
             <button className="botao secundario" type="button" onClick={() => setAExcluir('')}>
@@ -222,7 +274,7 @@ function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boo
       <div className="painel-cabecalho">
         <h2>Missões do CGP</h2>
       </div>
-      <p className="item-info">Envie pelo Numerador ou pelas demandas da P/3 (botão "Enviar para o CGP").</p>
+      {p.podeExcluir && <p className="item-info">Envie pelo Numerador ou pelas demandas da P/3 (botão "Enviar para o CGP").</p>}
       <div className="acoes-linha">
         <label className="campo">
           Data
