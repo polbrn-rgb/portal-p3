@@ -144,7 +144,7 @@ function EntrarAdmin({ aoEntrar }: { aoEntrar: (db: Firestore) => void }) {
       <p>Área só do Administrador: zerar o portal e ajustar a numeração. Use a senha própria do Administrador.</p>
       <form onSubmit={entrar} noValidate>
         <Campo rotulo="Senha do Administrador" erro={erro} obrigatorio>
-          <InputSenha autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} />
+          <InputSenha rotulo="Senha do Administrador" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} />
         </Campo>
         <button className="botao destaque" type="submit" disabled={entrando}>
           {entrando ? 'Entrando…' : 'Entrar'}

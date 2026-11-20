@@ -7,7 +7,7 @@ export async function entrar(page: Page, unidade: string, senha: string) {
   const antiga = page.getByRole('button', { name: 'Entrar com a conta da unidade (antiga)' });
   if (await antiga.isVisible()) await antiga.click();
   await page.getByLabel('Unidade').selectOption(unidade);
-  await page.getByLabel('Senha', { exact: true }).fill(senha);
+  await page.getByLabel(/^Senha\s*\*?$/).fill(senha);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 }
 
@@ -18,7 +18,7 @@ export async function entrarRE(page: Page, re: string, senha: string) {
   const pessoal = page.getByRole('button', { name: 'Entrar com RE e senha pessoal' });
   if (await pessoal.isVisible()) await pessoal.click();
   await page.getByLabel('RE').fill(re);
-  await page.getByLabel('Senha', { exact: true }).fill(senha);
+  await page.getByLabel(/^Senha\s*\*?$/).fill(senha);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 }
 
