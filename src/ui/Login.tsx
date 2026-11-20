@@ -1,3 +1,4 @@
+import { InputSenha } from './InputSenha';
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { type FormEvent, useState } from 'react';
 import { emailDeLogin, reBase } from '../domain/acessos';
@@ -102,7 +103,7 @@ function LoginRE() {
         <input type="text" inputMode="text" autoComplete="username" placeholder="ex.: 123456-7" value={re} onChange={(e) => setRe(e.target.value)} />
       </Campo>
       <Campo rotulo="Senha" erro={erros.senha} obrigatorio>
-        <input type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} />
+        <InputSenha autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} />
       </Campo>
       {erro && (
         <p className="mensagem erro" role="alert">
@@ -178,8 +179,8 @@ function LoginUnidade() {
           </select>
         </label>
         <Campo rotulo="Senha" erro={semSenha && !senha ? 'Digite a senha.' : undefined} obrigatorio>
-          <input
-            type="password"
+          <InputSenha
+            
             autoComplete="current-password"
             required
             value={senha}
