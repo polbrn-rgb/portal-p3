@@ -1,0 +1,153 @@
+import { describe, expect, test } from 'vitest';
+import {
+  abasDaProducao,
+  avisosProducao,
+  diasDoMes,
+  IDS_ITENS,
+  idProducao,
+  itensZerados,
+  lerItens,
+  lerQuantidade,
+  nomePlanilha,
+  pelotoesDa,
+  pendencias,
+  rotuloPelotao,
+  somarItens,
+  textoQuantidade,
+  turnosPendentes,
+  validarProducao,
+  validarTalao,
+  type ItemId,
+  type Producao,
+} from '../../src/domain/producao';
+import { PRODUTIVIDADE } from '../../src/domain/rac';
+
+const textos = (x: Partial<Record<ItemId, string>> = {}) => ({ ...(Object.fromEntries(IDS_ITENS.map((id) => [id, ''])) as Record<ItemId, string>), ...x });
+
+function lanc(extra: Partial<Producao>): Producao {
+  return {
+    id: '',
+    unidadeId: '1cia',
+    data: '2026-11-02',
+    mes: '2026-11',
+    pelotao: 'pelA',
+    itens: itensZerados(),
+    taloes: [],
+    lancadoPor: '1ª CIA',
+    lancadoEm: null,
+    atualizadoPor: '1ª CIA',
+    atualizadoEm: null,
+    ...extra,
+  };
+}
+
+describe('pelotões e itens', () => {
+  test('Cia: Pel A–D, RE e RPM; FT: Pel A e B; turnos de 12x36', () => {
+    expect(pelotoesDa('1cia').map((p) => p.id)).toEqual(['pelA', 'pelB', 'pelC', 'pelD', 're', 'rpm']);
+    expect(pelotoesDa('ft').map((p) => p.id)).toEqual(['pelA', 'pelB']);
+    expect(rotuloPelotao('pelA')).toBe('Pel A (dia)');
+    expect(rotuloPelotao('pelD')).toBe('Pel D (noite)');
+    expect(rotuloPelotao('rpm')).toBe('RPM');
+    expect(idProducao('3cia', '2026-11-20', 'pelB')).toBe('3cia_2026-11-20_pelB');
+  });
+
+  test('todo item do RAC (comparativo) tem o mesmo código no lançamento diário', () => {
+    for (const p of PRODUTIVIDADE) expect(IDS_ITENS).toContain(p.id);
+  });
+
+  test('item que faltar no banco vem zerado', () => {
+    expect(lerItens({ pessoasAbordadas: 12, ait: 'x' })).toMatchObject({ pessoasAbordadas: 12, ait: 0, armas: 0 });
+  });
+});
+
+describe('preenchimento', () => {
+  test('vazio é zero; inteiros nas quantidades; kg com vírgula ou ponto e até 3 casas', () => {
+    expect(lerQuantidade('')).toBe(0);
+    expect(lerQuantidade(' 15 ')).toBe(15);
+    expect(lerQuantidade('1,5')).toBeNull();
+    expect(lerQuantidade('-2')).toBeNull();
+    expect(lerQuantidade('0,250', true)).toBe(0.25);
+    expect(lerQuantidade('4.46', true)).toBe(4.46);
+    expect(lerQuantidade('1,2345', true)).toBeNull();
+    expect(lerQuantidade('100000')).toBeNull();
+    expect(textoQuantidade(0)).toBe('');
+    expect(textoQuantidade(0.1, true)).toBe('0,1');
+  });
+
+  test('validação: dia (não pode ser depois de hoje), pelotão da unidade e números', () => {
+    const ok = validarProducao({ data: '2026-11-20', pelotao: 'pelA', textos: textos({ pessoasAbordadas: '30', entorpecentesKg: '0,1' }), taloes: [] }, '1cia', '2026-11-20');
+    expect(ok.erros).toEqual({});
+    expect(ok.itens).toMatchObject({ pessoasAbordadas: 30, entorpecentesKg: 0.1, armas: 0 });
+
+    const ruim = validarProducao({ data: '2026-11-21', pelotao: 'pelC', textos: textos({ armas: 'dois' }), taloes: [] }, 'ft', '2026-11-20');
+    expect(ruim.itens).toBeNull();
+    expect(Object.keys(ruim.erros).sort()).toEqual(['armas', 'data', 'pelotao']);
+  });
+
+  test('talão: obrigatório, sem repetir, com o dia da ocorrência', () => {
+    expect(validarTalao({ numero: '', data: '2026-11-20' }, [])).toBeTruthy();
+    expect(validarTalao({ numero: '2026 1120 5108 01', data: '2026-11-20' }, [])).toBe('');
+    expect(validarTalao({ numero: '20261120510801', data: '2026-11-20' }, [{ numero: '20261120510801', data: '2026-11-20' }])).toMatch(/já está/);
+    expect(validarTalao({ numero: '123', data: '' }, [])).toMatch(/dia/);
+  });
+
+  test('conferências: presos sem ocorrência com prisão, mais ocorrências que presos, talões', () => {
+    const i = itensZerados();
+    expect(avisosProducao(i, [])).toEqual([]);
+    expect(avisosProducao({ ...i, flagrante: 2, ocorrencias: 3 }, [])).toEqual(['Houve presos: informe quantas ocorrências tiveram prisão.']);
+    expect(avisosProducao({ ...i, ocorrenciasComPrisao: 2, flagrante: 1, ocorrencias: 2 }, [{ numero: '1', data: '2026-11-20' }])).toEqual([
+      'Há mais ocorrências com prisão do que presos (flagrante + mandado).',
+    ]);
+    expect(avisosProducao({ ...i, ocorrenciasComPrisao: 1, procurados: 1, ocorrencias: 1 }, [])).toHaveLength(1);
+  });
+});
+
+describe('somas, pendências e planilha', () => {
+  test('soma sem erro de arredondamento no kg', () => {
+    const s = somarItens([lanc({ itens: { ...itensZerados(), entorpecentesKg: 0.1, pessoasAbordadas: 5 } }), lanc({ itens: { ...itensZerados(), entorpecentesKg: 0.2, pessoasAbordadas: 7 } })]);
+    expect(s.entorpecentesKg).toBe(0.3);
+    expect(s.pessoasAbordadas).toBe(12);
+  });
+
+  test('pendências: até ontem, um turno de dia e um de noite por dia (RE/RPM não contam)', () => {
+    expect(diasDoMes('2026-02')).toHaveLength(28);
+    const lista = [
+      lanc({ data: '2026-11-01', pelotao: 'pelA' }),
+      lanc({ data: '2026-11-01', pelotao: 'pelB' }),
+      lanc({ data: '2026-11-02', pelotao: 'pelC' }),
+      lanc({ data: '2026-11-02', pelotao: 'rpm' }),
+    ];
+    const p = pendencias(lista, '2026-11', '2026-11-04', '2026-11-01');
+    expect(p).toEqual([
+      { data: '2026-11-02', faltaDia: false, faltaNoite: true },
+      { data: '2026-11-03', faltaDia: true, faltaNoite: true },
+    ]);
+    expect(turnosPendentes(p)).toBe(3);
+    expect(pendencias([], '2026-12', '2026-11-20', '2026-11-01')).toEqual([]);
+  });
+
+  test('pendências só contam a partir do primeiro lançamento da unidade', () => {
+    expect(pendencias([], '2026-11', '2026-11-20', null)).toEqual([]);
+    const p = pendencias([lanc({ data: '2026-11-18', pelotao: 'pelA' })], '2026-11', '2026-11-20', '2026-11-18');
+    expect(p.map((x) => x.data)).toEqual(['2026-11-18', '2026-11-19']);
+    expect(turnosPendentes(p)).toBe(3);
+  });
+
+  test('planilha: lançamentos, por dia, totais do mês (com o Batalhão) e talões', () => {
+    const lista = [
+      lanc({ unidadeId: '2cia', data: '2026-11-03', pelotao: 'pelB', itens: { ...itensZerados(), armas: 1 }, taloes: [{ numero: '999', data: '2026-11-04' }] }),
+      lanc({ unidadeId: '1cia', data: '2026-11-03', pelotao: 'pelA', itens: { ...itensZerados(), armas: 2, pessoasAbordadas: 40 } }),
+      lanc({ unidadeId: '1cia', data: '2026-11-03', pelotao: 'pelB', itens: { ...itensZerados(), pessoasAbordadas: 10 } }),
+    ];
+    const abas = abasDaProducao(lista, ['1cia', '2cia']);
+    expect(abas.map((a) => a.nome)).toEqual(['Lançamentos', 'Por dia', 'Totais do mês', 'Talões']);
+    const [lancs, porDia, totais, taloes] = abas.map((a) => a.linhas);
+    expect(lancs).toHaveLength(4);
+    expect(lancs[1].slice(0, 5)).toEqual(['03/11/2026', 'terça-feira', '1ª CIA', 'Pel A', 'dia']);
+    expect(porDia[1].slice(0, 5)).toEqual(['03/11/2026', 'terça-feira', '1ª CIA', 2, 50]);
+    expect(totais[0]).toEqual(['Item', '1ª CIA', '2ª CIA', '8º BPM/M']);
+    expect(totais.find((l) => l[0] === 'Armas de fogo apreendidas')).toEqual(['Armas de fogo apreendidas', 2, 1, 3]);
+    expect(taloes[1]).toEqual(['04/11/2026', '999', '2ª CIA', 'Pel B', '03/11/2026']);
+    expect(nomePlanilha('2026-11', '1cia')).toBe('Produtividade 1ª CIA 2026-11.xlsx');
+  });
+});

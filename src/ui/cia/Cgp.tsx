@@ -554,15 +554,3 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
     </section>
   );
 }
-
-/** Aba Sala de Operações da Cia: página própria, a ser montada. */
-export function SalaDaCia() {
-  return (
-    <section className="painel">
-      <div className="painel-cabecalho">
-        <h2>Sala de Operações</h2>
-      </div>
-      <p className="vazio">Página em construção.</p>
-    </section>
-  );
-}
