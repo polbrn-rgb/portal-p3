@@ -196,6 +196,7 @@ export async function atualizarDemanda(
       for (const e of plano.reativar) {
         tx.update(doc(db, 'encaminhamentos', e), {
           ...resumo,
+          observacao: deleteField(),
           status: 'novo',
           resposta: '',
           respondidoPor: '',
@@ -204,7 +205,7 @@ export async function atualizarDemanda(
         });
       }
       for (const e of plano.atualizarResumo) {
-        if (!plano.reativar.includes(e)) tx.update(doc(db, 'encaminhamentos', e), { ...resumo, atualizadoEm: agora });
+        if (!plano.reativar.includes(e)) tx.update(doc(db, 'encaminhamentos', e), { ...resumo, observacao: deleteField(), atualizadoEm: agora });
       }
     },
     { maxAttempts: 10 },

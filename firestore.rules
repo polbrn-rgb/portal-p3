@@ -68,7 +68,9 @@ service cloud.firestore {
 
     match /encaminhamentos/{encaminhamentoId} {
       allow read: if ehP3() || ehDaMinhaUnidade(resource.data);
-      allow create, delete: if ehP3();
+      // A observação da demanda é só da P/3: não pode ir para o encaminhamento da Cia.
+      allow create: if ehP3() && !('observacao' in request.resource.data);
+      allow delete: if ehP3();
       allow update: if ehP3() || (ehDaMinhaUnidade(resource.data) && respostaDaUnidadeValida());
     }
 

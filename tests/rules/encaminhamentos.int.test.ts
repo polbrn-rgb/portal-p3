@@ -158,3 +158,20 @@ describe('demanda apagada fora da lixeira', () => {
     await expect(limparEncaminhamentosOrfaos(cia('1cia'))).rejects.toThrow();
   });
 });
+
+describe('observação é só da P/3', () => {
+  test('não vai para o encaminhamento da Cia (nem ao criar, nem ao editar, e sai dos antigos)', async () => {
+    const n = await criarDemanda(p3, dados(['1cia'], { observacao: 'Só nossa' }));
+    const id = String(n);
+    expect((await encaminhamentosDaDemanda(p3, id))[0]).not.toHaveProperty('observacao');
+
+    // Encaminhamento antigo, gravado antes da mudança, ainda com a observação: some na próxima edição.
+    await env.withSecurityRulesDisabled(async (c) => {
+      await updateDoc(doc(c.firestore(), 'encaminhamentos', `${id}_1cia`), { observacao: 'Só nossa' });
+    });
+    const aberta = dadosDe((await obterDemanda(p3, id))!);
+    await atualizarDemanda(p3, id, aberta, { ...aberta, observacao: 'Outra coisa' });
+    expect((await encaminhamentosDaDemanda(p3, id))[0]).not.toHaveProperty('observacao');
+    expect((await listaDaCia('1cia'))[0]).not.toHaveProperty('observacao');
+  });
+});

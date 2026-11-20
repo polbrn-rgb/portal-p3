@@ -286,7 +286,6 @@ function prazosDaP3(p: {
       titulo: `Prazo · ${numeroExibido(e)} — ${e.saida}`,
       data: e.prazoCia,
       concluido: e.status === 'respondido' || e.status === 'aceito',
-      descricao: e.observacao || undefined,
       href: `#/enc/${e.id}`,
       rotuloLink: 'Abrir demanda',
     });
@@ -487,12 +486,6 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
             <>
               <dt>{enc.origem === 'SEI' ? 'Processo SEI' : 'Nº da origem'}</dt>
               <dd>{enc.numeroOrigem}</dd>
-            </>
-          )}
-          {enc.observacao && (
-            <>
-              <dt>Observação</dt>
-              <dd>{enc.observacao}</dd>
             </>
           )}
         </dl>
