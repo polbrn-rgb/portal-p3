@@ -496,6 +496,58 @@ service cloud.firestore {
           .hasOnly(['saida', 'origem', 'numeroOrigem', 'prazo', 'responsavel', 'observacao', 'status', 'agendaId', 'atualizadoPor', 'atualizadoEm']);
     }
 
+    // CGP de cada Cia/FT: administrado pela própria Cia (sem login próprio). Uma Cia não vê o CGP da outra.
+    // Missão: id fixo "{cia}_{origem}_{ref}" -> a mesma demanda não vai duas vezes (não há update).
+    match /cgpMissoes/{missaoId} {
+      allow get: if ehDaCia(missaoId.split('_')[0]);
+      allow list: if ehDaCia(resource.data.unidadeId);
+      allow delete: if ehDaCia(resource.data.unidadeId);
+      allow create: if ehDaCia(request.resource.data.unidadeId)
+        && missaoId == request.resource.data.unidadeId + '_' + request.resource.data.origem + '_' + request.resource.data.refId
+        && request.resource.data.origem in ['enc', 'numerador']
+        && request.resource.data.inicio is string && request.resource.data.inicio.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.fim is string && request.resource.data.fim.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.fim >= request.resource.data.inicio
+        && request.resource.data.titulo is string && request.resource.data.titulo.size() <= 300
+        && request.resource.data.criadoPor is string && request.resource.data.criadoPor.size() > 0;
+    }
+
+    match /recadosCgp/{id} {
+      allow read, delete: if ehDaCia(resource.data.unidadeId);
+      allow create: if ehDaCia(request.resource.data.unidadeId)
+        && request.resource.data.keys().hasOnly(['unidadeId', 'texto', 'criadoPor', 'criadoEm'])
+        && request.resource.data.texto is string && request.resource.data.texto.size() > 0
+        && request.resource.data.texto.size() <= 2000;
+    }
+
+    // Fotos do CGP: sem limite de quantidade; descrição, local e observação obrigatórios; quem e quando ficam gravados.
+    function fotoCgpValida(id) {
+      let f = request.resource.data;
+      return ehDaCia(f.unidadeId)
+        && f.keys().hasOnly(['unidadeId', 'descricao', 'local', 'observacao', 'miniatura', 'tamanho', 'enviadoPor', 'enviadoEm'])
+        && f.descricao is string && f.descricao.size() > 0 && f.descricao.size() <= 300
+        && f.local is string && f.local.size() > 0 && f.local.size() <= 300
+        && f.observacao is string && f.observacao.size() > 0 && f.observacao.size() <= 300
+        && f.enviadoPor is string && f.enviadoPor.size() > 0
+        && f.enviadoEm == request.time
+        && f.miniatura is string && f.miniatura.size() <= 60000
+        && getAfter(/databases/$(database)/documents/fotosCgpDados/$(id)).data.dados.size() == f.tamanho;
+    }
+
+    match /fotosCgp/{id} {
+      allow read, delete: if ehDaCia(resource.data.unidadeId);
+      allow create: if fotoCgpValida(id);
+    }
+
+    match /fotosCgpDados/{id} {
+      allow read, delete: if ehDaCia(resource.data.unidadeId);
+      allow create: if ehDaCia(request.resource.data.unidadeId)
+        && request.resource.data.keys().hasOnly(['unidadeId', 'dados'])
+        && request.resource.data.dados is string && request.resource.data.dados.size() > 0
+        && request.resource.data.dados.size() <= 900000
+        && existsAfter(/databases/$(database)/documents/fotosCgp/$(id));
+    }
+
     // Contador de cada Cia/tipo/ano: só avança de 1 em 1 (começar de outro número é pelo Administrador).
     match /contadoresCia/{contadorId} {
       allow read: if ehDaCia(contadorId.split('_')[0]);

@@ -39,6 +39,9 @@ import { contarPendentesRac, FormRacCia, ListaRacCia } from './RacCia';
 import { observarDemandasCia } from '../../data/numeradorCia';
 import type { DemandaCia } from '../../domain/numeradorCia';
 import { FormNumeradorCia, ListaNumeradorCia } from './NumeradorCia';
+import { observarFotosCgp, observarMissoesCgp, observarRecadosCgp, type RecadoCgp } from '../../data/cgp';
+import type { FotoCgp, MissaoCgp } from '../../domain/cgp';
+import { EnviarAoCgp, missaoDe, PainelCgp, SalaDaCia } from './Cgp';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'pendentes', rotulo: 'Pendentes' },
@@ -46,11 +49,13 @@ const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda' | 'numerador';
+type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda' | 'numerador' | 'cgp' | 'sala';
 
 function abaDaRota(hash: string): AbaCia | undefined {
   if (hash === '#/agenda') return 'agenda';
   if (hash === '#/numerador' || hash.startsWith('#/numerador/')) return 'numerador';
+  if (hash === '#/cgp' || hash.startsWith('#/cgp/')) return 'cgp';
+  if (hash === '#/sala') return 'sala';
   if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash === '#/rac' || hash.startsWith('#/rac/')) return 'rac';
@@ -99,6 +104,22 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     'Não foi possível carregar o Numerador.',
   );
   const numeradorAberto = /^#\/numerador\/(.+)$/.exec(hash)?.[1];
+  // CGP da Cia: as missões ficam sempre carregadas (para avisar "já enviada" nas demandas); as fotos só na aba.
+  const missoesCgp = useAoVivo<MissaoCgp[]>((ok, erro) => observarMissoesCgp(db, unidade, ok, erro), [unidade], 'Não foi possível carregar o CGP.');
+  const recadosCgp = useAoVivo<RecadoCgp[]>((ok, erro) => observarRecadosCgp(db, unidade, ok, erro), [unidade]);
+  const naAbaFotos = hash.startsWith('#/cgp/fotos');
+  const fotosCgp = useAoVivo<FotoCgp[]>(
+    (ok, erro) => {
+      if (!naAbaFotos) {
+        ok([]);
+        return () => undefined;
+      }
+      return observarFotosCgp(db, unidade, ok, erro);
+    },
+    [unidade, naAbaFotos],
+    'Não foi possível carregar as fotos.',
+  );
+  const missoes = missoesCgp.valor ?? [];
   const itens = [
     ...ABAS.map((a) => ({
       id: a.id as AbaCia,
@@ -154,6 +175,8 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     contador: (numerador.valor ?? []).filter((d) => d.status === 'em_aberto' && !!d.prazo && d.prazo < hoje).length,
   });
   itens.push({ id: 'agenda', href: '#/agenda', rotulo: 'Agenda', contador: 0 });
+  itens.push({ id: 'cgp', href: '#/cgp', rotulo: 'CGP', contador: 0 });
+  itens.push({ id: 'sala', href: '#/sala', rotulo: 'Sala de Operações', contador: 0 });
 
   return (
     <div className="layout-p3">
@@ -164,12 +187,26 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
 
   function conteudo(): ReactNode {
     if (ativa === 'agenda') return <Agenda rota={hash} dono={unidade} prazos={prazos} />;
+    if (ativa === 'sala') return <SalaDaCia />;
+    if (ativa === 'cgp')
+      return (
+        <PainelCgp
+          unidade={unidade}
+          hash={hash}
+          missoes={missoes}
+          carregando={missoesCgp.carregando}
+          erro={missoesCgp.erro}
+          recados={recadosCgp.valor ?? []}
+          fotos={fotosCgp.valor ?? []}
+          carregandoFotos={fotosCgp.carregando}
+        />
+      );
     if (ativa === 'numerador') {
       if (numeradorAberto === 'nova') return <FormNumeradorCia key="nova" unidade={unidade} />;
       if (numeradorAberto) {
         if (numerador.carregando) return <p className="carregando">Carregando…</p>;
         const d = numerador.valor?.find((x) => x.id === numeradorAberto);
-        if (d) return <FormNumeradorCia key={d.id} unidade={unidade} existente={d} />;
+        if (d) return <FormNumeradorCia key={d.id} unidade={unidade} existente={d} missoesCgp={missoes} />;
         return (
           <section className="painel">
             <p className="mensagem erro" role="alert">
@@ -179,7 +216,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
           </section>
         );
       }
-      return <ListaNumeradorCia unidade={unidade} lista={numerador.valor ?? []} carregando={numerador.carregando} erro={numerador.erro} />;
+      return <ListaNumeradorCia unidade={unidade} lista={numerador.valor ?? []} carregando={numerador.carregando} erro={numerador.erro} missoesCgp={missoes} />;
     }
     if (ativa === 'rac') {
       if (racMeses.carregando || racs.carregando) return <p className="carregando">Carregando…</p>;
@@ -241,7 +278,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     }
 
     if (aberto) {
-      if (encAberto) return <DetalheEncaminhamento key={encAberto.id} enc={encAberto} />;
+      if (encAberto) return <DetalheEncaminhamento key={encAberto.id} enc={encAberto} missoesCgp={missoes} />;
       if (encs.carregando) return <p className="carregando">Carregando…</p>;
       return (
         <section className="painel">
@@ -261,6 +298,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
         erro={encs.erro}
         solicitacoes={solicitacoes.valor ?? []}
         eaps={eaps.valor ?? []}
+        missoesCgp={missoes}
       />
     );
   }
@@ -360,6 +398,7 @@ function ListaUnidade(p: {
   erro: string;
   solicitacoes: SolicitacaoEfetivo[];
   eaps: RespostaEap[];
+  missoesCgp: MissaoCgp[];
 }) {
   const hoje = hojeISO();
   const visiveis = p.lista.filter((e) => abaDoEncaminhamento(e.status) === p.aba);
@@ -402,7 +441,10 @@ function ListaUnidade(p: {
                 <span className="item-saida">{e.saida}</span>
                 <span className="item-info">
                   <span className="item-cat">{e.categoria}</span>
-                  <span className="item-prazo">{e.prazoCia ? `Prazo ${formatarData(e.prazoCia)}` : ''}</span>
+                  <span className="item-prazo">
+                    {missaoDe(p.missoesCgp, e.unidadeId, 'enc', e.id) ? '✅ CGP · ' : ''}
+                    {e.prazoCia ? `Prazo ${formatarData(e.prazoCia)}` : ''}
+                  </span>
                 </span>
               </a>
             </li>
@@ -421,7 +463,7 @@ function lerNome(): string {
   }
 }
 
-function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
+function DetalheEncaminhamento({ enc, missoesCgp }: { enc: Encaminhamento; missoesCgp: MissaoCgp[] }) {
   const [resposta, setResposta] = useState(enc.resposta);
   const [nome, setNome] = useState(quemSou() ?? (enc.respondidoPor || lerNome()));
   const [ocupado, setOcupado] = useState(false);
@@ -497,6 +539,17 @@ function DetalheEncaminhamento({ enc }: { enc: Encaminhamento }) {
           )}
         </dl>
         {enc.arquivoId && <BaixarPdf id={enc.arquivoId} nome={enc.arquivoNome || 'documento.pdf'} />}
+        {enc.status !== 'cancelado' && (
+          <EnviarAoCgp
+            unidade={enc.unidadeId}
+            origem="enc"
+            refId={enc.id}
+            numero={enc.numeroDocumento || `Nº ${enc.numero}`}
+            titulo={enc.saida}
+            fimSugerido={enc.prazoCia}
+            missoes={missoesCgp}
+          />
+        )}
       </div>
 
       {enc.status === 'devolvido' && enc.motivoDevolucao && (
