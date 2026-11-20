@@ -24,6 +24,8 @@ export type Sessao =
   /** admin: 'direto' (chefe/encarregado com login individual), 'senha' (conta antiga da P/3: pede a senha do Administrador), 'nao'. */
   | { tipo: 'p3'; sigla: string; admin: 'direto' | 'senha' | 'nao' }
   | { tipo: 'unidade'; unidade: UnidadeId; sigla: string }
+  /** CGP de uma Cia (acesso por RE): só a página do CGP daquela Cia. */
+  | { tipo: 'cgp'; unidade: UnidadeId; sigla: string }
   | { tipo: SetorId; sigla: string }
   | { tipo: 'sem-perfil' };
 
@@ -67,6 +69,10 @@ export function sessaoDosClaims(claims: Record<string, unknown>): Sessao {
   if (claims.perfil === 'unidade') {
     const unidade = UNIDADES.find((u) => u.id === claims.unidade);
     if (unidade) return { tipo: 'unidade', unidade: unidade.id, sigla: unidade.sigla };
+  }
+  if (claims.perfil === 'cgp') {
+    const unidade = UNIDADES.find((u) => u.id === claims.unidade);
+    if (unidade) return { tipo: 'cgp', unidade: unidade.id, sigla: `CGP ${unidade.sigla}` };
   }
   const setor = SETORES.find((s) => s.id === claims.perfil);
   if (setor) return { tipo: setor.id, sigla: setor.sigla };

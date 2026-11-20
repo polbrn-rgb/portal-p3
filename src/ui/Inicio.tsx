@@ -9,6 +9,7 @@ import { PainelSala } from './setores/PainelSala';
 import { Recados } from './setores/Recados';
 import { Topo } from './Topo';
 import { Agenda } from './p3/Agenda';
+import { PaginaCgp } from './cia/Cgp';
 
 export function Inicio({ sessao }: { sessao: Sessao }) {
   return (
@@ -29,6 +30,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
         </>
       )}
       {sessao.tipo === 'cfp' && <PaginasCfp />}
+      {sessao.tipo === 'cgp' && <PaginaCgp unidade={sessao.unidade} sigla={sessao.sigla} />}
       {sessao.tipo === 'sem-perfil' && (
         <section className="cartao" role="alert">
           <h2>Conta sem perfil</h2>

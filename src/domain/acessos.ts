@@ -12,10 +12,14 @@ export const DOMINIO_LOGIN = 'portal-p3.firebaseapp.com';
 /** Chefe e encarregado da P/3: veem a aba Administrador. */
 export const RES_ADMIN = ['144602', '130155'] as const;
 
-export type PerfilAcesso = 'p3' | 'unidade' | 'cfp' | 'sala';
+export type PerfilAcesso = 'p3' | 'unidade' | 'cgp' | 'cfp' | 'sala';
+
+/** Perfis que pertencem a uma Cia (pedem a Cia no cadastro). */
+export const perfilComCia = (p: PerfilAcesso | ''): boolean => p === 'unidade' || p === 'cgp';
 
 export const PERFIS_ACESSO: readonly { id: PerfilAcesso; rotulo: string; ajuda: string }[] = [
   { id: 'unidade', rotulo: 'Cia / Força Tática', ajuda: 'Só a página da própria Cia.' },
+  { id: 'cgp', rotulo: 'CGP de Cia / FT', ajuda: 'Só a página do CGP da Cia escolhida.' },
   { id: 'cfp', rotulo: 'CFP', ajuda: 'Página do CFP e da Sala de Operações.' },
   { id: 'sala', rotulo: 'Sala de Operações', ajuda: 'Só a página da Sala de Operações.' },
   { id: 'p3', rotulo: 'P/3', ajuda: 'O sistema todo (Administrador só para o chefe e o encarregado).' },
@@ -92,7 +96,7 @@ export function validarAcesso(d: DadosAcesso): ErrosAcesso {
   if (!d.posto.trim()) e.posto = 'Informe o posto/graduação.';
   if (!EMAIL.test(d.email.trim())) e.email = 'Informe o e-mail funcional (é para onde vão os links de senha).';
   if (!d.perfil) e.perfil = 'Escolha o acesso.';
-  if (d.perfil === 'unidade' && !d.unidade) e.unidade = 'Escolha a Cia.';
+  if (perfilComCia(d.perfil) && !d.unidade) e.unidade = 'Escolha a Cia.';
   return e;
 }
 
@@ -106,7 +110,7 @@ export function montarAcesso(d: DadosAcesso, opcoes: { novo: boolean; ativo?: bo
     posto: d.posto.trim(),
     email: d.email.trim().toLowerCase(),
     perfil,
-    unidade: perfil === 'unidade' ? d.unidade : '',
+    unidade: perfilComCia(perfil) ? d.unidade : '',
     manual: d.manual,
     admin: perfil === 'p3' && ehAdminRE(d.re),
     ativo: opcoes.ativo ?? true,
@@ -119,6 +123,7 @@ export function montarAcesso(d: DadosAcesso, opcoes: { novo: boolean; ativo?: bo
 
 export function rotuloAcesso(a: Pick<Acesso, 'perfil' | 'unidade' | 'admin'>): string {
   if (a.perfil === 'unidade') return UNIDADES.find((u) => u.id === a.unidade)?.sigla ?? 'Cia';
+  if (a.perfil === 'cgp') return `CGP ${UNIDADES.find((u) => u.id === a.unidade)?.sigla ?? ''}`.trim();
   if (a.perfil === 'p3') return a.admin ? 'P/3 + Administrador' : 'P/3';
   return PERFIS_ACESSO.find((p) => p.id === a.perfil)?.rotulo ?? a.perfil;
 }

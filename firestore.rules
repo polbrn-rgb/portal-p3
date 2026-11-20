@@ -496,11 +496,19 @@ service cloud.firestore {
           .hasOnly(['saida', 'origem', 'numeroOrigem', 'prazo', 'responsavel', 'observacao', 'status', 'agendaId', 'atualizadoPor', 'atualizadoEm']);
     }
 
-    // CGP de cada Cia/FT: administrado pela própria Cia (sem login próprio). Uma Cia não vê o CGP da outra.
+    // CGP de cada Cia/FT: a Cia administra; o CGP (acesso por RE, perfil 'cgp' + unidade) entra só na página dele.
+    // Uma Cia (e o CGP dela) não vê o CGP da outra.
+    function ehCgpDa(unidade) {
+      return logado() && request.auth.token.perfil == 'cgp'
+        && request.auth.token.get('unidade', '') == unidade;
+    }
+    function veCgp(unidade) {
+      return ehDaCia(unidade) || ehCgpDa(unidade);
+    }
     // Missão: id fixo "{cia}_{origem}_{ref}" -> a mesma demanda não vai duas vezes (não há update).
     match /cgpMissoes/{missaoId} {
-      allow get: if ehDaCia(missaoId.split('_')[0]);
-      allow list: if ehDaCia(resource.data.unidadeId);
+      allow get: if veCgp(missaoId.split('_')[0]);
+      allow list: if veCgp(resource.data.unidadeId);
       allow delete: if ehDaCia(resource.data.unidadeId);
       allow create: if ehDaCia(request.resource.data.unidadeId)
         && missaoId == request.resource.data.unidadeId + '_' + request.resource.data.origem + '_' + request.resource.data.refId
@@ -513,7 +521,8 @@ service cloud.firestore {
     }
 
     match /recadosCgp/{id} {
-      allow read, delete: if ehDaCia(resource.data.unidadeId);
+      allow read: if veCgp(resource.data.unidadeId);
+      allow delete: if ehDaCia(resource.data.unidadeId);
       allow create: if ehDaCia(request.resource.data.unidadeId)
         && request.resource.data.keys().hasOnly(['unidadeId', 'texto', 'criadoPor', 'criadoEm'])
         && request.resource.data.texto is string && request.resource.data.texto.size() > 0
@@ -523,7 +532,7 @@ service cloud.firestore {
     // Fotos do CGP: sem limite de quantidade; descrição, local e observação obrigatórios; quem e quando ficam gravados.
     function fotoCgpValida(id) {
       let f = request.resource.data;
-      return ehDaCia(f.unidadeId)
+      return veCgp(f.unidadeId)
         && f.keys().hasOnly(['unidadeId', 'descricao', 'local', 'observacao', 'miniatura', 'tamanho', 'enviadoPor', 'enviadoEm'])
         && f.descricao is string && f.descricao.size() > 0 && f.descricao.size() <= 300
         && f.local is string && f.local.size() > 0 && f.local.size() <= 300
@@ -535,13 +544,13 @@ service cloud.firestore {
     }
 
     match /fotosCgp/{id} {
-      allow read, delete: if ehDaCia(resource.data.unidadeId);
+      allow read, delete: if veCgp(resource.data.unidadeId);
       allow create: if fotoCgpValida(id);
     }
 
     match /fotosCgpDados/{id} {
-      allow read, delete: if ehDaCia(resource.data.unidadeId);
-      allow create: if ehDaCia(request.resource.data.unidadeId)
+      allow read, delete: if veCgp(resource.data.unidadeId);
+      allow create: if veCgp(request.resource.data.unidadeId)
         && request.resource.data.keys().hasOnly(['unidadeId', 'dados'])
         && request.resource.data.dados is string && request.resource.data.dados.size() > 0
         && request.resource.data.dados.size() <= 900000

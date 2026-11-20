@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-19';
+var VERSAO_LOGICA = '2026-11-20';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -787,7 +787,7 @@ function emailDeLoginAcesso(re) {
 /** Perfil gravado na conta (custom claims): é o que as regras do banco e o portal leem. */
 function claimsDoAcesso(a) {
   var c = { perfil: a.perfil, re: normalizarRE(a.re) };
-  if (a.perfil === 'unidade') c.unidade = a.unidade;
+  if (a.perfil === 'unidade' || a.perfil === 'cgp') c.unidade = a.unidade;
   if (a.perfil === 'p3' && a.admin === true) c.admin = true;
   return c;
 }
