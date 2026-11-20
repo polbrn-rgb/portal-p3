@@ -14,6 +14,7 @@ test('Numerador da Cia: número 8BPMM-xxx/303/AA e prazo na Agenda', async ({ pa
   await irParaAbaCia(page, 'Numerador');
   await page.getByRole('link', { name: '+ Nova demanda' }).click();
   await page.getByLabel('Demanda (resumo)').fill(assunto);
+  await expect(page.getByLabel('Responsável (quem está logado)')).toHaveValue('3ª CIA');
   await page.getByLabel('Prazo (vai para a Agenda)').fill(prazo);
   await page.getByRole('button', { name: 'Gerar número' }).click();
   await expect(page.locator('.numero-gerado')).toHaveText(new RegExp(`^OFÍCIO 8BPMM-\\d{3}/303/${ano}$`));
