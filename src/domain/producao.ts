@@ -4,7 +4,7 @@
 // - Força Tática: Pel A e Pel B de dia, em dias alternados (não tem turno da noite).
 // - Um lançamento por pelotão por dia de serviço (o turno da noite usa a data em que começou).
 // - O resultado da BCS entra no resultado do pelotão.
-// - Os números dos talões ficam guardados com a data da ocorrência: a P/3 usa para colher os dados oficiais do QMO.
+// - Nos flagrantes de delito ficam o nº do talão, o nº do BOPC e o dia da ocorrência: a P/3 usa para colher os dados oficiais do QMO.
 //
 // É o banco de onde saem as planilhas (CPA diário, RAC por pelotão, trimestral, BCS...). Os códigos dos itens são os
 // mesmos do RAC (domain/rac.ts) para o RAC poder ser preenchido daqui.
@@ -75,13 +75,19 @@ export const ITENS_PRODUCAO = [
   { id: 'procurados', rotulo: 'Procurados capturados (presos por mandado)', grupo: 'prisoes' },
   { id: 'atosInfracionais', rotulo: 'Atos infracionais (adolescentes apreendidos)', grupo: 'prisoes' },
   { id: 'armas', rotulo: 'Armas de fogo apreendidas', grupo: 'apreensoes' },
-  { id: 'entorpecentesKg', rotulo: 'Entorpecentes apreendidos (kg)', grupo: 'apreensoes', decimal: true },
-  { id: 'veiculosRecuperados', rotulo: 'Veículos recuperados', grupo: 'apreensoes' },
-  { id: 'veiculosApreendidos', rotulo: 'Carros apreendidos', grupo: 'apreensoes' },
-  { id: 'motosApreendidas', rotulo: 'Motos apreendidas', grupo: 'apreensoes' },
+  { id: 'maconhaKg', rotulo: 'Maconha (kg)', grupo: 'apreensoes', decimal: true },
+  { id: 'cocainaKg', rotulo: 'Cocaína (kg)', grupo: 'apreensoes', decimal: true },
+  { id: 'crackKg', rotulo: 'Crack (kg)', grupo: 'apreensoes', decimal: true },
+  { id: 'outrasDrogasKg', rotulo: 'Outras drogas (kg)', grupo: 'apreensoes', decimal: true },
+  { id: 'veiculosRecuperados', rotulo: 'Veículos recuperados (L01)', grupo: 'apreensoes' },
+  { id: 'veiculosApreendidos', rotulo: 'Carros apreendidos pela delegacia', grupo: 'apreensoes' },
+  { id: 'motosApreendidas', rotulo: 'Motos apreendidas pela delegacia', grupo: 'apreensoes' },
   { id: 'documentos', rotulo: 'Documentos apreendidos', grupo: 'apreensoes' },
   { id: 'ait', rotulo: 'AIT (CET)', grupo: 'transito' },
   { id: 'ai', rotulo: 'AI (DETRAN)', grupo: 'transito' },
+  { id: 'carrosRemovidos', rotulo: 'Carros removidos ao pátio', grupo: 'transito' },
+  { id: 'motosRemovidas', rotulo: 'Motos removidas ao pátio', grupo: 'transito' },
+  { id: 'ciclomotoresRemovidos', rotulo: 'Ciclomotores removidos ao pátio', grupo: 'transito' },
   { id: 'ocorrencias', rotulo: 'Ocorrências atendidas', grupo: 'registros' },
   { id: 'bopm', rotulo: 'BOPM elaborados', grupo: 'registros' },
   { id: 'operacoes', rotulo: 'Operações realizadas', grupo: 'registros' },
@@ -94,11 +100,18 @@ export type Itens = Record<ItemId, number>;
 export const IDS_ITENS = ITENS_PRODUCAO.map((i) => i.id) as ItemId[];
 export const ehDecimal = (id: ItemId): boolean => ITENS_PRODUCAO.some((i) => i.id === id && 'decimal' in i && i.decimal);
 
+/** Entorpecentes: soma dos tipos (a planilha do CPA e a BCS pedem o total em kg). */
+export const IDS_DROGAS: readonly ItemId[] = ['maconhaKg', 'cocainaKg', 'crackKg', 'outrasDrogasKg'];
+export function totalDrogasKg(itens: Itens): number {
+  return Math.round(IDS_DROGAS.reduce((s, id) => s + (itens[id] ?? 0), 0) * 1000) / 1000;
+}
+
 export const MAXIMO_QUANTIDADE = 99_999;
 export const MAXIMO_TALOES = 100;
 export const LIMITE_TALAO = 30;
 
-export type Talao = { numero: string; data: string };
+/** Flagrante de delito: nº do talão, nº do BOPC (pode ficar para depois) e o dia da ocorrência. */
+export type Talao = { numero: string; bopc: string; data: string };
 
 export type Producao = {
   id: string;
@@ -158,14 +171,18 @@ export function normalizarTalao(numero: string): string {
   return numero.replace(/\s+/g, '').toUpperCase();
 }
 
+const NUMERO_VALIDO = /^[0-9A-Z./-]+$/;
+
 /** '' = pode incluir; senão, o erro. */
 export function validarTalao(t: Talao, ja: readonly Talao[]): string {
   const n = normalizarTalao(t.numero);
+  const bopc = normalizarTalao(t.bopc ?? '');
   if (!n) return 'Digite o número do talão.';
-  if (n.length > LIMITE_TALAO || !/^[0-9A-Z./-]+$/.test(n)) return 'Use só números (e letras, se o talão tiver).';
+  if (n.length > LIMITE_TALAO || !NUMERO_VALIDO.test(n)) return 'Talão: use só números (e letras, se tiver).';
+  if (bopc && (bopc.length > LIMITE_TALAO || !NUMERO_VALIDO.test(bopc))) return 'BOPC: use só números (e letras, se tiver).';
   if (!ehDataISO(t.data)) return 'Informe o dia da ocorrência.';
   if (ja.some((x) => normalizarTalao(x.numero) === n)) return 'Este talão já está na lista.';
-  if (ja.length >= MAXIMO_TALOES) return `Até ${MAXIMO_TALOES} talões por lançamento.`;
+  if (ja.length >= MAXIMO_TALOES) return `Até ${MAXIMO_TALOES} flagrantes por lançamento.`;
   return '';
 }
 
@@ -188,7 +205,7 @@ export function validarProducao(
     if (v === null) erros[it.id] = decimal ? 'Número em kg, com até 3 casas (ex.: 0,250).' : 'Só números inteiros.';
     else itens[it.id] = v;
   }
-  if (p.taloes.length > MAXIMO_TALOES) erros.taloes = `Até ${MAXIMO_TALOES} talões por lançamento.`;
+  if (p.taloes.length > MAXIMO_TALOES) erros.taloes = `Até ${MAXIMO_TALOES} flagrantes por lançamento.`;
   return { erros, itens: Object.keys(erros).length ? null : itens };
 }
 
@@ -199,7 +216,8 @@ export function avisosProducao(itens: Itens, taloes: readonly Talao[]): string[]
   if (presos > 0 && itens.ocorrenciasComPrisao === 0) avisos.push('Houve presos: informe quantas ocorrências tiveram prisão.');
   if (itens.ocorrenciasComPrisao > presos) avisos.push('Há mais ocorrências com prisão do que presos (flagrante + mandado).');
   if (itens.ocorrenciasComPrisao > itens.ocorrencias) avisos.push('Ocorrências atendidas menor que as ocorrências com prisão.');
-  if (itens.ocorrenciasComPrisao > 0 && taloes.length === 0) avisos.push('Anote os talões das ocorrências com prisão: a P/3 usa para colher os dados.');
+  if (itens.flagrante > 0 && taloes.length === 0) avisos.push('Houve flagrante: anote o nº do talão e o nº do BOPC (a P/3 usa para colher os dados).');
+  if (taloes.some((t) => !t.bopc)) avisos.push('Há flagrante sem nº do BOPC: complete quando tiver.');
   return avisos;
 }
 
@@ -274,22 +292,28 @@ const quando = (d: Date | null) =>
 
 /**
  * A planilha do mês (o "banco" aberto): todos os lançamentos, a soma por dia de cada unidade,
- * os totais do mês por unidade e os talões.
+ * os totais do mês por unidade e os flagrantes (talão e BOPC).
  */
 export function abasDaProducao(lancamentos: readonly Producao[], unidades: readonly UnidadeId[]): AbaPlanilha[] {
   const lista = ordenar(lancamentos.filter((l) => unidades.includes(l.unidadeId)));
-  const rotulos = ITENS_PRODUCAO.map((i) => i.rotulo);
+  // Colunas: os itens, com o total de entorpecentes logo depois dos tipos de droga.
+  const colunas: { rotulo: string; valor: (i: Itens) => number }[] = ITENS_PRODUCAO.flatMap((it) => {
+    const c = { rotulo: it.rotulo, valor: (i: Itens) => i[it.id] };
+    return it.id === 'outrasDrogasKg' ? [c, { rotulo: 'Entorpecentes - total (kg)', valor: totalDrogasKg }] : [c];
+  });
+  const rotulos = colunas.map((c) => c.rotulo);
+  const flag = (t: Talao) => (t.bopc ? `${t.numero} / BOPC ${t.bopc}` : t.numero);
 
   const linhasLanc: Celula[][] = [
-    ['Dia do serviço', 'Dia da semana', 'Unidade', 'Pelotão', 'Turno', ...rotulos, 'Talões', 'Lançado por', 'Lançado em', 'Atualizado por', 'Atualizado em'],
+    ['Dia do serviço', 'Dia da semana', 'Unidade', 'Pelotão', 'Turno', ...rotulos, 'Flagrantes (talão / BOPC)', 'Lançado por', 'Lançado em', 'Atualizado por', 'Atualizado em'],
     ...lista.map((l) => [
       formatarData(l.data),
       diaDaSemanaPorExtenso(l.data),
       siglaDe(l.unidadeId),
       PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao,
       turnoDo(l.pelotao, l.unidadeId),
-      ...IDS_ITENS.map((id) => l.itens[id]),
-      l.taloes.map((t) => t.numero).join(', '),
+      ...colunas.map((c) => c.valor(l.itens)),
+      l.taloes.map(flag).join(', '),
       l.lancadoPor,
       quando(l.lancadoEm),
       l.atualizadoPor,
@@ -307,7 +331,7 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
     ...[...porDia.entries()].map(([k, ls]) => {
       const [data, u] = k.split('|');
       const soma = somarItens(ls);
-      return [formatarData(data), diaDaSemanaPorExtenso(data), siglaDe(u), ls.length, ...IDS_ITENS.map((id) => soma[id])];
+      return [formatarData(data), diaDaSemanaPorExtenso(data), siglaDe(u), ls.length, ...colunas.map((c) => c.valor(soma))];
     }),
   ];
 
@@ -315,23 +339,23 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
   const geral = somarItens(lista);
   const linhasTotais: Celula[][] = [
     ['Item', ...unidades.map(siglaDe), ...(unidades.length > 1 ? ['8º BPM/M'] : [])],
-    ...ITENS_PRODUCAO.map((it, i) => [it.rotulo, ...totais.map((t) => t[IDS_ITENS[i]]), ...(unidades.length > 1 ? [geral[IDS_ITENS[i]]] : [])]),
+    ...colunas.map((c) => [c.rotulo, ...totais.map((t) => c.valor(t)), ...(unidades.length > 1 ? [c.valor(geral)] : [])]),
     ['Lançamentos', ...unidades.map((u) => lista.filter((l) => l.unidadeId === u).length), ...(unidades.length > 1 ? [lista.length] : [])],
   ];
 
   const linhasTaloes: Celula[][] = [
-    ['Dia da ocorrência', 'Nº do talão', 'Unidade', 'Pelotão', 'Dia do serviço'],
+    ['Dia da ocorrência', 'Nº do talão', 'Nº do BOPC', 'Unidade', 'Pelotão', 'Dia do serviço'],
     ...lista
       .flatMap((l) => l.taloes.map((t) => ({ t, l })))
       .sort((a, b) => a.t.data.localeCompare(b.t.data) || ordemUnidade(a.l.unidadeId) - ordemUnidade(b.l.unidadeId))
-      .map(({ t, l }) => [formatarData(t.data), t.numero, siglaDe(l.unidadeId), PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao, formatarData(l.data)]),
+      .map(({ t, l }) => [formatarData(t.data), t.numero, t.bopc, siglaDe(l.unidadeId), PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao, formatarData(l.data)]),
   ];
 
   return [
     { nome: 'Lançamentos', linhas: linhasLanc },
     { nome: 'Por dia', linhas: linhasDia },
     { nome: 'Totais do mês', linhas: linhasTotais },
-    { nome: 'Talões', linhas: linhasTaloes },
+    { nome: 'Flagrantes', linhas: linhasTaloes },
   ];
 }
 

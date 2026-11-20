@@ -32,7 +32,9 @@ function paraProducao(id: string, x: DocumentData): Producao {
     pelotao: x.pelotao,
     itens: lerItens(x.itens),
     taloes: Array.isArray(x.taloes)
-      ? x.taloes.filter((t: Partial<Talao>) => t && typeof t.numero === 'string').map((t: Talao) => ({ numero: t.numero, data: t.data ?? '' }))
+      ? x.taloes
+          .filter((t: Partial<Talao>) => t && typeof t.numero === 'string')
+          .map((t: Partial<Talao>) => ({ numero: t.numero ?? '', bopc: t.bopc ?? '', data: t.data ?? '' }))
       : [],
     lancadoPor: x.lancadoPor ?? '',
     lancadoEm: quando(x.lancadoEm),
@@ -59,7 +61,7 @@ export async function salvarProducao(
       mes: p.data.slice(0, 7),
       pelotao: p.pelotao,
       itens: { ...p.itens },
-      taloes: p.taloes.map((t) => ({ numero: normalizarTalao(t.numero), data: t.data })),
+      taloes: p.taloes.map((t) => ({ numero: normalizarTalao(t.numero), bopc: normalizarTalao(t.bopc ?? ''), data: t.data })),
       lancadoPor: antes ? antes.lancadoPor : p.por,
       lancadoEm: antes ? antes.lancadoEm : serverTimestamp(),
       atualizadoPor: p.por,

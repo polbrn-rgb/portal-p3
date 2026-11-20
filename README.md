@@ -92,18 +92,20 @@ entra no do pelotão.
     lançamento cobram um lançamento por dia.
   - RE e RPM lançam à parte.
   - O turno da noite usa a data em que começou.
-- **Itens** (20): abordagens, prisões, apreensões, trânsito, atendimentos e registros. Os códigos são os mesmos do RAC,
-  e a lista cobre a planilha diária do CPA, o RAC por pelotão, o trimestral e a BCS. O que fica em branco conta como zero.
-- **Talões**: o número do talão de cada ocorrência, com o dia em que ela aconteceu, para a P/3 colher os dados
-  oficiais do QMO.
+- **Itens** (26): abordagens, prisões, apreensões (drogas por tipo em kg: maconha, cocaína, crack e outras, com o
+  total calculado; veículos recuperados (L01); carros e motos apreendidos pela delegacia), trânsito (AIT, AI e carros,
+  motos e ciclomotores removidos ao pátio), atendimentos e registros. Os códigos são os mesmos do RAC. O que fica em
+  branco conta como zero.
+- **Flagrantes de delito**: preencher só em caso de flagrante, com o nº do talão, o nº do BOPC (pode ser completado
+  depois) e o dia da ocorrência, para a P/3 colher os dados oficiais do QMO.
 - **Conferências** aparecem na hora, mas não impedem salvar. Exemplos: houve presos e nenhuma ocorrência com prisão;
   mais ocorrências com prisão do que presos.
 - **Um lançamento por pelotão por dia**. Ao abrir de novo, ele é corrigido. Ficam gravados quem lançou primeiro e quem
   corrigiu por último.
-- **Resumo do mês** (na Cia): turnos sem lançamento, totais por pelotão, lançamentos e talões, e a planilha da Cia.
+- **Resumo do mês** (na Cia): turnos sem lançamento, totais por pelotão, lançamentos e flagrantes, e a planilha da Cia.
   Os turnos sem lançamento contam a partir do primeiro lançamento de cada Cia.
 - **P/3 → Operações → Produtividade**: totais do mês por Cia e do 8º BPM/M, turnos sem lançamento e a planilha do
-  Batalhão, com as abas Lançamentos, Por dia, Totais do mês e Talões.
+  Batalhão, com as abas Lançamentos, Por dia, Totais do mês e Flagrantes.
 
 Banco: coleção `producao`, um documento por pelotão por dia (`{cia}_{AAAA-MM-DD}_{pelotão}`). É a base para montar
 as outras planilhas e as rotinas de atualização.

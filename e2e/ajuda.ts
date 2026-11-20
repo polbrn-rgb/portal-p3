@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Entrada antiga (conta da unidade). */
 export async function entrar(page: Page, unidade: string, senha: string) {
@@ -38,11 +38,21 @@ export async function irPara(page: Page, secao: string | RegExp) {
   // Espera a tela da P/3 aparecer depois do login (fechada no celular, a gaveta fica fora da árvore de acessibilidade).
   await page.locator('#menu-p3').waitFor({ state: 'attached' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });
-  if (await botao.isVisible()) await botao.click();
-  await page
+  const link = page
     .getByRole('navigation', { name: 'Seções da P/3' })
-    .getByRole('link', typeof secao === 'string' ? { name: secao, exact: true } : { name: secao })
-    .click();
+    .getByRole('link', typeof secao === 'string' ? { name: secao, exact: true } : { name: secao });
+  await abrirEClicar(botao, link);
+}
+
+/**
+ * No celular, abre o ☰ e toca no item. Logo depois do login a gaveta às vezes não abre no primeiro toque
+ * (a tela ainda está terminando de desenhar): tenta de novo em vez de esperar até estourar o tempo do teste.
+ */
+async function abrirEClicar(botao: Locator, link: Locator) {
+  await expect(async () => {
+    if (!(await link.isVisible()) && (await botao.isVisible())) await botao.click();
+    await link.click({ timeout: 3000 });
+  }).toPass({ timeout: 30_000 });
 }
 
 /** Vai para uma aba da Cia/Força Tática pelo menu (no celular abre o ☰ antes). */
@@ -52,8 +62,7 @@ export async function irParaAbaCia(
 ) {
   await page.locator('#menu-unidade').waitFor({ state: 'attached' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });
-  if (await botao.isVisible()) await botao.click();
-  await page.getByRole('navigation', { name: 'Seções da Cia' }).getByRole('link', { name: new RegExp(`^${aba}`) }).click();
+  await abrirEClicar(botao, page.getByRole('navigation', { name: 'Seções da Cia' }).getByRole('link', { name: new RegExp(`^${aba}`) }));
 }
 
 /** Nova demanda / edição: abre a caixa de destinos (se estiver fechada) e marca o destino. */

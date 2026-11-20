@@ -3,6 +3,7 @@ import { observarPrimeirosLancamentos, observarProducaoDoMes } from '../../data/
 import { hojeISO } from '../../domain/datas';
 import {
   abasDaProducao,
+  ehDecimal,
   ITENS_PRODUCAO,
   nomePlanilha,
   pendencias,
@@ -19,7 +20,7 @@ import { baixarXlsx } from '../../lib/xlsx';
 import { Campo } from '../Campo';
 
 // Operações → Produtividade: o que as Salas de Operações das Cias/FT lançaram no mês, somado por unidade,
-// com os turnos sem lançamento e a planilha completa (lançamentos, por dia, totais e talões).
+// com os turnos sem lançamento e a planilha completa (lançamentos, por dia, totais e flagrantes).
 
 const ehMes = (m: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
 
@@ -43,7 +44,7 @@ export function ProducaoP3() {
     const desde = primeiros.valor?.[ids[k]] ?? null;
     return desde ? turnosPendentes(pendencias(l, mes, hoje, desde, ids[k])) : null;
   });
-  const fmt = (v: number, id: ItemId) => (v ? textoQuantidade(v, id === 'entorpecentesKg') : '—');
+  const fmt = (v: number, id: ItemId) => (v ? textoQuantidade(v, ehDecimal(id)) : '—');
 
   return (
     <section className="painel">
@@ -60,7 +61,7 @@ export function ProducaoP3() {
       </div>
       <p className="item-info">
         Lançado pelas Salas de Operações, por pelotão, no fim de cada turno. Os turnos sem lançamento contam a partir do primeiro lançamento de
-        cada Cia (— = ainda não começou). A planilha traz todos os lançamentos, a soma por dia de cada Cia, os totais do mês e os talões.
+        cada Cia (— = ainda não começou). A planilha traz todos os lançamentos, a soma por dia de cada Cia, os totais do mês e os flagrantes (talão e BOPC).
       </p>
       <Campo rotulo="Mês">
         <input type="month" value={mes} max={hoje.slice(0, 7)} onChange={(e) => setMes(e.target.value)} />
@@ -99,7 +100,7 @@ export function ProducaoP3() {
                 <td>{lista.length}</td>
               </tr>
               <tr>
-                <th scope="row">Talões anotados</th>
+                <th scope="row">Flagrantes anotados (talão / BOPC)</th>
                 {porUnidade.map((l, k) => (
                   <td key={ids[k]}>{l.reduce((s, x) => s + x.taloes.length, 0)}</td>
                 ))}
