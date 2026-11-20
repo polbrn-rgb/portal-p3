@@ -68,7 +68,7 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   await sair(page);
 
   await entrar(page, 'p3', SENHA_TESTE);
-  await irPara(page, 'Operações');
+  await irPara(page, /^Operações/);
   await page.getByRole('navigation', { name: 'Operações' }).getByRole('link', { name: 'Produtividade', exact: true }).click();
   const total = page.getByRole('table', { name: 'Produtividade do mês por unidade' });
   // Espera a tabela carregar antes de ler os títulos das colunas.

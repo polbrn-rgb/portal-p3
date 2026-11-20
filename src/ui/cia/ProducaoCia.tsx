@@ -41,7 +41,7 @@ const ehMes = (m: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
 
 /** '#/sala/2026-11-20/pelA' -> { data, pelotao } */
 function lerRota(hash: string): { data?: string; pelotao?: PelotaoId } {
-  const m = /^#\/sala\/(\d{4}-\d{2}-\d{2})(?:\/(pelA|pelB|pelC|pelD|re|rpm))?$/.exec(hash);
+  const m = /^#\/sala\/(\d{4}-\d{2}-\d{2})(?:\/(pelA|pelB|pelC|pelD))?$/.exec(hash);
   return m ? { data: m[1], pelotao: m[2] as PelotaoId | undefined } : {};
 }
 

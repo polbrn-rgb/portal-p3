@@ -45,13 +45,12 @@ function lanc(extra: Partial<Producao>): Producao {
 }
 
 describe('pelotões e itens', () => {
-  test('Cia: Pel A–D (12x36: A e C de dia, B e D de noite), RE e RPM; FT: Pel A e B, os dois de dia', () => {
-    expect(pelotoesDa('1cia').map((p) => p.id)).toEqual(['pelA', 'pelB', 'pelC', 'pelD', 're', 'rpm']);
+  test('Cia: Pel A–D (12x36: A e C de dia, B e D de noite; Ronda Escolar e RPM no pelotão); FT: Pel A e B, os dois de dia', () => {
+    expect(pelotoesDa('1cia').map((p) => p.id)).toEqual(['pelA', 'pelB', 'pelC', 'pelD']);
     expect(pelotoesDa('ft').map((p) => p.id)).toEqual(['pelA', 'pelB']);
     expect(rotuloPelotao('pelA', '1cia')).toBe('Pel A (dia)');
     expect(rotuloPelotao('pelB', '1cia')).toBe('Pel B (noite)');
     expect(rotuloPelotao('pelD', '1cia')).toBe('Pel D (noite)');
-    expect(rotuloPelotao('rpm', '1cia')).toBe('RPM');
     expect(rotuloPelotao('pelB', 'ft')).toBe('Pel B (dia)');
     expect(turnoDo('pelB', 'ft')).toBe('dia');
     expect(temTurnoNoite('ft')).toBe(false);
@@ -133,13 +132,12 @@ describe('somas, pendências e planilha', () => {
     expect(s.pessoasAbordadas).toBe(12);
   });
 
-  test('pendências: até ontem, um turno de dia e um de noite por dia (RE/RPM não contam)', () => {
+  test('pendências: até ontem, um turno de dia e um de noite por dia', () => {
     expect(diasDoMes('2026-02')).toHaveLength(28);
     const lista = [
       lanc({ data: '2026-11-01', pelotao: 'pelA' }),
       lanc({ data: '2026-11-01', pelotao: 'pelB' }),
       lanc({ data: '2026-11-02', pelotao: 'pelC' }),
-      lanc({ data: '2026-11-02', pelotao: 'rpm' }),
     ];
     const p = pendencias(lista, '2026-11', '2026-11-04', '2026-11-01', '1cia');
     expect(p).toEqual([

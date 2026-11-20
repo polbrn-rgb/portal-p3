@@ -90,7 +90,7 @@ entra no do pelotão.
   - Pel A e Pel C trabalham de dia; Pel B e Pel D, de noite.
   - Na Força Tática, Pel A e Pel B trabalham de dia, em dias alternados (lá não tem turno da noite): os turnos sem
     lançamento cobram um lançamento por dia.
-  - RE e RPM lançam à parte.
+  - A Ronda Escolar e a RPM entram no resultado do pelotão (não têm lançamento à parte).
   - O turno da noite usa a data em que começou.
 - **Itens** (26): abordagens, prisões, apreensões (drogas por tipo em kg: maconha, cocaína, crack e outras, com o
   total calculado; veículos recuperados (L01); carros e motos apreendidos pela delegacia), trânsito (AIT, AI e carros,

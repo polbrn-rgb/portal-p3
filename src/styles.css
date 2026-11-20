@@ -3633,6 +3633,8 @@ li.agenda-linha {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
+  /* Nomes de uma ou duas linhas: os campos ficam todos na mesma altura (alinhados pela base). */
+  align-items: end;
 }
 
 .grade-producao .campo input {
