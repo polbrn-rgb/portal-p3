@@ -87,7 +87,9 @@ Na aba **Sala de Operações** de cada Cia/FT, cada pelotão lança no fim do tu
 entra no do pelotão.
 
 - **Pelotões** (os mesmos do RAC), em turnos de 12x36:
-  - Pel A e Pel C trabalham de dia; Pel B e Pel D, de noite (na FT, Pel A de dia e Pel B de noite).
+  - Pel A e Pel C trabalham de dia; Pel B e Pel D, de noite.
+  - Na Força Tática, Pel A e Pel B trabalham de dia, em dias alternados (lá não tem turno da noite): os turnos sem
+    lançamento cobram um lançamento por dia.
   - RE e RPM lançam à parte.
   - O turno da noite usa a data em que começou.
 - **Itens** (20): abordagens, prisões, apreensões, trânsito, atendimentos e registros. Os códigos são os mesmos do RAC,

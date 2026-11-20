@@ -1,6 +1,7 @@
 // Produção diária dos pelotões, lançada pela Sala de Operações de cada Cia/FT no fim do turno.
 //
-// - Turno de 12x36: Pel A e Pel C de dia, Pel B e Pel D de noite (na FT: Pel A de dia, Pel B de noite). RE e RPM à parte.
+// - Cias, turno de 12x36: Pel A e Pel C de dia, Pel B e Pel D de noite. RE e RPM à parte.
+// - Força Tática: Pel A e Pel B de dia, em dias alternados (não tem turno da noite).
 // - Um lançamento por pelotão por dia de serviço (o turno da noite usa a data em que começou).
 // - O resultado da BCS entra no resultado do pelotão.
 // - Os números dos talões ficam guardados com a data da ocorrência: a P/3 usa para colher os dados oficiais do QMO.
@@ -26,18 +27,31 @@ export const PELOTOES: readonly { id: PelotaoId; rotulo: string; turno: Turno }[
   { id: 'rpm', rotulo: 'RPM', turno: '' },
 ];
 
+/** Força Tática: Pel A e Pel B trabalham de dia, em dias alternados (não há turno da noite). */
+const PELOTOES_FT: readonly { id: PelotaoId; rotulo: string; turno: Turno }[] = [
+  { id: 'pelA', rotulo: 'Pel A', turno: 'dia' },
+  { id: 'pelB', rotulo: 'Pel B', turno: 'dia' },
+];
+
 /** Pelotões de cada unidade (os mesmos do RAC: Cia com Pel A–D, RE e RPM; FT com Pel A e B). */
 export function pelotoesDa(unidade: UnidadeId) {
-  return unidade === 'ft' ? PELOTOES.filter((p) => p.id === 'pelA' || p.id === 'pelB') : PELOTOES;
+  return unidade === 'ft' ? PELOTOES_FT : PELOTOES;
 }
 
-export function rotuloPelotao(id: string): string {
-  const p = PELOTOES.find((x) => x.id === id);
+/** Turno do pelotão na unidade ('' = RE/RPM, sem turno fixo). */
+export function turnoDo(id: string, unidade: UnidadeId): Turno {
+  return pelotoesDa(unidade).find((p) => p.id === id)?.turno ?? '';
+}
+
+/** "Pel A (dia)", "Pel D (noite)", "RPM". */
+export function rotuloPelotao(id: string, unidade: UnidadeId): string {
+  const p = pelotoesDa(unidade).find((x) => x.id === id);
   if (!p) return id;
   return p.turno ? `${p.rotulo} (${p.turno})` : p.rotulo;
 }
 
-export const turnoDo = (id: string): Turno => PELOTOES.find((p) => p.id === id)?.turno ?? '';
+/** A unidade tem turno da noite (a Força Tática não tem). */
+export const temTurnoNoite = (unidade: UnidadeId): boolean => pelotoesDa(unidade).some((p) => p.turno === 'noite');
 
 export const GRUPOS_PRODUCAO = [
   { id: 'abordagens', rotulo: 'Abordagens' },
@@ -208,24 +222,27 @@ export function diasDoMes(mes: string): string[] {
 export type PendenciaDia = { data: string; faltaDia: boolean; faltaNoite: boolean };
 
 /**
- * Dias do mês (até ontem) em que faltou o lançamento do turno do dia ou da noite.
- * Hoje não conta: o lançamento é feito no fim do turno. Só conta a partir do primeiro lançamento da unidade
- * (`desde`; null = a unidade ainda não começou a lançar): os dias de antes do sistema não viram pendência.
+ * Dias do mês (até ontem) em que faltou o lançamento do turno do dia ou da noite (na Força Tática, só o do dia:
+ * lá não tem turno da noite). Hoje não conta: o lançamento é feito no fim do turno. Só conta a partir do primeiro
+ * lançamento da unidade (`desde`; null = a unidade ainda não começou a lançar): os dias de antes do sistema não
+ * viram pendência.
  */
 export function pendencias(
   lancamentos: readonly Pick<Producao, 'data' | 'pelotao'>[],
   mes: string,
   hoje: string,
   desde: string | null,
+  unidade: UnidadeId,
 ): PendenciaDia[] {
   const r: PendenciaDia[] = [];
   if (!desde) return r;
+  const noite = temTurnoNoite(unidade);
   for (const data of diasDoMes(mes)) {
     if (data >= hoje) break;
     if (data < desde) continue;
     const doDia = lancamentos.filter((l) => l.data === data);
-    const faltaDia = !doDia.some((l) => turnoDo(l.pelotao) === 'dia');
-    const faltaNoite = !doDia.some((l) => turnoDo(l.pelotao) === 'noite');
+    const faltaDia = !doDia.some((l) => turnoDo(l.pelotao, unidade) === 'dia');
+    const faltaNoite = noite && !doDia.some((l) => turnoDo(l.pelotao, unidade) === 'noite');
     if (faltaDia || faltaNoite) r.push({ data, faltaDia, faltaNoite });
   }
   return r;
@@ -270,7 +287,7 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
       diaDaSemanaPorExtenso(l.data),
       siglaDe(l.unidadeId),
       PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao,
-      turnoDo(l.pelotao),
+      turnoDo(l.pelotao, l.unidadeId),
       ...IDS_ITENS.map((id) => l.itens[id]),
       l.taloes.map((t) => t.numero).join(', '),
       l.lancadoPor,
