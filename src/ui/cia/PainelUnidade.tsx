@@ -41,7 +41,8 @@ import type { DemandaCia } from '../../domain/numeradorCia';
 import { FormNumeradorCia, ListaNumeradorCia } from './NumeradorCia';
 import { observarFotosCgp, observarMissoesCgp, observarRecadosCgp, type RecadoCgp } from '../../data/cgp';
 import type { FotoCgp, MissaoCgp } from '../../domain/cgp';
-import { EnviarAoCgp, missaoDe, PainelCgp, SalaDaCia } from './Cgp';
+import { EnviarAoCgp, missaoDe, PainelCgp } from './Cgp';
+import { SalaDaCia } from './ProducaoCia';
 
 const ABAS: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'pendentes', rotulo: 'Pendentes' },
@@ -55,7 +56,7 @@ function abaDaRota(hash: string): AbaCia | undefined {
   if (hash === '#/agenda') return 'agenda';
   if (hash === '#/numerador' || hash.startsWith('#/numerador/')) return 'numerador';
   if (hash === '#/cgp' || hash.startsWith('#/cgp/')) return 'cgp';
-  if (hash === '#/sala') return 'sala';
+  if (hash === '#/sala' || hash.startsWith('#/sala/')) return 'sala';
   if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash === '#/rac' || hash.startsWith('#/rac/')) return 'rac';
@@ -187,7 +188,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
 
   function conteudo(): ReactNode {
     if (ativa === 'agenda') return <Agenda rota={hash} dono={unidade} prazos={prazos} />;
-    if (ativa === 'sala') return <SalaDaCia />;
+    if (ativa === 'sala') return <SalaDaCia unidade={unidade} sigla={sigla} hash={hash} />;
     if (ativa === 'cgp')
       return (
         <PainelCgp

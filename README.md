@@ -81,6 +81,31 @@ Script (o perfil do CGP é gravado na conta pelo motor).
 
 Banco: `cgpMissoes`, `recadosCgp`, `fotosCgp` + `fotosCgpDados`.
 
+## Produção diária dos pelotões (Sala de Operações das Cias)
+
+Na aba **Sala de Operações** de cada Cia/FT, cada pelotão lança no fim do turno o que produziu, e o resultado da BCS
+entra no do pelotão.
+
+- **Pelotões** (os mesmos do RAC), em turnos de 12x36:
+  - Pel A e Pel C trabalham de dia; Pel B e Pel D, de noite (na FT, Pel A de dia e Pel B de noite).
+  - RE e RPM lançam à parte.
+  - O turno da noite usa a data em que começou.
+- **Itens** (20): abordagens, prisões, apreensões, trânsito, atendimentos e registros. Os códigos são os mesmos do RAC,
+  e a lista cobre a planilha diária do CPA, o RAC por pelotão, o trimestral e a BCS. O que fica em branco conta como zero.
+- **Talões**: o número do talão de cada ocorrência, com o dia em que ela aconteceu, para a P/3 colher os dados
+  oficiais do QMO.
+- **Conferências** aparecem na hora, mas não impedem salvar. Exemplos: houve presos e nenhuma ocorrência com prisão;
+  mais ocorrências com prisão do que presos.
+- **Um lançamento por pelotão por dia**. Ao abrir de novo, ele é corrigido. Ficam gravados quem lançou primeiro e quem
+  corrigiu por último.
+- **Resumo do mês** (na Cia): turnos sem lançamento, totais por pelotão, lançamentos e talões, e a planilha da Cia.
+  Os turnos sem lançamento contam a partir do primeiro lançamento de cada Cia.
+- **P/3 → Operações → Produtividade**: totais do mês por Cia e do 8º BPM/M, turnos sem lançamento e a planilha do
+  Batalhão, com as abas Lançamentos, Por dia, Totais do mês e Talões.
+
+Banco: coleção `producao`, um documento por pelotão por dia (`{cia}_{AAAA-MM-DD}_{pelotão}`). É a base para montar
+as outras planilhas e as rotinas de atualização.
+
 ## Aba Administrador
 
 Conta própria `8bpmmp3+admin@gmail.com` (criada pelo `npm run usuarios`; trocar a senha: `npm run usuarios -- --nova-senha admin`).
