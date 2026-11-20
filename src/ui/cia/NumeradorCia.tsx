@@ -96,7 +96,9 @@ export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; 
 
 /** Nova demanda (sem `existente`) ou edição. */
 export function FormNumeradorCia({ unidade, existente }: { unidade: UnidadeId; existente?: DemandaCia }) {
-  const [dados, setDados] = useState<DadosDemandaCia>(() => (existente ? dadosDaDemandaCia(existente) : demandaCiaVazia(hojeISO())));
+  // O responsável é sempre quem está logado (ao criar e ao editar).
+  const comResponsavel = (d: DadosDemandaCia): DadosDemandaCia => ({ ...d, responsavel: autor(unidade) });
+  const [dados, setDados] = useState<DadosDemandaCia>(() => comResponsavel(existente ? dadosDaDemandaCia(existente) : demandaCiaVazia(hojeISO())));
   const [erros, setErros] = useState<ErrosDemandaCia>({});
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
@@ -148,7 +150,7 @@ export function FormNumeradorCia({ unidade, existente }: { unidade: UnidadeId; e
               type="button"
               onClick={() => {
                 setCriada('');
-                setDados(demandaCiaVazia(hojeISO()));
+                setDados(comResponsavel(demandaCiaVazia(hojeISO())));
               }}
             >
               Nova demanda
@@ -205,8 +207,8 @@ export function FormNumeradorCia({ unidade, existente }: { unidade: UnidadeId; e
           <Campo rotulo="Prazo (vai para a Agenda)" erro={erros.prazo}>
             <input type="date" value={dados.prazo} onChange={(e) => mudar('prazo', e.target.value)} />
           </Campo>
-          <Campo rotulo="Responsável" erro={erros.responsavel}>
-            <input value={dados.responsavel} placeholder="Posto/graduação e nome" onChange={(e) => mudar('responsavel', e.target.value)} />
+          <Campo rotulo="Responsável (quem está logado)" erro={erros.responsavel}>
+            <input value={dados.responsavel} readOnly />
           </Campo>
         </div>
         <Campo rotulo="Observação" erro={erros.observacao}>

@@ -146,7 +146,8 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       }),
     [unidade, mesRef, encs.valor, solicitacoes.valor, eaps.valor, envios.valor, iccs.valor, respostasIcc.valor, racMeses.valor, racs.valor],
   );
-  itens.push({
+  // Numerador é a primeira aba.
+  itens.unshift({
     id: 'numerador',
     href: '#/numerador',
     rotulo: 'Numerador',
