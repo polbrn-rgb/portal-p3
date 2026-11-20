@@ -32,8 +32,8 @@ test('sem senha: avisa no próprio campo, em vermelho, e não entra', async ({ p
   await page.getByLabel('RE').fill('130155-1');
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page.getByText('Digite a senha.')).toBeVisible();
-  await expect(page.getByLabel('Senha')).toBeFocused();
-  await expect(page.getByLabel('Senha')).toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
+  await expect(page.getByLabel(/^Senha\s*\*?$/)).toBeFocused();
+  await expect(page.getByLabel(/^Senha\s*\*?$/)).toHaveCSS('border-top-color', 'rgb(181, 43, 39)');
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
 });
 
@@ -69,4 +69,21 @@ test.describe('login por RE', () => {
     await page.getByRole('button', { name: 'Esqueci a senha' }).click();
     await expect(page.getByRole('status')).toContainText('Se o RE tiver acesso ao portal');
   });
+});
+
+test('👁 mostra e oculta a senha digitada (RE e conta da unidade)', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Entrar', exact: true }).waitFor();
+  for (const modo of ['Entrar com RE e senha pessoal', 'Entrar com a conta da unidade (antiga)']) {
+    const troca = page.getByRole('button', { name: modo });
+    if (await troca.isVisible()) await troca.click();
+    const senha = page.getByLabel(/^Senha\s*\*?$/);
+    await senha.fill('minha-senha');
+    await expect(senha).toHaveAttribute('type', 'password');
+    await page.getByRole('button', { name: 'Mostrar senha' }).click();
+    await expect(senha).toHaveAttribute('type', 'text');
+    await expect(senha).toHaveValue('minha-senha');
+    await page.getByRole('button', { name: 'Ocultar senha' }).click();
+    await expect(senha).toHaveAttribute('type', 'password');
+  }
 });

@@ -45,9 +45,9 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Importação de fotos' }).click();
   await page.getByRole('button', { name: /^Importar/ }).click();
   await expect(page.getByText('Informe o local da foto.')).toBeVisible();
-  await page.getByLabel(/^Descrição/).fill('Operação');
+  await page.getByPlaceholder('Ex.: Operação, Intensificação').fill('Operação');
   await page.getByLabel(/^Local da foto/).fill(`Praça ${assunto}`);
-  await page.getByLabel(/^Observação/).fill('Equipe 1, VTR 08-123');
+  await page.getByPlaceholder('Equipe, local, viatura').fill('Equipe 1, VTR 08-123');
   await page.locator('input[type="file"]').setInputFiles([foto(1), foto(2), foto(3)]);
   await page.getByRole('button', { name: 'Importar 3 fotos' }).click();
   await expect(page.getByText('3 foto(s) importada(s).')).toBeVisible();
