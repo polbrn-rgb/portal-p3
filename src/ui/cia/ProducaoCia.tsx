@@ -231,7 +231,10 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
                     autoComplete="off"
                     placeholder="0"
                     value={textos[i.id]}
-                    onChange={(e) => setTextos((t) => ({ ...t, [i.id]: e.target.value }))}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTextos((t) => ({ ...t, [i.id]: v }));
+                    }}
                   />
                 </Campo>
               );
@@ -250,7 +253,10 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
               autoComplete="off"
               value={novoTalao.numero}
               onKeyDown={aoTeclarTalao}
-              onChange={(e) => setNovoTalao((t) => ({ ...t, numero: e.target.value }))}
+              onChange={(e) => {
+                const v = e.target.value;
+                setNovoTalao((t) => ({ ...t, numero: v }));
+              }}
             />
           </Campo>
           <Campo rotulo="Dia da ocorrência">
@@ -258,7 +264,10 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
               type="date"
               value={novoTalao.data}
               max={somarDias(p.data, 1)}
-              onChange={(e) => setNovoTalao((t) => ({ ...t, data: e.target.value }))}
+              onChange={(e) => {
+                const v = e.target.value;
+                setNovoTalao((t) => ({ ...t, data: v }));
+              }}
             />
           </Campo>
         </div>

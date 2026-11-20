@@ -106,10 +106,25 @@ export function EnviarAoCgp(p: {
       <strong>Enviar para o CGP — quanto tempo dura?</strong>
       <div className="grade">
         <Campo rotulo="De" erro={erros.inicio} obrigatorio>
-          <input type="date" value={periodo.inicio} onChange={(e) => setPeriodo((x) => ({ ...x, inicio: e.target.value }))} />
+          <input
+            type="date"
+            value={periodo.inicio}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPeriodo((x) => ({ ...x, inicio: v }));
+            }}
+          />
         </Campo>
         <Campo rotulo="Até" erro={erros.fim} obrigatorio>
-          <input type="date" value={periodo.fim} min={periodo.inicio} onChange={(e) => setPeriodo((x) => ({ ...x, fim: e.target.value }))} />
+          <input
+            type="date"
+            value={periodo.fim}
+            min={periodo.inicio}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPeriodo((x) => ({ ...x, fim: v }));
+            }}
+          />
         </Campo>
       </div>
       {dias > 0 && (
@@ -465,7 +480,11 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
     setConfirmarId('');
   }
 
-  const mudar = (k: keyof DadosFotoCgp) => (e: { target: { value: string } }) => setDados((d) => ({ ...d, [k]: e.target.value }));
+  // O valor é lido na hora (ler e.target dentro da atualização adiada pode perder o que foi digitado).
+  const mudar = (k: keyof DadosFotoCgp) => (e: { target: { value: string } }) => {
+    const v = e.target.value;
+    setDados((d) => ({ ...d, [k]: v }));
+  };
   return (
     <section className="painel">
       <div className="painel-cabecalho">

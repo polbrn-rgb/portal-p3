@@ -16,6 +16,15 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   await page.getByRole('group', { name: 'Pelotão' }).getByRole('button', { name: /^Pel A \(dia\)/ }).click();
 
   const form = page.getByRole('form', { name: /Produção do Pel A \(dia\)/ });
+  await form.waitFor();
+  // Repetição do teste (retry): começa do zero, apagando o lançamento que a tentativa anterior deixou.
+  const apagar = form.getByRole('button', { name: 'Apagar lançamento' });
+  if (await apagar.isVisible()) {
+    await apagar.click();
+    await form.getByRole('alertdialog', { name: 'Confirmar exclusão do lançamento' }).getByRole('button', { name: 'Apagar' }).click();
+    await expect(form.getByText('Lançamento apagado.')).toBeVisible();
+    await expect(form.getByText(/Já lançado por/)).toHaveCount(0);
+  }
   await form.getByLabel('Pessoas abordadas').fill('25');
   await form.getByLabel('Pessoas presas em flagrante').fill('2');
   await expect(form.getByRole('list', { name: 'Conferências' })).toContainText('Houve presos');
@@ -55,9 +64,12 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   await irPara(page, 'Operações');
   await page.getByRole('navigation', { name: 'Operações' }).getByRole('link', { name: 'Produtividade', exact: true }).click();
   const total = page.getByRole('table', { name: 'Produtividade do mês por unidade' });
+  // Espera a tabela carregar antes de ler os títulos das colunas.
+  await expect(total.getByRole('columnheader', { name: cia.sigla, exact: true })).toBeVisible();
   const linha = total.getByRole('row', { name: /^Pessoas abordadas/ });
   const coluna = await total.getByRole('columnheader').allInnerTexts();
   const k = coluna.findIndex((c) => c.trim() === cia.sigla);
+  expect(k).toBeGreaterThan(0);
   await expect(linha.getByRole('cell').nth(k - 1)).toHaveText('30');
   await expect(total.getByRole('row', { name: /^Talões anotados/ }).getByRole('cell').nth(k - 1)).toHaveText('1');
 });
