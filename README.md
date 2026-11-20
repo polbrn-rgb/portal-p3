@@ -61,6 +61,21 @@ Número no mesmo formato da P/3, com a seção da Cia: `OFÍCIO 8BPMM-001/103/27
 Força Tática = 703). A sequência é por Cia e por tipo de saída e volta para 001 todo ano (ano da data de entrada).
 Contadores em `contadoresCia/{cia}_{ano}_{TIPO}`; demandas em `demandasCia`. Uma Cia não vê o numerador da outra.
 
+## CGP e Sala de Operações das Cias/FT
+
+Cada Cia/FT tem as abas **CGP** e **Sala de Operações** (esta ainda em construção). O CGP não tem login: a Cia
+administra a página, e uma Cia não vê o CGP da outra.
+
+- **Enviar para o CGP**: botão na demanda que a P/3 mandou para a Cia e na demanda do Numerador da Cia. Pede o
+  período (de/até, no calendário) e mostra quantos dias são. A mesma demanda só vai uma vez: depois de enviada,
+  aparece "✅ Já enviada para o CGP" no lugar do botão (e "✅ CGP" na lista). Para mudar, exclua na aba CGP.
+- **CGP → Missões**: o que foi enviado, por dia e as próximas, com **Excluir do CGP**.
+- **CGP → Importação de fotos**: sem limite de quantidade; descrição (Operação, Intensificação…), local e
+  observação (equipe, local, viatura) obrigatórios; grava quem importou (login) e a data. Baixar e apagar.
+- **CGP → Recados**: a Cia escreve para o CGP; os recados aparecem no alto da página do CGP.
+
+Banco: `cgpMissoes`, `recadosCgp`, `fotosCgp` + `fotosCgpDados`.
+
 ## Aba Administrador
 
 Conta própria `8bpmmp3+admin@gmail.com` (criada pelo `npm run usuarios`; trocar a senha: `npm run usuarios -- --nova-senha admin`).

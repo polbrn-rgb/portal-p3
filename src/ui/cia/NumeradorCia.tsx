@@ -19,6 +19,8 @@ import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
 import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
+import type { MissaoCgp } from '../../domain/cgp';
+import { EnviarAoCgp, missaoDe } from './Cgp';
 
 // Numerador próprio da Cia/FT: cria a demanda com número (8BPMM-001/103/27…) e põe o prazo na agenda da Cia.
 // Não distribui para ninguém.
@@ -27,7 +29,7 @@ const autor = (unidade: UnidadeId) => quemSou() ?? UNIDADES.find((u) => u.id ===
 
 type Aba = 'abertas' | 'concluidas';
 
-export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; carregando: boolean; erro: string }) {
+export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; carregando: boolean; erro: string; missoesCgp: MissaoCgp[] }) {
   const [aba, setAba] = useState<Aba>('abertas');
   const [texto, setTexto] = useState('');
   const hoje = hojeISO();
@@ -83,7 +85,10 @@ export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; 
                 <span className="item-saida">{d.saida}</span>
                 <span className="item-info">
                   <span className="item-cat">{d.responsavel}</span>
-                  <span className="item-prazo">{d.prazo ? `Prazo ${formatarData(d.prazo)}` : ''}</span>
+                  <span className="item-prazo">
+                    {missaoDe(p.missoesCgp, p.unidade, 'numerador', d.id) ? '✅ CGP · ' : ''}
+                    {d.prazo ? `Prazo ${formatarData(d.prazo)}` : ''}
+                  </span>
                 </span>
               </a>
             </li>
@@ -95,7 +100,7 @@ export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; 
 }
 
 /** Nova demanda (sem `existente`) ou edição. */
-export function FormNumeradorCia({ unidade, existente }: { unidade: UnidadeId; existente?: DemandaCia }) {
+export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unidade: UnidadeId; existente?: DemandaCia; missoesCgp?: MissaoCgp[] }) {
   // O responsável é sempre quem está logado (ao criar e ao editar).
   const comResponsavel = (d: DadosDemandaCia): DadosDemandaCia => ({ ...d, responsavel: autor(unidade) });
   const [dados, setDados] = useState<DadosDemandaCia>(() => comResponsavel(existente ? dadosDaDemandaCia(existente) : demandaCiaVazia(hojeISO())));
@@ -170,6 +175,19 @@ export function FormNumeradorCia({ unidade, existente }: { unidade: UnidadeId; e
         {existente && <span className={`selo ${existente.status === 'concluida' ? 'enc-aceito' : 'enc-novo'}`}>{ROTULO_STATUS_CIA[existente.status]}</span>}
       </div>
       {previa && <p className="vazio">O número sai ao salvar: {previa}</p>}
+      {existente && (
+        <div className="cartao grupo">
+          <EnviarAoCgp
+            unidade={unidade}
+            origem="numerador"
+            refId={existente.id}
+            numero={existente.numeroDocumento}
+            titulo={existente.saida}
+            fimSugerido={existente.prazo}
+            missoes={missoesCgp}
+          />
+        </div>
+      )}
 
       <fieldset className="cartao grupo">
         <legend>Entrada</legend>
