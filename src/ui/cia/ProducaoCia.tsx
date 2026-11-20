@@ -90,8 +90,10 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; dataInicial?: st
         <h2>Produção do pelotão</h2>
       </div>
       <p className="item-info">
-        Cada pelotão lança no fim do turno o que produziu (a BCS entra no resultado do pelotão). Pel A e C: dia; Pel B e D: noite. No turno da noite,
-        use o dia em que o turno começou.
+        Cada pelotão lança no fim do turno o que produziu (a BCS entra no resultado do pelotão).{' '}
+        {p.unidade === 'ft'
+          ? 'Pel A e Pel B trabalham de dia, em dias alternados.'
+          : 'Pel A e C: dia; Pel B e D: noite. No turno da noite, use o dia em que o turno começou.'}
       </p>
       <div className="cartao grupo">
         <Campo rotulo="Dia do serviço" obrigatorio>
@@ -108,7 +110,7 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; dataInicial?: st
                 aria-pressed={pelotao === x.id}
                 onClick={() => setPelotao(x.id)}
               >
-                {rotuloPelotao(x.id)}
+                {rotuloPelotao(x.id, p.unidade)}
                 {feito && <span className="feito-pelotao"> ✓</span>}
               </button>
             );
@@ -179,7 +181,7 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
     setOcupado(true);
     try {
       await salvarProducao(db, { unidade: p.unidade, data: p.data, pelotao: p.pelotao, itens: r.itens, taloes, por: autor });
-      setMensagem(`Lançamento do ${rotuloPelotao(p.pelotao)} de ${formatarData(p.data)} salvo.`);
+      setMensagem(`Lançamento do ${rotuloPelotao(p.pelotao, p.unidade)} de ${formatarData(p.data)} salvo.`);
     } catch {
       setErro('Não foi possível salvar. Verifique a conexão e tente de novo.');
     }
@@ -202,9 +204,9 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
   }
 
   return (
-    <form className="formulario-producao" onSubmit={salvar} noValidate aria-label={`Produção do ${rotuloPelotao(p.pelotao)} em ${formatarData(p.data)}`}>
+    <form className="formulario-producao" onSubmit={salvar} noValidate aria-label={`Produção do ${rotuloPelotao(p.pelotao, p.unidade)} em ${formatarData(p.data)}`}>
       <h3 className="titulo-secao">
-        {rotuloPelotao(p.pelotao)} · {formatarData(p.data)} ({diaDaSemanaPorExtenso(p.data)})
+        {rotuloPelotao(p.pelotao, p.unidade)} · {formatarData(p.data)} ({diaDaSemanaPorExtenso(p.data)})
       </h3>
       {p.existente ? (
         <p className="mensagem atencao" role="status">
@@ -355,7 +357,7 @@ function ResumoDoMes({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) 
   const pels = pelotoesDa(unidade);
   const porPelotao = pels.map((x) => somarItens(lista.filter((l) => l.pelotao === x.id)));
   const total = somarItens(lista);
-  const pend = valido ? pendencias(lista, mes, hoje, primeiro.valor ?? null) : [];
+  const pend = valido ? pendencias(lista, mes, hoje, primeiro.valor ?? null, unidade) : [];
   const taloes = lista
     .flatMap((l) => l.taloes.map((t) => ({ ...t, pelotao: l.pelotao })))
     .sort((a, b) => a.data.localeCompare(b.data) || a.numero.localeCompare(b.numero));

@@ -41,7 +41,7 @@ export function ProducaoP3() {
   // null = a unidade ainda não começou a lançar (sem pendência a contar).
   const pend = porUnidade.map((l, k) => {
     const desde = primeiros.valor?.[ids[k]] ?? null;
-    return desde ? turnosPendentes(pendencias(l, mes, hoje, desde)) : null;
+    return desde ? turnosPendentes(pendencias(l, mes, hoje, desde, ids[k])) : null;
   });
   const fmt = (v: number, id: ItemId) => (v ? textoQuantidade(v, id === 'entorpecentesKg') : '—');
 

@@ -12,6 +12,8 @@ import {
   pelotoesDa,
   pendencias,
   rotuloPelotao,
+  temTurnoNoite,
+  turnoDo,
   somarItens,
   textoQuantidade,
   turnosPendentes,
@@ -42,12 +44,17 @@ function lanc(extra: Partial<Producao>): Producao {
 }
 
 describe('pelotões e itens', () => {
-  test('Cia: Pel A–D, RE e RPM; FT: Pel A e B; turnos de 12x36', () => {
+  test('Cia: Pel A–D (12x36: A e C de dia, B e D de noite), RE e RPM; FT: Pel A e B, os dois de dia', () => {
     expect(pelotoesDa('1cia').map((p) => p.id)).toEqual(['pelA', 'pelB', 'pelC', 'pelD', 're', 'rpm']);
     expect(pelotoesDa('ft').map((p) => p.id)).toEqual(['pelA', 'pelB']);
-    expect(rotuloPelotao('pelA')).toBe('Pel A (dia)');
-    expect(rotuloPelotao('pelD')).toBe('Pel D (noite)');
-    expect(rotuloPelotao('rpm')).toBe('RPM');
+    expect(rotuloPelotao('pelA', '1cia')).toBe('Pel A (dia)');
+    expect(rotuloPelotao('pelB', '1cia')).toBe('Pel B (noite)');
+    expect(rotuloPelotao('pelD', '1cia')).toBe('Pel D (noite)');
+    expect(rotuloPelotao('rpm', '1cia')).toBe('RPM');
+    expect(rotuloPelotao('pelB', 'ft')).toBe('Pel B (dia)');
+    expect(turnoDo('pelB', 'ft')).toBe('dia');
+    expect(temTurnoNoite('ft')).toBe(false);
+    expect(temTurnoNoite('3cia')).toBe(true);
     expect(idProducao('3cia', '2026-11-20', 'pelB')).toBe('3cia_2026-11-20_pelB');
   });
 
@@ -117,20 +124,40 @@ describe('somas, pendências e planilha', () => {
       lanc({ data: '2026-11-02', pelotao: 'pelC' }),
       lanc({ data: '2026-11-02', pelotao: 'rpm' }),
     ];
-    const p = pendencias(lista, '2026-11', '2026-11-04', '2026-11-01');
+    const p = pendencias(lista, '2026-11', '2026-11-04', '2026-11-01', '1cia');
     expect(p).toEqual([
       { data: '2026-11-02', faltaDia: false, faltaNoite: true },
       { data: '2026-11-03', faltaDia: true, faltaNoite: true },
     ]);
     expect(turnosPendentes(p)).toBe(3);
-    expect(pendencias([], '2026-12', '2026-11-20', '2026-11-01')).toEqual([]);
+    expect(pendencias([], '2026-12', '2026-11-20', '2026-11-01', '1cia')).toEqual([]);
   });
 
   test('pendências só contam a partir do primeiro lançamento da unidade', () => {
-    expect(pendencias([], '2026-11', '2026-11-20', null)).toEqual([]);
-    const p = pendencias([lanc({ data: '2026-11-18', pelotao: 'pelA' })], '2026-11', '2026-11-20', '2026-11-18');
+    expect(pendencias([], '2026-11', '2026-11-20', null, '1cia')).toEqual([]);
+    const p = pendencias([lanc({ data: '2026-11-18', pelotao: 'pelA' })], '2026-11', '2026-11-20', '2026-11-18', '1cia');
     expect(p.map((x) => x.data)).toEqual(['2026-11-18', '2026-11-19']);
     expect(turnosPendentes(p)).toBe(3);
+  });
+
+  test('Força Tática: um lançamento por dia (Pel A num dia, Pel B no outro), sem turno da noite', () => {
+    const lista = [
+      lanc({ unidadeId: 'ft', data: '2026-11-01', pelotao: 'pelA' }),
+      lanc({ unidadeId: 'ft', data: '2026-11-02', pelotao: 'pelB' }),
+      lanc({ unidadeId: 'ft', data: '2026-11-04', pelotao: 'pelB' }),
+    ];
+    const p = pendencias(lista, '2026-11', '2026-11-06', '2026-11-01', 'ft');
+    expect(p).toEqual([
+      { data: '2026-11-03', faltaDia: true, faltaNoite: false },
+      { data: '2026-11-05', faltaDia: true, faltaNoite: false },
+    ]);
+    expect(turnosPendentes(p)).toBe(2);
+    const turnos = abasDaProducao(lista, ['ft'])[0].linhas.slice(1).map((l) => [l[3], l[4]]);
+    expect(turnos).toEqual([
+      ['Pel A', 'dia'],
+      ['Pel B', 'dia'],
+      ['Pel B', 'dia'],
+    ]);
   });
 
   test('planilha: lançamentos, por dia, totais do mês (com o Batalhão) e talões', () => {
