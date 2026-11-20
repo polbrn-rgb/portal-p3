@@ -95,3 +95,25 @@ describe('CGP das Cias', () => {
     await assertSucceeds(apagarFotoCgp(cia('3cia'), l[0].id));
   });
 });
+
+describe('acesso do CGP (perfil cgp + Cia)', () => {
+  test('vê missões, recados e fotos da sua Cia; importa fotos; não envia nem exclui missão; não vê outra Cia', async () => {
+    const id = await enviarAoCgp(cia('1cia'), missao());
+    await enviarRecadoCgp(cia('1cia'), '1cia', 'Atenção', '1ª CIA');
+    const cgp = () => como({ perfil: 'cgp', unidade: '1cia', re: '444444' });
+    const outro = () => como({ perfil: 'cgp', unidade: '2cia', re: '555555' });
+
+    expect(await uma<MissaoCgp[]>((ok, e) => observarMissoesCgp(cgp(), '1cia', ok, e))).toHaveLength(1);
+    expect(await uma<RecadoCgp[]>((ok, e) => observarRecadosCgp(cgp(), '1cia', ok, e))).toHaveLength(1);
+    await assertFails(excluirMissaoCgp(cgp(), id));
+    await assertFails(enviarAoCgp(cgp(), missao('nova')));
+    await assertFails(enviarRecadoCgp(cgp(), '1cia', 'x', 'CGP'));
+    await assertFails(getDocs(query(collection(outro(), 'cgpMissoes'), where('unidadeId', '==', '1cia'))));
+
+    const dados = { descricao: 'Operação', local: 'Centro', observacao: 'Equipe 3' };
+    expect(await enviarFotosCgp(cgp(), '1cia', dados, [{ dados: 'QUJD', miniatura: '' }], 'Sd PM CGP (RE 444444)')).toBe(1);
+    await assertFails(enviarFotosCgp(outro(), '1cia', dados, [{ dados: 'QUJD', miniatura: '' }], 'x'));
+    const fotos = await uma<FotoCgp[]>((ok, e) => observarFotosCgp(cia('1cia'), '1cia', ok, e));
+    expect(fotos[0].enviadoPor).toBe('Sd PM CGP (RE 444444)');
+  });
+});

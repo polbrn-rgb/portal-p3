@@ -63,8 +63,13 @@ Contadores em `contadoresCia/{cia}_{ano}_{TIPO}`; demandas em `demandasCia`. Uma
 
 ## CGP e Sala de Operações das Cias/FT
 
-Cada Cia/FT tem as abas **CGP** e **Sala de Operações** (esta ainda em construção). O CGP não tem login: a Cia
-administra a página, e uma Cia não vê o CGP da outra.
+Cada Cia/FT tem as abas **CGP** e **Sala de Operações** (esta ainda em construção). A Cia administra o CGP, e uma
+Cia não vê o CGP da outra.
+
+**Acesso do CGP**: na aba Administrador → Acessos, cadastre o RE com o acesso **CGP de Cia / FT** e escolha a Cia.
+Quem entra com esse RE vê **só a página do CGP daquela Cia**: missões e recados (só leitura) e a importação de fotos.
+Não envia nem exclui missões (isso é da Cia). Depois de atualizar, cole de novo o **Motor.gs e o Logica.gs** no Apps
+Script (o perfil do CGP é gravado na conta pelo motor).
 
 - **Enviar para o CGP**: botão na demanda que a P/3 mandou para a Cia e na demanda do Numerador da Cia. Pede o
   período (de/até, no calendário) e mostra quantos dias são. A mesma demanda só vai uma vez: depois de enviada,

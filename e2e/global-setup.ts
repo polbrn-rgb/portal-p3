@@ -20,6 +20,7 @@ export default async function globalSetup() {
     ['111111-1', { perfil: 'p3', re: '111111' }],
     ['222222-2', { perfil: 'cfp', re: '222222' }],
     ['333333-3', { perfil: 'unidade', unidade: '3cia', re: '333333' }],
+    ['444444-4', { perfil: 'cgp', unidade: '4cia', re: '444444' }],
   ] as const) {
     const email = emailDeLogin(re);
     const displayName = re === '333333-3' ? 'Sd PM TESTE' : undefined;
