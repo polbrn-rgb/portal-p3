@@ -25,7 +25,7 @@ export type ResumoEnc = {
   origem: string;
   numeroOrigem: string;
   prazoCia: string;
-  observacao: string;
+  // A observação da demanda NÃO vai para as Cias: é informação só da P/3.
   numeroDocumento?: string;
   /** PDF da demanda para a Cia baixar (enquanto a demanda não é finalizada). */
   arquivoId?: string;
@@ -46,7 +46,7 @@ export type Encaminhamento = ResumoEnc & {
 
 type BaseResumo = Pick<
   Demanda,
-  'numero' | 'saida' | 'categoria' | 'tipoSaida' | 'origem' | 'numeroOrigem' | 'prazoCia' | 'prazoCPA' | 'observacao'
+  'numero' | 'saida' | 'categoria' | 'tipoSaida' | 'origem' | 'numeroOrigem' | 'prazoCia' | 'prazoCPA'
 > & { numeroDocumento?: string; arquivoId?: string; arquivoNome?: string };
 
 export function idEncaminhamento(demandaId: string, unidadeId: UnidadeId): string {
@@ -63,7 +63,6 @@ export function resumoDaDemanda(d: BaseResumo): ResumoEnc {
     origem: d.origem,
     numeroOrigem: d.numeroOrigem,
     prazoCia: d.prazoCia || d.prazoCPA,
-    observacao: d.observacao,
     ...(d.numeroDocumento ? { numeroDocumento: d.numeroDocumento } : {}),
     ...(d.arquivoId ? { arquivoId: d.arquivoId, arquivoNome: d.arquivoNome ?? 'documento.pdf' } : {}),
   };
@@ -89,7 +88,8 @@ export type PlanoEnc = {
 };
 
 function mudouResumo(e: ResumoEnc, r: ResumoEnc): boolean {
-  return (Object.keys(r) as (keyof ResumoEnc)[]).some((k) => e[k] !== r[k]);
+  // Encaminhamento antigo ainda com a observação: atualiza para tirá-la.
+  return 'observacao' in e || (Object.keys(r) as (keyof ResumoEnc)[]).some((k) => e[k] !== r[k]);
 }
 
 /**
