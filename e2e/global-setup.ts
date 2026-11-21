@@ -4,6 +4,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { garantirContas } from '../scripts/contas-admin';
 import { emailDeLogin } from '../src/domain/acessos';
 import { TODAS_CONTAS } from '../src/domain/contas';
+import { mesReferencia } from '../src/domain/documentosMensais';
+import { diasDoMes, idProducao, itensZerados } from '../src/domain/producao';
 import { SENHA_TESTE } from './dados';
 
 // Cria as contas no emulador de login, com o mesmo código do script real, e um policial no banco de efetivo.
@@ -34,4 +36,25 @@ export default async function globalSetup() {
   await getFirestore(app)
     .doc('efetivo/123456')
     .set({ re: '123456-7', posto: 'Cb PM', nomeGuerra: 'SILVA', telefone: '(11) 90000-0000' });
+  // Produção completa do mês de referência (todos os dias, dia e noite) da 2ª e da 5ª Cia: os Documentos Mensais
+  // delas vêm pré-preenchidos. As outras Cias ficam sem produção (documento travado e alerta para a P/3).
+  const db = getFirestore(app);
+  const mes = mesReferencia();
+  const lote = db.batch();
+  for (const unidade of ['2cia', '5cia'] as const)
+    for (const data of diasDoMes(mes))
+      for (const pelotao of ['pelA', 'pelB'] as const)
+        lote.set(db.doc(`producao/${idProducao(unidade, data, pelotao)}`), {
+          unidadeId: unidade,
+          data,
+          mes,
+          pelotao,
+          itens: { ...itensZerados(), carrosRemovidos: 1, motosApreendidas: 1 },
+          taloes: [],
+          lancadoPor: 'teste',
+          lancadoEm: new Date(),
+          atualizadoPor: 'teste',
+          atualizadoEm: new Date(),
+        });
+  await lote.commit();
 }

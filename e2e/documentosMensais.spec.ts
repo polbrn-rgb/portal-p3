@@ -8,25 +8,30 @@ test.afterEach(async ({ page }, info) => {
 });
 import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
+import { mesReferencia } from '../src/domain/documentosMensais';
+import { diasDoMes } from '../src/domain/producao';
 
-test('Documentos Mensais: a Cia envia pelo portal e a P/3 acompanha e arquiva', async ({ page }, info) => {
+test('Documentos Mensais: vem pré-preenchido da produção dos pelotões; a Cia confere e envia; a P/3 vê o que foi corrigido', async ({ page }, info) => {
   const celular = info.project.name === 'celular';
   const unidade = celular ? '5cia' : '2cia';
   const sigla = celular ? '5ª' : '2ª';
+  const dias = diasDoMes(mesReferencia()).length;
 
   await entrar(page, unidade, SENHA_TESTE);
   await irParaAbaCia(page, 'Documentos Mensais');
   await expect(page.getByRole('heading', { name: 'Documentos Mensais', level: 2 })).toBeVisible();
   await page.getByRole('link', { name: /Veículos Apreendidos/ }).click();
 
-  await page.getByRole('button', { name: /^Enviar$/ }).click();
-  await expect(page.getByText('Preencha (se não houver, coloque 0).').first()).toBeVisible();
-  await page.getByLabel('Veículos 4 rodas').fill('2');
-  await page.getByLabel('Veículos 2 rodas').fill('0');
-  await page.getByLabel('Caminhões').fill('1');
+  // A produção do mês (global-setup) está completa: 1 carro removido e 1 moto apreendida por turno.
+  await expect(page.getByText(/Os campos com 🔗 vieram somados da produção/)).toBeVisible();
+  await expect(page.getByLabel(/Veículos 4 rodas/)).toHaveValue(String(dias * 2));
+  await expect(page.getByLabel(/Veículos 2 rodas/)).toHaveValue(String(dias * 2));
+  await expect(page.getByLabel(/Caminhões/)).toHaveValue('0');
+  await page.getByLabel(/Caminhões/).fill('1'); // a Cia corrige na conferência
+  await expect(page.getByText('· na produção: 0')).toBeVisible();
   await page.getByLabel('Preenchido por').fill('Cb PM Teste');
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
-  await page.getByRole('button', { name: /^Enviar$/ }).click();
+  await page.getByRole('button', { name: 'Conferi: enviar para a P/3' }).click();
   await expect(page.getByRole('link', { name: /Veículos Apreendidos/ })).toContainText('Enviado', { timeout: 15000 });
   await sair(page);
 
@@ -36,12 +41,27 @@ test('Documentos Mensais: a Cia envia pelo portal e a P/3 acompanha e arquiva', 
   await expect(page.getByRole('heading', { name: 'Documentos Mensais', level: 2 })).toBeVisible();
   const veiculos = page.getByRole('article', { name: 'Veículos Apreendidos' });
   await expect(veiculos.getByRole('list', { name: /Envios/ })).toContainText(`⏳ ${sigla}`);
+  await expect(veiculos).toContainText(`${sigla} corrigiu o que veio da produção: Caminhões (produção 0 → enviado 1)`);
+  // As Cias sem produção completa aparecem no alerta e com ⚠️ nos documentos integrados.
+  await expect(page.getByRole('alert', { name: 'Produção incompleta' })).toContainText('1ª');
+  await expect(veiculos.getByRole('list', { name: /Envios/ })).toContainText('⚠️ 1ª');
 
   // Planilhas do ano todo só guardam a cópia; arquivar pede confirmação.
   const arquivar = page.getByRole('article', { name: celular ? 'Dados Sobre BO Eletrônico' : 'Avaliação Periódica e Cumprimento de Metas' });
   await arquivar.getByRole('button', { name: '📦 Arquivar cópia' }).click();
   await arquivar.getByRole('alertdialog').getByRole('button', { name: 'Sim, arquivar' }).click();
   await expect(arquivar.getByRole('button', { name: '⏳ Arquivando…' })).toBeDisabled();
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+});
+
+test('Documentos Mensais: produção do mês incompleta — não pré-preenche e não envia', async ({ page }, info) => {
+  const unidade = info.project.name === 'celular' ? '1cia' : '3cia';
+  await entrar(page, unidade, SENHA_TESTE);
+  await irParaAbaCia(page, 'Documentos Mensais');
+  await page.getByRole('link', { name: /Vistoria de Ciclomotores/ }).click();
+  await expect(page.getByRole('alert')).toContainText('incompleta');
+  await expect(page.getByRole('alert')).toContainText(`faltam ${diasDoMes(mesReferencia()).length * 2} turno(s)`);
+  await expect(page.getByRole('button', { name: 'Produção incompleta' })).toBeDisabled();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });
 

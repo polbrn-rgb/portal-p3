@@ -9,10 +9,12 @@ import {
   GRUPOS_PRODUCAO,
   ITENS_PRODUCAO,
   lerQuantidade,
+  NATUREZAS_FLAGRANTE,
   nomePlanilha,
   normalizarTalao,
   pelotoesDa,
   pendencias,
+  rotuloNatureza,
   rotuloPelotao,
   somarItens,
   textoQuantidade,
@@ -23,6 +25,7 @@ import {
   type ItemId,
   type Itens,
   type PelotaoId,
+  type NaturezaFlagrante,
   type Producao,
   type Talao,
 } from '../../domain/producao';
@@ -139,7 +142,7 @@ const textosDe = (itens?: Itens): Record<ItemId, string> =>
 function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelotao: PelotaoId; existente?: Producao }) {
   const [textos, setTextos] = useState<Record<ItemId, string>>(() => textosDe(p.existente?.itens));
   const [taloes, setTaloes] = useState<Talao[]>(() => p.existente?.taloes ?? []);
-  const [novoTalao, setNovoTalao] = useState<Talao>({ numero: '', bopc: '', data: p.data });
+  const [novoTalao, setNovoTalao] = useState<Talao>({ numero: '', bopc: '', data: p.data, natureza: '' });
   const [erroTalao, setErroTalao] = useState('');
   const [erros, setErros] = useState<ErrosProducao>({});
   const [ocupado, setOcupado] = useState(false);
@@ -158,8 +161,11 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
     const e = validarTalao(novoTalao, taloes);
     setErroTalao(e);
     if (e) return;
-    setTaloes((t) => [...t, { numero: normalizarTalao(novoTalao.numero), bopc: normalizarTalao(novoTalao.bopc), data: novoTalao.data }]);
-    setNovoTalao((t) => ({ ...t, numero: '', bopc: '' }));
+    setTaloes((t) => [
+      ...t,
+      { numero: normalizarTalao(novoTalao.numero), bopc: normalizarTalao(novoTalao.bopc), data: novoTalao.data, natureza: novoTalao.natureza },
+    ]);
+    setNovoTalao((t) => ({ ...t, numero: '', bopc: '', natureza: '' }));
   }
 
   function aoTeclarTalao(e: KeyboardEvent<HTMLInputElement>) {
@@ -175,7 +181,7 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
     const r = validarProducao({ data: p.data, pelotao: p.pelotao, textos, taloes }, p.unidade, hojeISO());
     setErros(r.erros);
     if (!r.itens) return;
-    if (novoTalao.numero.trim() || novoTalao.bopc.trim()) {
+    if (novoTalao.numero.trim() || novoTalao.bopc.trim() || novoTalao.natureza) {
       setErroTalao('Toque em "Incluir flagrante" (ou apague os números) antes de salvar.');
       return;
     }
@@ -249,7 +255,8 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
       <fieldset className="cartao grupo">
         <legend>Flagrantes de delito</legend>
         <p className="item-info">
-          Preencher em caso de flagrante de delito: o nº do talão, o nº do BOPC e o dia da ocorrência. A P/3 usa para colher os dados oficiais.
+          Preencher em caso de flagrante de delito: o nº do talão, o nº do BOPC, o dia e a natureza da ocorrência. A P/3 usa para colher os dados
+          oficiais e para os Documentos Mensais.
         </p>
         <div className="grade-producao">
           <Campo rotulo="Nº do talão" erro={erroTalao || erros.taloes}>
@@ -287,6 +294,22 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
               }}
             />
           </Campo>
+          <Campo rotulo="Natureza da ocorrência">
+            <select
+              value={novoTalao.natureza}
+              onChange={(e) => {
+                const v = e.target.value as NaturezaFlagrante | '';
+                setNovoTalao((t) => ({ ...t, natureza: v }));
+              }}
+            >
+              <option value="">Escolha…</option>
+              {NATUREZAS_FLAGRANTE.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.rotulo}
+                </option>
+              ))}
+            </select>
+          </Campo>
         </div>
         <div className="acoes-linha">
           <button className="botao secundario" type="button" onClick={incluirTalao}>
@@ -298,7 +321,8 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
             {taloes.map((t) => (
               <li key={t.numero}>
                 <span>
-                  Talão <strong>{t.numero}</strong> · BOPC {t.bopc ? <strong>{t.bopc}</strong> : <em>a completar</em>} · {formatarData(t.data)}
+                  Talão <strong>{t.numero}</strong> · BOPC {t.bopc ? <strong>{t.bopc}</strong> : <em>a completar</em>} · {formatarData(t.data)} ·{' '}
+                  {t.natureza ? rotuloNatureza(t.natureza) : <em>natureza a completar</em>}
                 </span>
                 <button
                   className="botao-tirar-talao"
@@ -480,7 +504,7 @@ function ResumoDoMes({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) 
               {taloes.map((t) => (
                 <li key={`${t.numero}_${t.pelotao}`}>
                   <span>
-                    Talão <strong>{t.numero}</strong> · BOPC {t.bopc || '—'} · {formatarData(t.data)} ·{' '}
+                    Talão <strong>{t.numero}</strong> · BOPC {t.bopc || '—'} · {formatarData(t.data)} · {rotuloNatureza(t.natureza)} ·{' '}
                     {pels.find((x) => x.id === t.pelotao)?.rotulo ?? t.pelotao}
                   </span>
                 </li>

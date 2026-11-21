@@ -13,7 +13,7 @@ import {
   type Firestore,
   type Timestamp,
 } from 'firebase/firestore';
-import { idProducao, lerItens, normalizarTalao, type Itens, type PelotaoId, type Producao, type Talao } from '../domain/producao';
+import { ehNatureza, idProducao, lerItens, normalizarTalao, type Itens, type PelotaoId, type Producao, type Talao } from '../domain/producao';
 import type { UnidadeId } from '../domain/unidades';
 
 // Produção diária dos pelotões (ver domain/producao.ts). Coleção "producao", id "{cia}_{dia}_{pelotão}":
@@ -34,7 +34,7 @@ function paraProducao(id: string, x: DocumentData): Producao {
     taloes: Array.isArray(x.taloes)
       ? x.taloes
           .filter((t: Partial<Talao>) => t && typeof t.numero === 'string')
-          .map((t: Partial<Talao>) => ({ numero: t.numero ?? '', bopc: t.bopc ?? '', data: t.data ?? '' }))
+          .map((t: Partial<Talao>) => ({ numero: t.numero ?? '', bopc: t.bopc ?? '', data: t.data ?? '', natureza: ehNatureza(t.natureza) ? t.natureza : '' }))
       : [],
     lancadoPor: x.lancadoPor ?? '',
     lancadoEm: quando(x.lancadoEm),
@@ -61,7 +61,7 @@ export async function salvarProducao(
       mes: p.data.slice(0, 7),
       pelotao: p.pelotao,
       itens: { ...p.itens },
-      taloes: p.taloes.map((t) => ({ numero: normalizarTalao(t.numero), bopc: normalizarTalao(t.bopc ?? ''), data: t.data })),
+      taloes: p.taloes.map((t) => ({ numero: normalizarTalao(t.numero), bopc: normalizarTalao(t.bopc ?? ''), data: t.data, natureza: t.natureza })),
       lancadoPor: antes ? antes.lancadoPor : p.por,
       lancadoEm: antes ? antes.lancadoEm : serverTimestamp(),
       atualizadoPor: p.por,

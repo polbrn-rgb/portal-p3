@@ -92,12 +92,13 @@ describe('preenchimento', () => {
   });
 
   test('flagrante: talão obrigatório e sem repetir, BOPC opcional, com o dia da ocorrência', () => {
-    expect(validarTalao({ numero: '', bopc: '', data: '2026-11-20' }, [])).toBeTruthy();
-    expect(validarTalao({ numero: '2026 1120 5108 01', bopc: '', data: '2026-11-20' }, [])).toBe('');
-    expect(validarTalao({ numero: '123', bopc: 'AB1234/2026', data: '2026-11-20' }, [])).toBe('');
-    expect(validarTalao({ numero: '123', bopc: 'BO #1', data: '2026-11-20' }, [])).toMatch(/BOPC/);
-    expect(validarTalao({ numero: '20261120510801', bopc: '', data: '2026-11-20' }, [{ numero: '20261120510801', bopc: '', data: '2026-11-20' }])).toMatch(/já está/);
-    expect(validarTalao({ numero: '123', bopc: '', data: '' }, [])).toMatch(/dia/);
+    expect(validarTalao({ numero: '', bopc: '', data: '2026-11-20', natureza: 'roubo' }, [])).toBeTruthy();
+    expect(validarTalao({ numero: '2026 1120 5108 01', bopc: '', data: '2026-11-20', natureza: 'roubo' }, [])).toBe('');
+    expect(validarTalao({ numero: '123', bopc: 'AB1234/2026', data: '2026-11-20', natureza: 'roubo' }, [])).toBe('');
+    expect(validarTalao({ numero: '123', bopc: 'BO #1', data: '2026-11-20', natureza: 'roubo' }, [])).toMatch(/BOPC/);
+    expect(validarTalao({ numero: '20261120510801', bopc: '', data: '2026-11-20', natureza: 'roubo' }, [{ numero: '20261120510801', bopc: '', data: '2026-11-20', natureza: 'roubo' }])).toMatch(/já está/);
+    expect(validarTalao({ numero: '123', bopc: '', data: '', natureza: 'roubo' }, [])).toMatch(/dia/);
+    expect(validarTalao({ numero: '123', bopc: '', data: '2026-11-20', natureza: '' }, [])).toMatch(/natureza/);
   });
 
   test('conferências: presos sem ocorrência com prisão, mais ocorrências que presos, talões', () => {
@@ -107,7 +108,7 @@ describe('preenchimento', () => {
       'Houve presos: informe quantas ocorrências tiveram prisão.',
       'Houve flagrante: anote o nº do talão e o nº do BOPC (a P/3 usa para colher os dados).',
     ]);
-    expect(avisosProducao({ ...i, ocorrenciasComPrisao: 2, flagrante: 1, ocorrencias: 2 }, [{ numero: '1', bopc: '9', data: '2026-11-20' }])).toEqual([
+    expect(avisosProducao({ ...i, ocorrenciasComPrisao: 2, flagrante: 1, ocorrencias: 2 }, [{ numero: '1', bopc: '9', data: '2026-11-20', natureza: 'roubo' }])).toEqual([
       'Há mais ocorrências com prisão do que presos (flagrante + mandado).',
     ]);
     // Mandado sem flagrante: não pede talão/BOPC.
@@ -115,7 +116,7 @@ describe('preenchimento', () => {
     expect(avisosProducao({ ...i, ocorrenciasComPrisao: 1, flagrante: 1, ocorrencias: 1 }, [])).toEqual([
       'Houve flagrante: anote o nº do talão e o nº do BOPC (a P/3 usa para colher os dados).',
     ]);
-    expect(avisosProducao({ ...i, ocorrenciasComPrisao: 1, flagrante: 1, ocorrencias: 1 }, [{ numero: '1', bopc: '', data: '2026-11-20' }])).toEqual([
+    expect(avisosProducao({ ...i, ocorrenciasComPrisao: 1, flagrante: 1, ocorrencias: 1 }, [{ numero: '1', bopc: '', data: '2026-11-20', natureza: 'roubo' }])).toEqual([
       'Há flagrante sem nº do BOPC: complete quando tiver.',
     ]);
   });
@@ -177,7 +178,7 @@ describe('somas, pendências e planilha', () => {
 
   test('planilha: lançamentos, por dia, totais do mês (com o Batalhão) e talões', () => {
     const lista = [
-      lanc({ unidadeId: '2cia', data: '2026-11-03', pelotao: 'pelB', itens: { ...itensZerados(), armas: 1 }, taloes: [{ numero: '999', bopc: 'BO77', data: '2026-11-04' }] }),
+      lanc({ unidadeId: '2cia', data: '2026-11-03', pelotao: 'pelB', itens: { ...itensZerados(), armas: 1 }, taloes: [{ numero: '999', bopc: 'BO77', data: '2026-11-04', natureza: 'roubo' }] }),
       lanc({ unidadeId: '1cia', data: '2026-11-03', pelotao: 'pelA', itens: { ...itensZerados(), armas: 2, pessoasAbordadas: 40 } }),
       lanc({ unidadeId: '1cia', data: '2026-11-03', pelotao: 'pelB', itens: { ...itensZerados(), pessoasAbordadas: 10 } }),
     ];
@@ -189,7 +190,7 @@ describe('somas, pendências e planilha', () => {
     expect(porDia[1].slice(0, 5)).toEqual(['03/11/2026', 'terça-feira', '1ª CIA', 2, 50]);
     expect(totais[0]).toEqual(['Item', '1ª CIA', '2ª CIA', '8º BPM/M']);
     expect(totais.find((l) => l[0] === 'Armas de fogo apreendidas')).toEqual(['Armas de fogo apreendidas', 2, 1, 3]);
-    expect(taloes[1]).toEqual(['04/11/2026', '999', 'BO77', '2ª CIA', 'Pel B', '03/11/2026']);
+    expect(taloes[1]).toEqual(['04/11/2026', '999', 'BO77', 'Roubo', '2ª CIA', 'Pel B', '03/11/2026']);
     expect(totais.map((l) => l[0])).toContain('Entorpecentes - total (kg)');
     expect(lancs[0][lancs[0].indexOf('Outras drogas (kg)') + 1]).toBe('Entorpecentes - total (kg)');
     expect(nomePlanilha('2026-11', '1cia')).toBe('Produtividade 1ª CIA 2026-11.xlsx');

@@ -1,7 +1,10 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { enviarDocMensal } from '../../data/documentosMensais';
 import { buscarPolicial } from '../../data/efetivo';
-import { formatarData } from '../../domain/datas';
+import { observarProducaoDaCia } from '../../data/producao';
+import { formatarData, hojeISO } from '../../domain/datas';
+import { divergencias, preencherDaProducao, temIntegracao } from '../../domain/integracao';
+import type { Producao } from '../../domain/producao';
 import {
   camposDaUnidade,
   daUnidade,
@@ -26,6 +29,7 @@ import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { irPara } from '../../lib/navegacao';
 import { quemSou } from '../../lib/quemSou';
+import { useAoVivo } from '../../lib/useAoVivo';
 import { Campo } from '../Campo';
 
 const CHAVE_NOME = 'portalp3.respondidoPor';
@@ -100,7 +104,35 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
   const prazo = prazoDoDocumento(d, p.mesRef);
   const s = situacaoEnvio(p.envio, prazo);
 
+  // Produção dos pelotões do mês: pré-preenche o que existe nela (só com a produção completa).
+  const integrado = temIntegracao(d.id);
+  const producao = useAoVivo<Producao[]>(
+    (ok, falha) => (integrado ? observarProducaoDaCia(db, p.unidade, p.mesRef, ok, falha) : (ok([]), () => undefined)),
+    [integrado, p.unidade, p.mesRef],
+    'Não foi possível conferir a produção dos pelotões.',
+  );
+  const pre =
+    integrado && producao.valor
+      ? preencherDaProducao(d.id, campos.map((c) => c.id), producao.valor, p.mesRef, p.unidade, hojeISO())
+      : null;
+  const travado = integrado && (!pre || !pre.completa);
+  const preenchido = useRef(false);
+  useEffect(() => {
+    if (!pre?.completa || preenchido.current) return;
+    preenchido.current = true;
+    // Só completa o que está vazio: não apaga o que a Cia já enviou ou está digitando.
+    setRascunho((r) => {
+      const n = { ...r };
+      for (const [c, v] of Object.entries(pre.valores)) if (!String(n[c] ?? '').trim()) n[c] = String(v).replace('.', ',');
+      return n;
+    });
+  }, [pre]);
+
   async function enviar() {
+    if (travado) {
+      setErro('A produção dos pelotões do mês está incompleta: complete a produção antes de enviar.');
+      return;
+    }
     const { valores, erros: e } = d.lista ? valoresDaLista(d, p.unidade, linhas) : lerValores(d, p.unidade, rascunho);
     if (!nome.trim()) e.__nome = 'Informe quem preencheu (posto/graduação e nome).';
     setErros(e);
@@ -109,7 +141,14 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
     setEnviando(true);
     try {
       // O envio aparece na hora (o banco confirma em seguida); se a conexão estiver lenta, não prende a Cia na tela.
-      const envio = enviarDocMensal(db, { docId: d.id, mesRef: p.mesRef, unidadeId: p.unidade, valores, respondidoPor: nome });
+      const envio = enviarDocMensal(db, {
+        docId: d.id,
+        mesRef: p.mesRef,
+        unidadeId: p.unidade,
+        valores,
+        respondidoPor: nome,
+        daProducao: pre?.completa ? pre.valores : undefined,
+      });
       envio.catch(() => undefined);
       await Promise.race([envio, new Promise((ok) => setTimeout(ok, 3000))]);
       try {
@@ -147,13 +186,31 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
           A P/3 foi avisada: {p.envio.erro}
         </p>
       )}
+      {integrado && <AvisoProducao carregando={producao.carregando} erro={producao.erro} pre={pre} mesRef={p.mesRef} />}
       {d.lista && <ListaCia documento={d} unidade={p.unidade} linhas={linhas} aoMudar={setLinhas} erros={erros} />}
       {grupos.map((g) => (
         <fieldset key={g.titulo || 'campos'} className="cartao grupo">
           {g.titulo && <legend className="legenda-grupo">{g.titulo}</legend>}
           <div className="grade-2">
             {g.campos.map((c) => (
-              <Campo key={c.id} rotulo={c.rotulo} obrigatorio={!c.texto || c.obrigatorio} erro={erros[c.id]} className={c.texto ? 'campo-largo' : undefined}>
+              <Campo
+                key={c.id}
+                rotulo={
+                  pre?.completa && c.id in pre.valores ? (
+                    <>
+                      {c.rotulo} 🔗
+                      {divergencias(pre.valores, { [c.id]: Number(String(rascunho[c.id]).replace(',', '.')) }).length > 0 && (
+                        <span className="dica-producao"> · na produção: {String(pre.valores[c.id]).replace('.', ',')}</span>
+                      )}
+                    </>
+                  ) : (
+                    c.rotulo
+                  )
+                }
+                obrigatorio={!c.texto || c.obrigatorio}
+                erro={erros[c.id]}
+                className={c.texto ? 'campo-largo' : undefined}
+              >
                 {c.texto ? (
                   <textarea rows={2} value={rascunho[c.id]} onChange={(e) => setRascunho({ ...rascunho, [c.id]: e.target.value })} />
                 ) : (
@@ -182,11 +239,57 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
         <a className="botao secundario" href="#/documentos">
           Voltar
         </a>
-        <button className="botao destaque" type="button" disabled={enviando} onClick={enviar}>
-          {enviando ? 'Enviando…' : p.envio ? 'Atualizar envio' : 'Enviar'}
+        <button className="botao destaque" type="button" disabled={enviando || travado} onClick={enviar}>
+          {enviando
+            ? 'Enviando…'
+            : travado
+              ? 'Produção incompleta'
+              : p.envio
+                ? 'Atualizar envio'
+                : integrado
+                  ? 'Conferi: enviar para a P/3'
+                  : 'Enviar'}
         </button>
       </div>
     </section>
+  );
+}
+
+function AvisoProducao(p: { carregando: boolean; erro: string; pre: ReturnType<typeof preencherDaProducao> | null; mesRef: string }) {
+  if (p.erro)
+    return (
+      <p className="mensagem erro" role="alert">
+        {p.erro} Abra de novo para tentar.
+      </p>
+    );
+  if (p.carregando || !p.pre) return <p className="carregando">Conferindo a produção dos pelotões…</p>;
+  if (!p.pre.completa) {
+    const lista = p.pre.pendencias.map((x) => `${formatarData(x.data)} (${[x.faltaDia && 'dia', x.faltaNoite && 'noite'].filter(Boolean).join(' e ')})`);
+    return (
+      <div className="mensagem erro" role="alert">
+        <p>
+          <strong>Produção dos pelotões de {rotuloMes(p.mesRef)} incompleta</strong>
+          {p.pre.turnosFaltando ? `: faltam ${p.pre.turnosFaltando} turno(s) em ${lista.length} dia(s).` : ': o mês ainda não terminou.'} Este documento
+          não é pré-preenchido e não pode ser enviado até a Sala de Operações completar a produção. A P/3 está vendo este alerta.
+        </p>
+        {lista.length > 0 && <p>Faltam: {lista.join(', ')}.</p>}
+        <a className="botao secundario" href="#/sala">
+          Ir para a Sala de Operações
+        </a>
+      </div>
+    );
+  }
+  return (
+    <>
+      <p className="mensagem aviso" role="status">
+        Os campos com 🔗 vieram somados da produção dos pelotões de {rotuloMes(p.mesRef)}. Confira e corrija se preciso antes de enviar para a P/3.
+      </p>
+      {p.pre.avisos.map((a) => (
+        <p key={a} className="mensagem atencao">
+          {a}
+        </p>
+      ))}
+    </>
   );
 }
 

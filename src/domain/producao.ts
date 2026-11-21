@@ -5,7 +5,9 @@
 // - Força Tática: Pel A e Pel B de dia, em dias alternados (não tem turno da noite).
 // - Um lançamento por pelotão por dia de serviço (o turno da noite usa a data em que começou).
 // - O resultado da BCS entra no resultado do pelotão.
-// - Nos flagrantes de delito ficam o nº do talão, o nº do BOPC e o dia da ocorrência: a P/3 usa para colher os dados oficiais do QMO.
+// - Nos flagrantes de delito ficam o nº do talão, o nº do BOPC, o dia e a natureza da ocorrência: a P/3 usa para colher
+//   os dados oficiais do QMO, e a natureza separa o flagrante de tráfico dos outros na Avaliação Periódica.
+// - Os itens também pré-preenchem os Documentos Mensais (ver domain/integracao.ts).
 //
 // É o banco de onde saem as planilhas (CPA diário, RAC por pelotão, trimestral, BCS...). Os códigos dos itens são os
 // mesmos do RAC (domain/rac.ts) para o RAC poder ser preenchido daqui.
@@ -57,6 +59,7 @@ export const GRUPOS_PRODUCAO = [
   { id: 'prisoes', rotulo: 'Prisões' },
   { id: 'apreensoes', rotulo: 'Apreensões' },
   { id: 'transito', rotulo: 'Trânsito' },
+  { id: 'ciclos', rotulo: 'Bicicletas elétricas, ciclomotores e autopropelidos' },
   { id: 'registros', rotulo: 'Atendimentos e registros' },
 ] as const;
 export type GrupoProducao = (typeof GRUPOS_PRODUCAO)[number]['id'];
@@ -74,6 +77,7 @@ export const ITENS_PRODUCAO = [
   { id: 'procurados', rotulo: 'Procurados capturados (presos por mandado)', grupo: 'prisoes' },
   { id: 'atosInfracionais', rotulo: 'Atos infracionais (adolescentes apreendidos)', grupo: 'prisoes' },
   { id: 'armas', rotulo: 'Armas de fogo apreendidas', grupo: 'apreensoes' },
+  { id: 'armasBrancas', rotulo: 'Armas brancas apreendidas', grupo: 'apreensoes' },
   { id: 'maconhaKg', rotulo: 'Maconha (kg)', grupo: 'apreensoes', decimal: true },
   { id: 'cocainaKg', rotulo: 'Cocaína (kg)', grupo: 'apreensoes', decimal: true },
   { id: 'crackKg', rotulo: 'Crack (kg)', grupo: 'apreensoes', decimal: true },
@@ -81,17 +85,33 @@ export const ITENS_PRODUCAO = [
   { id: 'veiculosRecuperados', rotulo: 'Veículos recuperados (L01)', grupo: 'apreensoes' },
   { id: 'veiculosApreendidos', rotulo: 'Carros apreendidos pela delegacia', grupo: 'apreensoes' },
   { id: 'motosApreendidas', rotulo: 'Motos apreendidas pela delegacia', grupo: 'apreensoes' },
+  { id: 'caminhoesApreendidos', rotulo: 'Caminhões apreendidos pela delegacia', grupo: 'apreensoes' },
   { id: 'documentos', rotulo: 'Documentos apreendidos', grupo: 'apreensoes' },
   { id: 'ait', rotulo: 'AIT (CET)', grupo: 'transito' },
   { id: 'ai', rotulo: 'AI (DETRAN)', grupo: 'transito' },
+  { id: 'trv', rotulo: 'TRV', grupo: 'transito' },
   { id: 'carrosRemovidos', rotulo: 'Carros removidos ao pátio', grupo: 'transito' },
   { id: 'motosRemovidas', rotulo: 'Motos removidas ao pátio', grupo: 'transito' },
-  { id: 'ciclomotoresRemovidos', rotulo: 'Ciclomotores removidos ao pátio', grupo: 'transito' },
+  { id: 'caminhoesRemovidos', rotulo: 'Caminhões removidos ao pátio', grupo: 'transito' },
+  { id: 'bikeVist', rotulo: 'Bicicletas elétricas vistoriadas', grupo: 'ciclos' },
+  { id: 'bikeRem', rotulo: 'Bicicletas elétricas removidas', grupo: 'ciclos' },
+  { id: 'bikeLoc', rotulo: 'Bicicletas elétricas localizadas', grupo: 'ciclos' },
+  { id: 'bikeAut', rotulo: 'Bicicletas elétricas autuadas', grupo: 'ciclos' },
+  { id: 'cicloVist', rotulo: 'Ciclomotores vistoriados', grupo: 'ciclos' },
+  { id: 'cicloRem', rotulo: 'Ciclomotores removidos', grupo: 'ciclos' },
+  { id: 'cicloLoc', rotulo: 'Ciclomotores localizados', grupo: 'ciclos' },
+  { id: 'cicloAut', rotulo: 'Ciclomotores autuados', grupo: 'ciclos' },
+  { id: 'autoVist', rotulo: 'Autopropelidos vistoriados', grupo: 'ciclos' },
+  { id: 'autoRem', rotulo: 'Autopropelidos removidos', grupo: 'ciclos' },
+  { id: 'autoLoc', rotulo: 'Autopropelidos localizados', grupo: 'ciclos' },
+  { id: 'autoAut', rotulo: 'Autopropelidos autuados', grupo: 'ciclos' },
   { id: 'ocorrencias', rotulo: 'Ocorrências atendidas', grupo: 'registros' },
   { id: 'bopm', rotulo: 'BOPM elaborados', grupo: 'registros' },
   { id: 'operacoes', rotulo: 'Operações realizadas', grupo: 'registros' },
   { id: 'raiia', rotulo: 'RAIIA', grupo: 'registros' },
   { id: 'palestras', rotulo: 'Palestras realizadas', grupo: 'registros' },
+  { id: 'escoltasRecebidas', rotulo: 'Pedidos de escolta da Fundação Casa recebidos', grupo: 'registros' },
+  { id: 'escoltasAtendidas', rotulo: 'Pedidos de escolta da Fundação Casa atendidos', grupo: 'registros' },
 ] as const satisfies readonly { id: string; rotulo: string; grupo: GrupoProducao; decimal?: boolean }[];
 
 export type ItemId = (typeof ITENS_PRODUCAO)[number]['id'];
@@ -109,8 +129,33 @@ export const MAXIMO_QUANTIDADE = 99_999;
 export const MAXIMO_TALOES = 100;
 export const LIMITE_TALAO = 30;
 
-/** Flagrante de delito: nº do talão, nº do BOPC (pode ficar para depois) e o dia da ocorrência. */
-export type Talao = { numero: string; bopc: string; data: string };
+/** Natureza da ocorrência do flagrante (a lista pode crescer; "outra" cobre o resto). */
+export const NATUREZAS_FLAGRANTE = [
+  { id: 'trafico', rotulo: 'Tráfico de drogas' },
+  { id: 'roubo', rotulo: 'Roubo' },
+  { id: 'furto', rotulo: 'Furto' },
+  { id: 'receptacao', rotulo: 'Receptação' },
+  { id: 'armaFogo', rotulo: 'Porte / posse ilegal de arma de fogo' },
+  { id: 'violenciaDomestica', rotulo: 'Violência doméstica (Maria da Penha)' },
+  { id: 'embriaguez', rotulo: 'Embriaguez ao volante' },
+  { id: 'lesao', rotulo: 'Lesão corporal' },
+  { id: 'homicidio', rotulo: 'Homicídio (consumado ou tentado)' },
+  { id: 'estupro', rotulo: 'Estupro' },
+  { id: 'ameaca', rotulo: 'Ameaça' },
+  { id: 'dano', rotulo: 'Dano' },
+  { id: 'desacato', rotulo: 'Desacato / resistência / desobediência' },
+  { id: 'outra', rotulo: 'Outra' },
+] as const;
+export type NaturezaFlagrante = (typeof NATUREZAS_FLAGRANTE)[number]['id'];
+export const ehNatureza = (v: unknown): v is NaturezaFlagrante => NATUREZAS_FLAGRANTE.some((n) => n.id === v);
+/** "Tráfico de drogas"; '' (lançamento antigo, sem natureza) vira "—". */
+export const rotuloNatureza = (id: string): string => NATUREZAS_FLAGRANTE.find((n) => n.id === id)?.rotulo ?? '—';
+
+/**
+ * Flagrante de delito: nº do talão, nº do BOPC (pode ficar para depois), o dia e a natureza da ocorrência.
+ * `natureza` = '' nos lançamentos feitos antes de o campo existir.
+ */
+export type Talao = { numero: string; bopc: string; data: string; natureza: NaturezaFlagrante | '' };
 
 export type Producao = {
   id: string;
@@ -143,6 +188,8 @@ export function lerItens(bruto: unknown): Itens {
     const v = Number(x[id]);
     r[id] = Number.isFinite(v) && v >= 0 ? v : 0;
   }
+  // Lançamento antigo: "Ciclomotores removidos ao pátio" virou "Ciclomotores removidos" (bloco das bicicletas/ciclomotores).
+  if (x.cicloRem === undefined && Number(x.ciclomotoresRemovidos) > 0) r.cicloRem = Number(x.ciclomotoresRemovidos);
   return r;
 }
 
@@ -180,6 +227,7 @@ export function validarTalao(t: Talao, ja: readonly Talao[]): string {
   if (n.length > LIMITE_TALAO || !NUMERO_VALIDO.test(n)) return 'Talão: use só números (e letras, se tiver).';
   if (bopc && (bopc.length > LIMITE_TALAO || !NUMERO_VALIDO.test(bopc))) return 'BOPC: use só números (e letras, se tiver).';
   if (!ehDataISO(t.data)) return 'Informe o dia da ocorrência.';
+  if (!ehNatureza(t.natureza)) return 'Escolha a natureza da ocorrência.';
   if (ja.some((x) => normalizarTalao(x.numero) === n)) return 'Este talão já está na lista.';
   if (ja.length >= MAXIMO_TALOES) return `Até ${MAXIMO_TALOES} flagrantes por lançamento.`;
   return '';
@@ -217,6 +265,8 @@ export function avisosProducao(itens: Itens, taloes: readonly Talao[]): string[]
   if (itens.ocorrenciasComPrisao > itens.ocorrencias) avisos.push('Ocorrências atendidas menor que as ocorrências com prisão.');
   if (itens.flagrante > 0 && taloes.length === 0) avisos.push('Houve flagrante: anote o nº do talão e o nº do BOPC (a P/3 usa para colher os dados).');
   if (taloes.some((t) => !t.bopc)) avisos.push('Há flagrante sem nº do BOPC: complete quando tiver.');
+  if (taloes.some((t) => !t.natureza)) avisos.push('Há flagrante sem a natureza da ocorrência: tire e inclua de novo com a natureza.');
+  if (itens.escoltasAtendidas > itens.escoltasRecebidas) avisos.push('Há mais escoltas atendidas do que pedidos de escolta recebidos.');
   return avisos;
 }
 
@@ -301,7 +351,7 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
     return it.id === 'outrasDrogasKg' ? [c, { rotulo: 'Entorpecentes - total (kg)', valor: totalDrogasKg }] : [c];
   });
   const rotulos = colunas.map((c) => c.rotulo);
-  const flag = (t: Talao) => (t.bopc ? `${t.numero} / BOPC ${t.bopc}` : t.numero);
+  const flag = (t: Talao) => `${t.bopc ? `${t.numero} / BOPC ${t.bopc}` : t.numero}${t.natureza ? ` (${rotuloNatureza(t.natureza)})` : ''}`;
 
   const linhasLanc: Celula[][] = [
     ['Dia do serviço', 'Dia da semana', 'Unidade', 'Pelotão', 'Turno', ...rotulos, 'Flagrantes (talão / BOPC)', 'Lançado por', 'Lançado em', 'Atualizado por', 'Atualizado em'],
@@ -343,11 +393,11 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
   ];
 
   const linhasTaloes: Celula[][] = [
-    ['Dia da ocorrência', 'Nº do talão', 'Nº do BOPC', 'Unidade', 'Pelotão', 'Dia do serviço'],
+    ['Dia da ocorrência', 'Nº do talão', 'Nº do BOPC', 'Natureza', 'Unidade', 'Pelotão', 'Dia do serviço'],
     ...lista
       .flatMap((l) => l.taloes.map((t) => ({ t, l })))
       .sort((a, b) => a.t.data.localeCompare(b.t.data) || ordemUnidade(a.l.unidadeId) - ordemUnidade(b.l.unidadeId))
-      .map(({ t, l }) => [formatarData(t.data), t.numero, t.bopc, siglaDe(l.unidadeId), PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao, formatarData(l.data)]),
+      .map(({ t, l }) => [formatarData(t.data), t.numero, t.bopc, t.natureza ? rotuloNatureza(t.natureza) : '', siglaDe(l.unidadeId), PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao, formatarData(l.data)]),
   ];
 
   return [

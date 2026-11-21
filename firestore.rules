@@ -171,7 +171,8 @@ service cloud.firestore {
     // Envio da Cia (id = documento_mês_unidade): só a dela; o motor grava na planilha e marca "gravado".
     function envioMensalValido(id) {
       let r = request.resource.data;
-      return r.keys().hasOnly(['docId', 'mesRef', 'unidadeId', 'valores', 'respondidoPor', 'enviadoEm', 'gravado', 'gravadoEm', 'erro', 'erroEm'])
+      return r.keys().hasOnly(['docId', 'mesRef', 'unidadeId', 'valores', 'respondidoPor', 'enviadoEm', 'gravado', 'gravadoEm', 'erro', 'erroEm', 'daProducao'])
+        && (!('daProducao' in r) || (r.daProducao is map && r.daProducao.size() <= 200))
         && r.docId is string && r.mesRef is string && r.mesRef.matches('^[0-9]{4}-[0-9]{2}$')
         && id == r.docId + '_' + r.mesRef + '_' + r.unidadeId
         && r.valores is map && r.valores.size() <= 200
@@ -561,13 +562,16 @@ service cloud.firestore {
 
     // Produção diária dos pelotões: a Sala de Operações da Cia lança no fim do turno (id fixo "{cia}_{dia}_{pelotão}":
     // um lançamento por pelotão por dia). A Cia lança e corrige o dela; a P/3 lê tudo. Quem lançou e quem alterou ficam gravados.
+    // Sem "v is number": comparar texto, booleano ou nulo com número dá erro, e erro nega o pedido. Fica mais barato
+    // (o Firestore avalia no máximo 1000 expressões por pedido e a produção tem mais de 40 itens).
     function qtdProducao(v) {
-      return v is number && v >= 0 && v <= 99999;
+      return v >= 0 && v <= 99999;
     }
+    // Cada item obrigatório é conferido abaixo (qtdProducao falha se faltar). Os que entraram depois (e
+    // ciclomotoresRemovidos, que saiu) podem faltar nos lançamentos antigos: get(..., 0).
     function itensProducaoValidos(i) {
       return i is map
-        && i.keys().hasOnly(['pessoasAbordadas', 'veiculosVistoriados', 'motosVistoriadas', 'ocorrenciasComPrisao', 'flagrante', 'procurados', 'atosInfracionais', 'armas', 'maconhaKg', 'cocainaKg', 'crackKg', 'outrasDrogasKg', 'veiculosRecuperados', 'veiculosApreendidos', 'motosApreendidas', 'documentos', 'ait', 'ai', 'carrosRemovidos', 'motosRemovidas', 'ciclomotoresRemovidos', 'ocorrencias', 'bopm', 'operacoes', 'raiia', 'palestras'])
-        && i.keys().hasAll(['pessoasAbordadas', 'veiculosVistoriados', 'motosVistoriadas', 'ocorrenciasComPrisao', 'flagrante', 'procurados', 'atosInfracionais', 'armas', 'maconhaKg', 'cocainaKg', 'crackKg', 'outrasDrogasKg', 'veiculosRecuperados', 'veiculosApreendidos', 'motosApreendidas', 'documentos', 'ait', 'ai', 'carrosRemovidos', 'motosRemovidas', 'ciclomotoresRemovidos', 'ocorrencias', 'bopm', 'operacoes', 'raiia', 'palestras'])
+        && i.keys().hasOnly(['pessoasAbordadas', 'veiculosVistoriados', 'motosVistoriadas', 'ocorrenciasComPrisao', 'flagrante', 'procurados', 'atosInfracionais', 'armas', 'maconhaKg', 'cocainaKg', 'crackKg', 'outrasDrogasKg', 'veiculosRecuperados', 'veiculosApreendidos', 'motosApreendidas', 'documentos', 'ait', 'ai', 'carrosRemovidos', 'motosRemovidas', 'ciclomotoresRemovidos', 'ocorrencias', 'bopm', 'operacoes', 'raiia', 'palestras', 'armasBrancas', 'caminhoesApreendidos', 'trv', 'caminhoesRemovidos', 'bikeVist', 'bikeRem', 'bikeLoc', 'bikeAut', 'cicloVist', 'cicloRem', 'cicloLoc', 'cicloAut', 'autoVist', 'autoRem', 'autoLoc', 'autoAut', 'escoltasRecebidas', 'escoltasAtendidas'])
         && qtdProducao(i.pessoasAbordadas)
         && qtdProducao(i.veiculosVistoriados)
         && qtdProducao(i.motosVistoriadas)
@@ -588,12 +592,30 @@ service cloud.firestore {
         && qtdProducao(i.ai)
         && qtdProducao(i.carrosRemovidos)
         && qtdProducao(i.motosRemovidas)
-        && qtdProducao(i.ciclomotoresRemovidos)
+        && qtdProducao(i.get('ciclomotoresRemovidos', 0))
         && qtdProducao(i.ocorrencias)
         && qtdProducao(i.bopm)
         && qtdProducao(i.operacoes)
         && qtdProducao(i.raiia)
-        && qtdProducao(i.palestras);
+        && qtdProducao(i.palestras)
+        && qtdProducao(i.get('armasBrancas', 0))
+        && qtdProducao(i.get('caminhoesApreendidos', 0))
+        && qtdProducao(i.get('trv', 0))
+        && qtdProducao(i.get('caminhoesRemovidos', 0))
+        && qtdProducao(i.get('bikeVist', 0))
+        && qtdProducao(i.get('bikeRem', 0))
+        && qtdProducao(i.get('bikeLoc', 0))
+        && qtdProducao(i.get('bikeAut', 0))
+        && qtdProducao(i.get('cicloVist', 0))
+        && qtdProducao(i.get('cicloRem', 0))
+        && qtdProducao(i.get('cicloLoc', 0))
+        && qtdProducao(i.get('cicloAut', 0))
+        && qtdProducao(i.get('autoVist', 0))
+        && qtdProducao(i.get('autoRem', 0))
+        && qtdProducao(i.get('autoLoc', 0))
+        && qtdProducao(i.get('autoAut', 0))
+        && qtdProducao(i.get('escoltasRecebidas', 0))
+        && qtdProducao(i.get('escoltasAtendidas', 0));
     }
     function producaoValida(id) {
       let d = request.resource.data;

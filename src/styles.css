@@ -3723,3 +3723,9 @@ li.agenda-linha {
   left: 0;
   background: var(--cor-fundo);
 }
+
+/* Documento Mensal: campo que veio da produção e foi alterado pela Cia. */
+.dica-producao {
+  color: var(--cor-destaque);
+  font-weight: 600;
+}
