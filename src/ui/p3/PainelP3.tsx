@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, type ReactNode } from 'react';
 import { sobDemanda } from '../../lib/sobDemanda';
 import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { garantirCopiaAutomatica } from '../../data/banco';
@@ -39,30 +39,51 @@ const MissoesCfp = sobDemanda(() => import('../setores/PainelCfp'), 'MissoesCfp'
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-/** Dentro de Operações: Checklist, Controle de Operações (Relatório de Indicadores), Documentos Mensais, RAC, Produtividade e Banco de dados. */
-function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos' | 'rac' | 'produtividade' | 'banco'; operacoes?: number }) {
+type SubAba = { hash: string; rotulo: string; Tela: (p: { operacoes: AoVivo<Operacao[]> }) => ReactNode };
+
+/** Sub-abas de Operações, do Painel e do CFP: a rota, o rótulo e a tela de cada uma. */
+const OPERACOES: SubAba[] = [
+  { hash: '#/operacoes', rotulo: 'Checklist Operações', Tela: ({ operacoes }) => <ChecklistOperacoes operacoes={operacoes} /> },
+  { hash: '#/operacoes/controle', rotulo: 'Controle de Operações', Tela: () => <ControleOperacoes /> },
+  { hash: '#/operacoes/documentos', rotulo: 'Documentos Mensais', Tela: () => <DocumentosMensais /> },
+  { hash: '#/operacoes/rac', rotulo: 'RAC', Tela: () => <RacP3 /> },
+  { hash: '#/operacoes/produtividade', rotulo: 'Produtividade', Tela: () => <ProducaoP3 /> },
+  { hash: '#/operacoes/banco', rotulo: 'Banco de dados', Tela: () => <BancoDados /> },
+];
+const PAINEL: SubAba[] = [
+  { hash: '#/painel', rotulo: 'Prazos', Tela: () => <PainelPrazos /> },
+  { hash: '#/painel/p3', rotulo: 'Estatístico P/3', Tela: () => <EstatisticoP3 /> },
+  { hash: '#/painel/batalhao', rotulo: 'Estatístico do Batalhão', Tela: () => <PainelBatalhao /> },
+];
+const CFP: SubAba[] = [
+  {
+    hash: '#/cfp',
+    rotulo: 'Missões e recados',
+    Tela: () => (
+      <>
+        <Recados setor="cfp" podeEnviar />
+        <MissoesCfp />
+      </>
+    ),
+  },
+  { hash: '#/cfp/tds', rotulo: 'TDS', Tela: () => <TdsP3 /> },
+];
+
+/** Barra de sub-abas + a tela da escolhida. contadores: número ao lado do rótulo (ex.: operações abertas). */
+function ComSubAbas(p: { rotulo: string; abas: SubAba[]; ativa: SubAba; operacoes: AoVivo<Operacao[]>; contadores?: Record<string, number | undefined> }) {
+  const { Tela } = p.ativa;
   return (
-    <nav className="abas abas-p3 subabas" aria-label="Operações">
-      <a href="#/operacoes" aria-current={ativa === 'checklist' ? 'page' : undefined}>
-        Checklist Operações
-        {operacoes ? <span className="contador-aba">{operacoes}</span> : null}
-      </a>
-      <a href="#/operacoes/controle" aria-current={ativa === 'controle' ? 'page' : undefined}>
-        Controle de Operações
-      </a>
-      <a href="#/operacoes/documentos" aria-current={ativa === 'documentos' ? 'page' : undefined}>
-        Documentos Mensais
-      </a>
-      <a href="#/operacoes/rac" aria-current={ativa === 'rac' ? 'page' : undefined}>
-        RAC
-      </a>
-      <a href="#/operacoes/produtividade" aria-current={ativa === 'produtividade' ? 'page' : undefined}>
-        Produtividade
-      </a>
-      <a href="#/operacoes/banco" aria-current={ativa === 'banco' ? 'page' : undefined}>
-        Banco de dados
-      </a>
-    </nav>
+    <>
+      <nav className="abas abas-p3 subabas" aria-label={p.rotulo}>
+        {p.abas.map((a) => (
+          <a key={a.hash} href={a.hash} aria-current={a === p.ativa ? 'page' : undefined}>
+            {a.rotulo}
+            {p.contadores?.[a.hash] ? <span className="contador-aba">{p.contadores[a.hash]}</span> : null}
+          </a>
+        ))}
+      </nav>
+      <Tela operacoes={p.operacoes} />
+    </>
   );
 }
 
@@ -129,110 +150,30 @@ function ConteudoP3({
   const editar = /^#\/demanda\/(\d+)$/.exec(hash);
   if (editar) return <EditarDemanda id={editar[1]} />;
   if (hash.startsWith('#/painel')) {
-    const aba = hash === '#/painel/p3' ? 'p3' : hash === '#/painel/batalhao' ? 'batalhao' : 'prazos';
-    return (
-      <>
-        <nav className="abas abas-p3 subabas" aria-label="Painel">
-          <a href="#/painel" aria-current={aba === 'prazos' ? 'page' : undefined}>
-            Prazos
-          </a>
-          <a href="#/painel/p3" aria-current={aba === 'p3' ? 'page' : undefined}>
-            Estatístico P/3
-          </a>
-          <a href="#/painel/batalhao" aria-current={aba === 'batalhao' ? 'page' : undefined}>
-            Estatístico do Batalhão
-          </a>
-        </nav>
-        {aba === 'p3' ? <EstatisticoP3 /> : aba === 'batalhao' ? <PainelBatalhao /> : <PainelPrazos />}
-      </>
-    );
+    const ativa = PAINEL.find((a) => a.hash === hash) ?? PAINEL[0];
+    return <ComSubAbas rotulo="Painel" abas={PAINEL} ativa={ativa} operacoes={operacoes} />;
   }
-  if (hash === '#/cfp' || hash === '#/cfp/tds') {
-    const tds = hash === '#/cfp/tds';
-    return (
-      <>
-        <nav className="abas abas-p3 subabas" aria-label="CFP">
-          <a href="#/cfp" aria-current={tds ? undefined : 'page'}>
-            Missões e recados
-          </a>
-          <a href="#/cfp/tds" aria-current={tds ? 'page' : undefined}>
-            TDS
-          </a>
-        </nav>
-        {tds ? (
-          <TdsP3 />
-        ) : (
-          <>
-            <Recados setor="cfp" podeEnviar />
-            <MissoesCfp />
-          </>
-        )}
-      </>
-    );
-  }
-  if (hash.startsWith('#/aperfeicoamento')) {
-    return (
-      <>
-        <Aperfeicoamento rota={hash} />
-      </>
-    );
-  }
+  const doCfp = CFP.find((a) => a.hash === hash);
+  if (doCfp) return <ComSubAbas rotulo="CFP" abas={CFP} ativa={doCfp} operacoes={operacoes} />;
+  if (hash.startsWith('#/aperfeicoamento')) return <Aperfeicoamento rota={hash} />;
   if (hash.startsWith('#/agenda')) return <Agenda rota={hash} />;
-  if (hash === '#/sala') {
-    return (
-      <>
-        <Recados setor="sala" podeEnviar />
-      </>
-    );
-  }
+  if (hash === '#/sala') return <Recados setor="sala" podeEnviar />;
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
-  if (
-    hash === '#/operacoes' ||
-    hash === '#/operacoes/controle' ||
-    hash === '#/operacoes/documentos' ||
-    hash === '#/operacoes/rac' ||
-    hash === '#/operacoes/produtividade' ||
-    hash === '#/operacoes/banco'
-  ) {
-    const ativa =
-      hash === '#/operacoes/controle'
-        ? 'controle'
-        : hash === '#/operacoes/documentos'
-          ? 'documentos'
-          : hash === '#/operacoes/rac'
-            ? 'rac'
-            : hash === '#/operacoes/produtividade'
-              ? 'produtividade'
-              : hash === '#/operacoes/banco'
-                ? 'banco'
-                : 'checklist';
+  const deOperacoes = OPERACOES.find((a) => a.hash === hash);
+  if (deOperacoes) {
     return (
-      <>
-        <SubAbasOperacoes ativa={ativa} operacoes={operacoes.valor?.length} />
-        {ativa === 'controle' ? (
-          <ControleOperacoes />
-        ) : ativa === 'documentos' ? (
-          <DocumentosMensais />
-        ) : ativa === 'rac' ? (
-          <RacP3 />
-        ) : ativa === 'produtividade' ? (
-          <ProducaoP3 />
-        ) : ativa === 'banco' ? (
-          <BancoDados />
-        ) : (
-          <ChecklistOperacoes operacoes={operacoes} />
-        )}
-      </>
+      <ComSubAbas
+        rotulo="Operações"
+        abas={OPERACOES}
+        ativa={deOperacoes}
+        operacoes={operacoes}
+        contadores={{ '#/operacoes': operacoes.valor?.length }}
+      />
     );
   }
   const filtro = /^#\/demandas\/(\w+)$/.exec(hash)?.[1];
   return (
-    <>
-      <ListaDemandas
-        key={filtro ?? 'todas'}
-        filtroInicial={filtro && FILTROS_VALIDOS.includes(filtro) ? (filtro as Situacao) : 'todas'}
-      />
-    </>
+    <ListaDemandas key={filtro ?? 'todas'} filtroInicial={filtro && FILTROS_VALIDOS.includes(filtro) ? (filtro as Situacao) : 'todas'} />
   );
 }
 
