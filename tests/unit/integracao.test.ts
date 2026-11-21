@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { camposDaUnidade, DOCUMENTOS } from '../../src/domain/documentosMensais';
-import { DA_PRODUCAO, divergencias, preencherDaProducao, situacaoProducaoMes } from '../../src/domain/integracao';
+import { DA_PRODUCAO, divergencias, preencherDaProducao, racDaProducao, situacaoProducaoMes } from '../../src/domain/integracao';
+import { producaoAtual, racVazio, totalPelotao } from '../../src/domain/rac';
 import { diasDoMes, IDS_ITENS, itensZerados, lerItens, pelotoesDa, type Itens, type Producao, type Talao } from '../../src/domain/producao';
 import type { UnidadeId } from '../../src/domain/unidades';
 
@@ -119,5 +120,33 @@ describe('produção → documentos mensais', () => {
   test('lançamento antigo de "ciclomotores removidos" vira "ciclomotores removidos" do bloco novo', () => {
     expect(lerItens({ ciclomotoresRemovidos: 3 }).cicloRem).toBe(3);
     expect(lerItens({ ciclomotoresRemovidos: 3, cicloRem: 1 }).cicloRem).toBe(1);
+  });
+
+  test('RAC: produtividade por pelotão e itens à parte vêm da produção; RE e RPM com 0; não apaga o que a Cia digitou', () => {
+    const lancs = mesCompleto('1cia', { pessoasAbordadas: 2, ocorrencias: 1, bopm: 1 });
+    const d = racVazio('1cia', MES);
+    d.pelotoes.armas.pelA = 7; // a Cia já tinha digitado
+    const r = racDaProducao(d, lancs, HOJE);
+    expect(r.completa).toBe(true);
+    expect(r.rac.pelotoes.pessoasAbordadas.pelA).toBe(62); // 31 dias × 2
+    expect(r.rac.pelotoes.pessoasAbordadas.pelB).toBe(62);
+    expect(r.rac.pelotoes.pessoasAbordadas.pelC).toBe(0);
+    expect(r.rac.pelotoes.pessoasAbordadas.re).toBe(0);
+    expect(r.rac.pelotoes.pessoasAbordadas.rpm).toBe(0);
+    expect(totalPelotao(r.rac, 'pessoasAbordadas')).toBe(124);
+    expect(r.rac.pelotoes.armas.pelA).toBe(7);
+    expect(r.daProducao['pelotoes.armas.pelA']).toBe(0);
+    expect(producaoAtual(r.rac).ocorrencias).toBe(62);
+    expect(producaoAtual(r.rac).bopm).toBe(62);
+  });
+
+  test('RAC: produção incompleta não mexe em nada; FT usa Pel A e B', () => {
+    const d = racVazio('1cia', MES);
+    const r = racDaProducao(d, mesCompleto('1cia').slice(1), HOJE);
+    expect(r.completa).toBe(false);
+    expect(r.rac).toBe(d);
+    const ft = racDaProducao(racVazio('ft', MES), mesCompleto('ft', { armas: 1 }), HOJE);
+    expect(ft.rac.pelotoes.armas.pelA).toBe(31);
+    expect(ft.rac.pelotoes.armas.pelB).toBe(0);
   });
 });

@@ -3,10 +3,12 @@
 // Ao abrir um Documento Mensal, os campos que existem na produção diária já vêm somados do mês de referência.
 // A Cia confere (pode corrigir) e envia para a P/3, como antes. Regra: só pré-preenche se a produção do mês
 // estiver COMPLETA (todos os dias, turno do dia e da noite; na FT só o do dia). Faltando algum turno, nada é
-// pré-preenchido, o envio fica travado e a P/3 vê o alerta com os dias que faltam.
+// pré-preenchido (a Cia preenche à mão) e a Cia e a P/3 veem o alerta com os dias que faltam.
+// Quem confere, corrige e envia é sempre a Cia: o que vem da produção é só ponto de partida.
 //
 // Campos que não existem na produção (crimes, naturezas de BO, escolas, EAP...) continuam digitados pela Cia.
 import { diasDoMes, pendencias, somarItens, type Itens, type PendenciaDia, type Producao } from './producao';
+import { colunasPelotao, comCampo, linhasPelotao, prodDigitadaAParte, valorDoCampo, type RacDados } from './rac';
 import type { UnidadeId } from './unidades';
 
 type Lancs = readonly Pick<Producao, 'data' | 'pelotao' | 'itens' | 'taloes'>[];
@@ -101,4 +103,32 @@ export function preencherDaProducao(docId: string, campos: readonly string[], la
 export function divergencias(daProducao: Record<string, number> | undefined, valores: Record<string, unknown>): string[] {
   if (!daProducao) return [];
   return Object.keys(daProducao).filter((c) => Number(valores[c]) !== daProducao[c]);
+}
+
+// ---------- RAC ----------
+
+/**
+ * Produtividade mensal do RAC tirada da produção: a tabela por pelotão (Pel A–D; na FT, Pel A e B) e os itens que
+ * a Cia digita à parte. Ronda Escolar e RPM entram no resultado do pelotão na produção, então as colunas RE e RPM
+ * vêm com 0 (a Cia ajusta se separar). Só com a produção do mês completa; só nos campos ainda vazios.
+ * Devolve o RAC preenchido e o valor de cada campo que veio da produção (para mostrar o que a Cia mudou).
+ */
+export function racDaProducao(
+  d: RacDados,
+  lancs: Lancs,
+  hoje: string,
+): SituacaoProducaoMes & { rac: RacDados; daProducao: Record<string, number> } {
+  const daProducao: Record<string, number> = {};
+  if (d.unidade === 'btl') return { completa: false, pendencias: [], turnosFaltando: 0, rac: d, daProducao };
+  const u = d.unidade;
+  const situacao = situacaoProducaoMes(lancs, d.mes, u, hoje);
+  if (!situacao.completa) return { ...situacao, rac: d, daProducao };
+  const somaPel = (pel: string) => somarItens(lancs.filter((l) => l.pelotao === pel));
+  const total = somarItens(lancs);
+  for (const l of linhasPelotao(u))
+    for (const c of colunasPelotao(u)) daProducao[`pelotoes.${l.id}.${c.id}`] = c.id === 're' || c.id === 'rpm' ? 0 : somaPel(c.id)[l.id];
+  for (const id of prodDigitadaAParte(u)) daProducao[`producao.${id}.atual`] = total[id];
+  let rac = d;
+  for (const [campo, v] of Object.entries(daProducao)) if (valorDoCampo(rac, campo) === null) rac = comCampo(rac, campo, v);
+  return { ...situacao, rac, daProducao };
 }

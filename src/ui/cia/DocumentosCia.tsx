@@ -115,7 +115,6 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
     integrado && producao.valor
       ? preencherDaProducao(d.id, campos.map((c) => c.id), producao.valor, p.mesRef, p.unidade, hojeISO())
       : null;
-  const travado = integrado && (!pre || !pre.completa);
   const preenchido = useRef(false);
   useEffect(() => {
     if (!pre?.completa || preenchido.current) return;
@@ -129,10 +128,6 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
   }, [pre]);
 
   async function enviar() {
-    if (travado) {
-      setErro('A produção dos pelotões do mês está incompleta: complete a produção antes de enviar.');
-      return;
-    }
     const { valores, erros: e } = d.lista ? valoresDaLista(d, p.unidade, linhas) : lerValores(d, p.unidade, rascunho);
     if (!nome.trim()) e.__nome = 'Informe quem preencheu (posto/graduação e nome).';
     setErros(e);
@@ -239,16 +234,8 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
         <a className="botao secundario" href="#/documentos">
           Voltar
         </a>
-        <button className="botao destaque" type="button" disabled={enviando || travado} onClick={enviar}>
-          {enviando
-            ? 'Enviando…'
-            : travado
-              ? 'Produção incompleta'
-              : p.envio
-                ? 'Atualizar envio'
-                : integrado
-                  ? 'Conferi: enviar para a P/3'
-                  : 'Enviar'}
+        <button className="botao destaque" type="button" disabled={enviando} onClick={enviar}>
+          {enviando ? 'Enviando…' : p.envio ? 'Atualizar envio' : integrado ? 'Conferi: enviar para a P/3' : 'Enviar'}
         </button>
       </div>
     </section>
@@ -266,11 +253,12 @@ function AvisoProducao(p: { carregando: boolean; erro: string; pre: ReturnType<t
   if (!p.pre.completa) {
     const lista = p.pre.pendencias.map((x) => `${formatarData(x.data)} (${[x.faltaDia && 'dia', x.faltaNoite && 'noite'].filter(Boolean).join(' e ')})`);
     return (
-      <div className="mensagem erro" role="alert">
+      <div className="mensagem atencao" role="alert">
         <p>
           <strong>Produção dos pelotões de {rotuloMes(p.mesRef)} incompleta</strong>
-          {p.pre.turnosFaltando ? `: faltam ${p.pre.turnosFaltando} turno(s) em ${lista.length} dia(s).` : ': o mês ainda não terminou.'} Este documento
-          não é pré-preenchido e não pode ser enviado até a Sala de Operações completar a produção. A P/3 está vendo este alerta.
+          {p.pre.turnosFaltando ? `: faltam ${p.pre.turnosFaltando} turno(s) em ${lista.length} dia(s).` : ': o mês ainda não terminou.'} Por isso
+          este documento não veio pré-preenchido: complete a produção (ele preenche sozinho ao abrir de novo) ou preencha à mão. Quem confere e
+          envia é a Cia. A P/3 está vendo este alerta.
         </p>
         {lista.length > 0 && <p>Faltam: {lista.join(', ')}.</p>}
         <a className="botao secundario" href="#/sala">
