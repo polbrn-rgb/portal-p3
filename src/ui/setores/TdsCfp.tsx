@@ -18,6 +18,7 @@ import {
   type ErrosManuais,
   type FotoTds,
 } from '../../domain/tds';
+import { DIAS_NO_SISTEMA, textoApagaEm } from '../../domain/fotos';
 import { db } from '../../lib/firebase';
 import { reduzirFoto, type FotoReduzida } from '../../lib/imagem';
 import { useAoVivo } from '../../lib/useAoVivo';
@@ -188,7 +189,7 @@ export function TdsCfp() {
         <ul>
           <li>Informe o seu RE, a data e o assunto da instrução.</li>
           <li>Toque em <strong>📷 Escolher fotos</strong> e marque as fotos no álbum do celular.</li>
-          <li>As fotos são reduzidas antes de enviar e ficam com a P/3.</li>
+          <li>As fotos são reduzidas antes de enviar e ficam com a P/3 por {DIAS_NO_SISTEMA} dias; depois são apagadas sozinhas.</li>
         </ul>
       </div>
 
@@ -298,6 +299,8 @@ export function TdsCfp() {
                   <img src={`data:image/jpeg;base64,${f.miniatura}`} alt={`${f.assunto} (${formatarData(f.data)})`} />
                   <span className="legenda-foto">
                     {formatarData(f.data)} · {f.assunto}
+                    <br />
+                    <span className="item-info">{textoApagaEm(f.enviadoEm)}</span>
                   </span>
                   {confirmarId === f.id ? (
                     <div className="confirmar-foto" role="alertdialog" aria-label={`Confirmar exclusão da foto ${f.vaga}`}>

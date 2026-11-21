@@ -45,7 +45,7 @@ function montar(agora = { valor: Date.parse('2026-11-21T12:00:00Z') }) {
   const etapas = [
     'importarEmails_', 'processarPlanilhas_', 'gravarResultados_', 'sincronizarAgendaCfp_', 'sincronizarControleOperacoes_',
     'processarEap_', 'processarRelatorios_', 'processarDocsMensais_', 'processarIcc_', 'levarEfetivoManual_', 'processarEmails_',
-    'processarAcessos_', 'processarRac_', 'processarBackupBanco_', 'pedirTrocaDeSenha_', 'limparEncaminhamentosOrfaos_',
+    'processarAcessos_', 'processarRac_', 'processarBackupBanco_', 'pedirTrocaDeSenha_', 'limparEncaminhamentosOrfaos_', 'apagarFotosVencidas_',
   ];
   for (const nome of etapas) ctx[nome] = () => chamadas.push(nome);
   let fila: { nome: string; dados: Record<string, unknown> }[] = [];
@@ -147,5 +147,60 @@ describe('rodada do motor', () => {
     expect(JSON.parse(m.props.get('TEMPO_DO_DIA')!).portal).toBe(120);
     for (let i = 0; i < 40; i++) m.ctx.doPost({ parameter: { acao: 'senha', re: String(1000000 + i) } });
     expect(m.chamadas.filter((c) => c === 'pedirTrocaDeSenha_')).toHaveLength(30);
+  });
+});
+
+describe('fotos com mais de 15 dias', () => {
+  function comFirestore(m: ReturnType<typeof montar>, porColecao: Record<string, string[]>) {
+    const pedidos: { metodo: string; caminho: string; corpo?: { structuredQuery?: { from: { collectionId: string }[]; where: unknown } } }[] = [];
+    m.ctx.firestore_ = (metodo: string, caminho: string, corpo?: (typeof pedidos)[number]['corpo']) => {
+      pedidos.push({ metodo, caminho, corpo });
+      if (metodo === 'post') {
+        const col = corpo!.structuredQuery!.from[0].collectionId;
+        return { status: 200, json: (porColecao[col] ?? []).map((id) => ({ document: { name: `projects/p/databases/(default)/documents/${col}/${id}` } })) };
+      }
+      return { status: 200, json: {} };
+    };
+    return pedidos;
+  }
+
+  function motorReal() {
+    // Recarrega o Motor.gs para ter a função de verdade (montar() troca as etapas por versões de teste).
+    const r = montar();
+    runInNewContext(readFileSync('apps-script/Motor.gs', 'utf8'), r.ctx);
+    return r;
+  }
+
+  test('antes de 15 dias da regra começar, nada é apagado (as fotos antigas ganham o prazo inteiro)', () => {
+    const r = motorReal();
+    r.agora.valor = Date.parse('2026-12-06T12:00:00Z'); // 14 dias e meio depois de 22/11
+    const pedidos = comFirestore(r, { fotosCgp: ['a'] });
+    expect((r.ctx.apagarFotosVencidas_ as (f: boolean) => number)(true)).toBe(0);
+    expect(pedidos).toEqual([]);
+  });
+
+  test('depois: apaga foto e resumo das 3 coleções, a foto primeiro; no máximo 1 vez por hora', () => {
+    const r = motorReal();
+    r.agora.valor = Date.parse('2026-12-20T12:00:00Z');
+    const pedidos = comFirestore(r, { fotosCgp: ['a'], fotosTds: ['2026-12_123456_1'], fotosEncaminhadas: ['b'] });
+    const apagar = r.ctx.apagarFotosVencidas_ as (f?: boolean) => number;
+    expect(apagar()).toBe(3);
+    const consultas = pedidos.filter((p) => p.metodo === 'post').map((p) => p.corpo!.structuredQuery!.where);
+    expect(consultas).toContainEqual({
+      fieldFilter: { field: { fieldPath: 'enviadoEm' }, op: 'LESS_THAN', value: { timestampValue: '2026-12-05T12:00:00.000Z' } },
+    });
+    expect(consultas).toContainEqual({
+      fieldFilter: { field: { fieldPath: 'encaminhadaEm' }, op: 'LESS_THAN', value: { timestampValue: '2026-12-05T12:00:00.000Z' } },
+    });
+    const apagados = pedidos.filter((p) => p.metodo === 'delete').map((p) => p.caminho.split('/documents/')[1]);
+    expect(apagados).toEqual([
+      'fotosCgpDados/a', 'fotosCgp/a',
+      'fotosTdsDados/2026-12_123456_1', 'fotosTds/2026-12_123456_1',
+      'fotosEncaminhadasDados/b', 'fotosEncaminhadas/b',
+    ]);
+    pedidos.length = 0;
+    r.agora.valor += 30 * MIN;
+    expect(apagar()).toBe(0);
+    expect(pedidos).toEqual([]);
   });
 });

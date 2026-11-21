@@ -598,6 +598,36 @@ service cloud.firestore {
         && existsAfter(/databases/$(database)/documents/fotosCgp/$(id));
     }
 
+    // Foto do CGP que a Cia encaminhou à P/3: cópia fiel de uma foto do CGP da própria Cia (mesmo id, mesmos textos e
+    // a mesma foto). A Cia vê quais encaminhou; só a P/3 baixa e apaga. O motor apaga 15 dias depois do encaminhamento.
+    function fotoEncaminhadaValida(id) {
+      let f = request.resource.data;
+      let original = get(/databases/$(database)/documents/fotosCgp/$(id)).data;
+      return ehDaCia(f.unidadeId)
+        && f.keys().hasOnly(['unidadeId', 'descricao', 'local', 'observacao', 'miniatura', 'tamanho', 'enviadoPor', 'enviadoEm', 'encaminhadaPor', 'encaminhadaEm'])
+        && original.unidadeId == f.unidadeId
+        && f.descricao == original.descricao && f.local == original.local && f.observacao == original.observacao
+        && f.miniatura == original.miniatura && f.tamanho == original.tamanho && f.enviadoPor == original.enviadoPor
+        && f.enviadoEm is timestamp
+        && f.encaminhadaPor is string && f.encaminhadaPor.size() > 0 && f.encaminhadaPor.size() <= 120
+        && f.encaminhadaEm == request.time
+        && getAfter(/databases/$(database)/documents/fotosEncaminhadasDados/$(id)).data.dados
+          == get(/databases/$(database)/documents/fotosCgpDados/$(id)).data.dados;
+    }
+
+    match /fotosEncaminhadas/{id} {
+      allow read: if ehP3() || ehDaCia(resource.data.unidadeId);
+      allow delete: if ehP3();
+      allow create: if fotoEncaminhadaValida(id);
+    }
+
+    match /fotosEncaminhadasDados/{id} {
+      allow read, delete: if ehP3();
+      allow create: if ehDaCia(request.resource.data.unidadeId)
+        && request.resource.data.keys().hasOnly(['unidadeId', 'dados'])
+        && existsAfter(/databases/$(database)/documents/fotosEncaminhadas/$(id));
+    }
+
     // Produção diária dos pelotões: a Sala de Operações da Cia lança no fim do turno (id fixo "{cia}_{dia}_{pelotão}":
     // um lançamento por pelotão por dia). A Cia lança e corrige o dela; a P/3 lê tudo. Quem lançou e quem alterou ficam gravados.
     // Sem "v is number": comparar texto, booleano ou nulo com número dá erro, e erro nega o pedido. Fica mais barato

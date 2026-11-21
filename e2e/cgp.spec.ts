@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, entrarRE, irParaAbaCia, sair } from './ajuda';
+import { entrar, entrarRE, irPara, irParaAbaCia, sair } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -53,6 +53,18 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   await expect(page.getByText('3 foto(s) importada(s).')).toBeVisible();
   await expect(page.getByRole('img', { name: `Operação — Praça ${assunto}` })).toHaveCount(3);
   await expect(page.getByText(/Importada por 4ª CIA em/).first()).toBeVisible();
+  await expect(page.getByText(/^Sai do sistema em \d{2}\/\d{2}\/\d{4}$/).first()).toBeVisible();
+
+  // A Cia encaminha as fotos à P/3, uma a uma (a mesma foto não vai duas vezes). O botão "Encaminhar as N fotos"
+  // não é usado aqui: o teste do celular e o do computador importam na mesma Cia ao mesmo tempo.
+  await expect(page.getByRole('button', { name: /^Encaminhar (a foto|as \d+ fotos) à P\/3$/ })).toBeVisible();
+  const minhas = page.getByRole('listitem').filter({ has: page.getByRole('img', { name: `Operação — Praça ${assunto}` }) });
+  for (let i = 0; i < 3; i++) {
+    await minhas.getByRole('button', { name: 'Encaminhar à P/3' }).first().click();
+    await expect(minhas.filter({ hasText: '✅ Encaminhada à P/3' })).toHaveCount(i + 1);
+  }
+  await expect(page.getByText('1 foto(s) encaminhada(s) à P/3.')).toBeVisible();
+  await expect(minhas.getByRole('button', { name: 'Encaminhar à P/3' })).toHaveCount(0);
 
   // O CGP da 4ª Cia (acesso por RE) vê só a página dele: a missão, o recado e as fotos; não exclui missão.
   await sair(page);
@@ -64,6 +76,23 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   await expect(page.getByText(`Recado ${assunto}`)).toBeVisible();
   await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Importação de fotos' }).click();
   await expect(page.getByRole('img', { name: `Operação — Praça ${assunto}` })).toHaveCount(3);
+  // O acesso do CGP não encaminha (isso é da Cia).
+  await expect(page.getByRole('button', { name: /Encaminhar/ })).toHaveCount(0);
+  await sair(page);
+
+  // A P/3 recebe em "Fotos das Cias": baixa uma e apaga outra.
+  await entrar(page, 'p3', SENHA_TESTE);
+  await irPara(page, /^Fotos das Cias/);
+  await page.getByRole('combobox', { name: 'Cia', exact: true }).selectOption('4cia');
+  const naP3 = page.getByRole('listitem').filter({ has: page.getByRole('img', { name: `Operação — Praça ${assunto}` }) });
+  await expect(naP3).toHaveCount(3);
+  await expect(naP3.first()).toContainText('encaminhada por 4ª CIA');
+  const baixou = page.waitForEvent('download');
+  await naP3.first().getByRole('button', { name: 'Baixar' }).click();
+  expect((await baixou).suggestedFilename()).toBe(`CGP Operação - Praça ${assunto}.jpg`);
+  await naP3.first().getByRole('button', { name: 'Apagar' }).click();
+  await naP3.first().getByRole('button', { name: 'Sim, apagar' }).click();
+  await expect(naP3).toHaveCount(2);
   await sair(page);
   await entrar(page, '4cia', SENHA_TESTE);
   await irParaAbaCia(page, 'CGP');

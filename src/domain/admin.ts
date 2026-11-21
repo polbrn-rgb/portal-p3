@@ -23,6 +23,8 @@ export const COLECOES_ZERAR = [
   'arquivos',
   'fotosTds',
   'fotosTdsDados',
+  'fotosEncaminhadas',
+  'fotosEncaminhadasDados',
   'recadosCfp',
   'recadosSala',
   'emails',

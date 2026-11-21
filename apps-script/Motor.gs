@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-22';
+var VERSAO_MOTOR = '2026-11-23';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -318,6 +318,7 @@ function rodarMotor_(esperaMs, opcoes) {
     etapa('RAC', processarRac_);
     etapa('Banco de dados (cópia)', processarBackupBanco_);
     etapa('Encaminhamentos sem demanda', limparEncaminhamentosOrfaos_);
+    etapa('Fotos com mais de 15 dias', apagarFotosVencidas_);
     registrarRodada_(props, opcoes.origem || 'gatilho', comeco, tempos);
   } finally {
     trava.releaseLock();
@@ -366,6 +367,45 @@ function limparEncaminhamentosOrfaos_(forcar) {
   if (orfaos.length) console.info(orfaos.length + ' encaminhamento(s) de demanda apagada removido(s) das Cias.');
   props.setProperty('ORFAOS_EM', dia);
   return orfaos.length;
+}
+
+// Fotos que saem do sistema 15 dias depois de gravadas: coleção do resumo, coleção da foto (mesmo id) e o campo da data.
+var FOTOS_COM_PRAZO = [
+  { resumo: 'fotosCgp', dados: 'fotosCgpDados', campo: 'enviadoEm' },
+  { resumo: 'fotosTds', dados: 'fotosTdsDados', campo: 'enviadoEm' },
+  { resumo: 'fotosEncaminhadas', dados: 'fotosEncaminhadasDados', campo: 'encaminhadaEm' }
+];
+
+/** De hora em hora: apaga as fotos (CGP, TDS e encaminhadas à P/3) com mais de 15 dias no sistema. */
+function apagarFotosVencidas_(forcar) {
+  var props = PropertiesService.getScriptProperties();
+  var agora = Date.now();
+  if (!forcar && agora - (Number(props.getProperty('FOTOS_VENCIDAS_EM')) || 0) < 60 * 60 * 1000) return 0;
+  var limite = limiteFotosVencidas(agora);
+  var total = 0;
+  if (limite) {
+    FOTOS_COM_PRAZO.forEach(function (c) {
+      var r = firestore_('post', caminhoDocs_() + ':runQuery', {
+        structuredQuery: {
+          from: [{ collectionId: c.resumo }],
+          where: { fieldFilter: { field: { fieldPath: c.campo }, op: 'LESS_THAN', value: { timestampValue: limite } } },
+          select: { fields: [{ fieldPath: '__name__' }] },
+          limit: 300
+        }
+      });
+      if (r.status !== 200) throw new Error(c.resumo + ': Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+      r.json.filter(function (x) { return x.document; }).forEach(function (x) {
+        var id = x.document.name.split('/').pop();
+        // A foto primeiro: se o resumo falhar, ele é apagado na próxima rodada (nunca fica foto sem resumo).
+        firestore_('delete', caminhoDocs_() + '/' + c.dados + '/' + id);
+        firestore_('delete', caminhoDocs_() + '/' + c.resumo + '/' + id);
+        total++;
+      });
+    });
+  }
+  if (total) console.info(total + ' foto(s) com mais de ' + FOTOS_DIAS_NO_SISTEMA + ' dias apagada(s).');
+  props.setProperty('FOTOS_VENCIDAS_EM', String(agora));
+  return total;
 }
 
 /** Guarda o tempo da última rodada e o total do dia (o diagnóstico mostra; a cota do Google é por dia). */
