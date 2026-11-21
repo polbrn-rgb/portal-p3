@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react';
 import { sobDemanda } from '../../lib/sobDemanda';
-import { limparEncaminhamentosOrfaos, observarAbertosP3 } from '../../data/encaminhamentos';
+import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { garantirCopiaAutomatica } from '../../data/banco';
 import { mesDaCopiaAutomatica } from '../../domain/banco';
 import { hojeISO } from '../../domain/datas';
@@ -72,11 +72,8 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
   const hash = useHash();
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
-  // Demanda apagada que ainda aparecia para a Cia: sai da tela dela.
+  // A limpeza de encaminhamentos sem demanda passou para o motor (uma vez por dia, sem depender de abrir o portal).
   useEffect(() => {
-    limparEncaminhamentosOrfaos(db)
-      .then((n) => n && console.info(`Portal P3: ${n} encaminhamento(s) de demanda apagada removido(s) das Cias.`))
-      .catch(() => undefined);
     // Cópia de segurança automática do banco de dados (o mês de referência, depois do prazo dos documentos).
     const hoje = hojeISO();
     garantirCopiaAutomatica(db, mesDaCopiaAutomatica(hoje), hoje)

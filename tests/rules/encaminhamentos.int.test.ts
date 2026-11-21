@@ -6,7 +6,6 @@ import { alterarStatus, atualizarDemanda, criarDemanda, encaminhamentosDaDemanda
 import {
   aceitarResposta,
   devolverResposta,
-  limparEncaminhamentosOrfaos,
   marcarEmAndamento,
   marcarVisualizado,
   observarDaUnidade,
@@ -135,7 +134,7 @@ describe('resposta da Cia e decisão da P/3', () => {
 });
 
 describe('demanda apagada fora da lixeira', () => {
-  test('a P/3 ao abrir o portal tira da Cia o que ficou sem demanda (apagada ou excluída); o resto fica', async () => {
+  test('encaminhamento de demanda apagada: a P/3 pode tirar da tela da Cia, a Cia não', async () => {
     const viva = await criarDemanda(p3, dados(['1cia', '2cia']));
     const apagada = await criarDemanda(p3, dados(['1cia']));
     const excluida = await criarDemanda(p3, dados(['1cia']));
@@ -151,11 +150,12 @@ describe('demanda apagada fora da lixeira', () => {
     });
     expect((await listaDaCia('1cia')).map((e) => e.numero).sort()).toEqual([viva, apagada, excluida].sort());
 
-    expect(await limparEncaminhamentosOrfaos(p3)).toBe(3);
-    expect((await listaDaCia('1cia')).map((e) => e.numero)).toEqual([viva]);
-    expect((await listaDaCia('2cia')).map((e) => e.numero)).toEqual([viva]);
-    expect(await limparEncaminhamentosOrfaos(p3)).toBe(0);
-    await expect(limparEncaminhamentosOrfaos(cia('1cia'))).rejects.toThrow();
+    // A limpeza diária do motor (Logica.gs → encaminhamentosOrfaos) apaga com a conta de serviço;
+    // aqui fica a regra: a P/3 pode apagar encaminhamento, a Cia não.
+    const [daApagada] = (await listaDaCia('1cia')).filter((e) => e.numero === apagada);
+    await expect(deleteDoc(doc(cia('1cia'), 'encaminhamentos', daApagada.id))).rejects.toThrow();
+    await deleteDoc(doc(p3, 'encaminhamentos', daApagada.id));
+    expect((await listaDaCia('1cia')).map((e) => e.numero).sort()).toEqual([viva, excluida].sort());
   });
 });
 

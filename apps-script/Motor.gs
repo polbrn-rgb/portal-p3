@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-21';
+var VERSAO_MOTOR = '2026-11-22';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -317,10 +317,55 @@ function rodarMotor_(esperaMs, opcoes) {
     etapa('Acessos', processarAcessos_);
     etapa('RAC', processarRac_);
     etapa('Banco de dados (cópia)', processarBackupBanco_);
+    etapa('Encaminhamentos sem demanda', limparEncaminhamentosOrfaos_);
     registrarRodada_(props, opcoes.origem || 'gatilho', comeco, tempos);
   } finally {
     trava.releaseLock();
   }
+}
+
+// Status em que o encaminhamento ainda aparece na tela da Cia (igual a STATUS_PENDENTES + 'respondido' no portal).
+var STATUS_ENC_NA_TELA = ['novo', 'visualizado', 'em_andamento', 'devolvido', 'respondido'];
+
+/**
+ * Uma vez por dia: tira da tela das Cias o encaminhamento cuja demanda foi apagada direto no banco ou
+ * excluída (a lixeira do portal já apaga os dela; isto pega o que sobrou de outros caminhos).
+ */
+function limparEncaminhamentosOrfaos_(forcar) {
+  var props = PropertiesService.getScriptProperties();
+  var dia = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  if (!forcar && props.getProperty('ORFAOS_EM') === dia) return 0;
+  var r = firestore_('post', caminhoDocs_() + ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: 'encaminhamentos' }],
+      where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'IN', value: jsParaValor(STATUS_ENC_NA_TELA) } },
+      select: { fields: [{ fieldPath: 'demandaId' }] }
+    }
+  });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  var encs = r.json
+    .filter(function (x) { return x.document; })
+    .map(function (x) {
+      return { id: x.document.name.split('/').pop(), demandaId: String(camposParaJs(x.document.fields || {}).demandaId || '') };
+    });
+  var ids = [];
+  encs.forEach(function (e) { if (e.demandaId && ids.indexOf(e.demandaId) < 0) ids.push(e.demandaId); });
+  var status = {};
+  for (var i = 0; i < ids.length; i += 100) {
+    var g = firestore_('post', caminhoDocs_() + ':batchGet', {
+      documents: ids.slice(i, i + 100).map(function (id) { return caminhoDocs_() + '/demandas/' + id; }),
+      mask: { fieldPaths: ['status'] }
+    });
+    if (g.status !== 200) throw new Error('Firestore ' + g.status + ': ' + JSON.stringify(g.json));
+    g.json.forEach(function (x) {
+      if (x.found) status[x.found.name.split('/').pop()] = String(camposParaJs(x.found.fields || {}).status || 'em_aberto');
+    });
+  }
+  var orfaos = encaminhamentosOrfaos(encs, status);
+  orfaos.forEach(function (id) { firestore_('delete', caminhoDocs_() + '/encaminhamentos/' + id); });
+  if (orfaos.length) console.info(orfaos.length + ' encaminhamento(s) de demanda apagada removido(s) das Cias.');
+  props.setProperty('ORFAOS_EM', dia);
+  return orfaos.length;
 }
 
 /** Guarda o tempo da última rodada e o total do dia (o diagnóstico mostra; a cota do Google é por dia). */

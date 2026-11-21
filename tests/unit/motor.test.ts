@@ -29,6 +29,7 @@ type Motor = {
   letraDaColuna: (n: number) => string;
   intervalosBrancos: (fundos: string[][], linhaInicial: number, colunaInicial?: number) => string[];
   idsPrintsDoRac: (mes: string) => string[];
+  encaminhamentosOrfaos: (encs: { id: string; demandaId: string }[], status: Record<string, string>) => string[];
 };
 const ctx: Record<string, unknown> = {};
 runInNewContext(readFileSync('apps-script/Logica.gs', 'utf8'), ctx);
@@ -432,5 +433,18 @@ describe('RAC: prints apagados depois de arquivar o RAC GERAL', () => {
     const ids = new Set(motor.idsPrintsDoRac('2026-09'));
     for (const u of [...UNIDADES_RAC, 'btl' as const]) for (const s of slotsDaUnidade(u)) expect(ids.has(idPrint('2026-09', u, s.id))).toBe(true);
     expect([...ids].every((id) => id.startsWith('2026-09_'))).toBe(true);
+  });
+});
+
+describe('limpeza diária de encaminhamentos sem demanda', () => {
+  test('sai o que ficou sem demanda (apagada ou excluída); o resto fica', () => {
+    const encs = [
+      { id: '10_1cia', demandaId: '10' },
+      { id: '11_1cia', demandaId: '11' },
+      { id: '12_2cia', demandaId: '12' },
+      { id: 'sem', demandaId: '' },
+    ];
+    expect(motor.encaminhamentosOrfaos(encs, { '10': 'em_aberto', '12': 'excluido' })).toEqual(['11_1cia', '12_2cia', 'sem']);
+    expect(motor.encaminhamentosOrfaos(encs.slice(0, 1), { '10': 'concluido' })).toEqual([]);
   });
 });
