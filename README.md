@@ -218,3 +218,25 @@ Na lista de demandas, **Baixar planilha** gera um `.csv` com todas as demandas (
 ## Regra do projeto
 
 Nenhuma parte é dada como pronta sem `npm run test:tudo` passando.
+
+## Banco de dados (Operações → Banco de dados)
+
+Tudo o que o portal guarda, **separado por Cia e por mês**, com um código fixo para cada número (o "indicador"):
+
+| Origem | O que entra | Detalhe guardado |
+|---|---|---|
+| Produção dos pelotões (Sala de Operações) | todos os itens, somados no mês | por dia, turno e pelotão (coleção `producao`) |
+| Flagrantes da produção | total e por natureza da ocorrência, sem BOPC | talão, BOPC, dia e natureza |
+| Documentos Mensais | todos os campos (números, textos e listas) | por documento, mês e Cia (`docsMensais`) |
+| RAC | crimes do mês e inconsistências (RAC enviado) | por mês e Cia (`racs`) |
+
+- O banco é montado na hora a partir dessas coleções (nada é gravado em dobro). O catálogo fica em
+  `src/domain/banco.ts` (`INDICADORES`): planilha nova pedida por escalão superior se adequa a partir dos códigos dele.
+- **Histórico que não se apaga**: cada lançamento, correção e exclusão da produção (`producaoHistorico`) e cada envio
+  de Documento Mensal (`docsMensaisHistorico`) vira um registro que ninguém altera nem apaga (só a P/3 lê).
+- **Baixar banco completo (Excel)**: o banco em linhas (Mês × Cia × indicador), a cobertura de cada mês, o catálogo e
+  todos os lançamentos da produção. Serve também de cópia de segurança: baixe todo mês e guarde no Drive.
+- A série diária por Cia (`serieDiaria`) é a base do futuro painel estatístico do Batalhão.
+
+Ao publicar mudanças na produção ou nos documentos: **primeiro as regras** (`npm run deploy:regras`), depois o site.
+As regras do lançamento da produção estão perto do limite de 1000 expressões do Firestore: cabem menos de 20 itens novos.

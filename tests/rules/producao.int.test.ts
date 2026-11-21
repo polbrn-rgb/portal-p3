@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import {
   excluirProducao,
@@ -61,7 +61,7 @@ describe('produção diária dos pelotões', () => {
     await assertFails(getDoc(doc(cia('2cia'), 'producao', id)));
     await assertFails(getDocs(query(collection(cia('2cia'), 'producao'), where('unidadeId', '==', '1cia'), where('mes', '==', '2026-11'))));
     await assertFails(salvarProducao(cia('2cia'), lancamento()));
-    await assertFails(excluirProducao(cia('2cia'), id));
+    await assertFails(excluirProducao(cia('2cia'), { id, unidadeId: '1cia', mes: '2026-11', itens: itensZerados(), taloes: [] }, 'x'));
 
     const todas = await uma((ok, e) => observarProducaoDoMes(p3(), '2026-11', ok, e));
     expect(todas.map((l) => l.unidadeId).sort()).toEqual(['1cia', 'ft']);
@@ -94,7 +94,7 @@ describe('produção diária dos pelotões', () => {
     await assertSucceeds(setDoc(doc(c, 'producao', '1cia_2026-11-21_pelA'), base));
     await assertFails(updateDoc(doc(c, 'producao', '1cia_2026-11-21_pelA'), { lancadoPor: 'outro', atualizadoEm: serverTimestamp() }));
 
-    await assertSucceeds(excluirProducao(c, '1cia_2026-11-21_pelA'));
+    await assertSucceeds(excluirProducao(c, { id: '1cia_2026-11-21_pelA', unidadeId: '1cia', mes: '2026-11', itens: itensZerados(), taloes: [] }, 'Sd PM X'));
   });
 
   test('lançamento antigo (com "ciclomotores removidos" e sem os itens novos) e o novo valem; item novo negativo não', async () => {
@@ -120,6 +120,34 @@ describe('produção diária dos pelotões', () => {
     await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), armas: true } as never })));
     await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), armas: null } as never })));
     await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), escoltasAtendidas: 100000 } })));
+  });
+
+  test('histórico: lançamento, correção e exclusão ficam guardados; ninguém altera, apaga ou inventa', async () => {
+    const c = cia('1cia');
+    const id = await salvarProducao(c, lancamento());
+    await salvarProducao(c, lancamento({ itens: { ...itensZerados(), pessoasAbordadas: 45 }, por: 'Cb PM OUTRO' }));
+    const [l] = await uma((ok, e) => observarProducaoDaCia(c, '1cia', '2026-11', ok, e));
+    await excluirProducao(c, l, 'Sgt PM QUEM APAGOU');
+    expect((await getDoc(doc(c, 'producao', id))).exists()).toBe(false);
+
+    const h = await getDocs(query(collection(p3(), 'producaoHistorico'), orderBy('em')));
+    expect(h.docs.map((d) => [d.data().acao, d.data().por, d.data().itens.pessoasAbordadas])).toEqual([
+      ['lancado', 'Sd PM SALA (RE 111111)', 40],
+      ['corrigido', 'Cb PM OUTRO', 45],
+      ['excluido', 'Sgt PM QUEM APAGOU', 45],
+    ]);
+    expect(h.docs[0].data().taloes[0].natureza).toBe('trafico');
+    await assertFails(getDocs(collection(c, 'producaoHistorico'))); // só a P/3 lê
+    await assertFails(updateDoc(doc(c, 'producaoHistorico', h.docs[0].id), { por: 'outro' }));
+    await assertFails(deleteDoc(doc(c, 'producaoHistorico', h.docs[0].id)));
+    await assertFails(deleteDoc(doc(p3(), 'producaoHistorico', h.docs[0].id)));
+
+    // Registro inventado (sem gravar a produção, ou com números diferentes dela) é recusado.
+    const falso = { producaoId: '1cia_2026-11-20_pelB', unidadeId: '1cia', mes: '2026-11', acao: 'lancado', itens: itensZerados(), taloes: [], por: 'x', em: serverTimestamp() };
+    await assertFails(addDoc(collection(c, 'producaoHistorico'), falso));
+    await salvarProducao(c, lancamento({ pelotao: 'pelB' }));
+    await assertFails(addDoc(collection(c, 'producaoHistorico'), { ...falso, acao: 'excluido' }));
+    await assertFails(addDoc(collection(cia('2cia'), 'producaoHistorico'), { ...falso, unidadeId: '2cia', producaoId: '2cia_2026-11-20_pelB' }));
   });
 
   test('primeiro lançamento de cada Cia (início da contagem das pendências)', async () => {

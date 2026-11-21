@@ -16,7 +16,7 @@ function paraMes(id: string, x: Partial<RacMes>): RacMes {
   return { mes: x.mes ?? id, prazo: x.prazo ?? '', status: x.status === 'encerrado' ? 'encerrado' : 'aberto', ...(arquivo ? { arquivo } : {}) };
 }
 
-function paraRac(id: string, x: Record<string, unknown>): RacSalvo {
+export function paraRac(id: string, x: Record<string, unknown>): RacSalvo {
   const unidade = x.unidadeId as UnidadeRac;
   const mes = String(x.mes ?? '');
   return {

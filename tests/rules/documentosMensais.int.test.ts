@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, getDoc, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { enviarDocMensal, marcarFeito, observarEnviosDaUnidade, observarEnviosDoMes, pedirArquivamento, publicarConfig } from '../../src/data/documentosMensais';
 import type { EnvioMensal } from '../../src/domain/documentosMensais';
@@ -47,6 +47,28 @@ describe('envio das Cias', () => {
     await enviarDocMensal(cia('2cia'), { ...envio, unidadeId: '2cia', valores: { v4: 3, v2: 1, cam: 0 }, daProducao: { v4: 2, v2: 1, cam: 0 } });
     const doMes = await quando((ok, e) => observarEnviosDoMes(p3, '2026-10', ok, e), (l) => l.length === 1);
     expect(doMes[0].daProducao).toEqual({ v4: 2, v2: 1, cam: 0 });
+  });
+
+  test('histórico: cada envio e cada correção ficam guardados; ninguém altera, apaga ou inventa', async () => {
+    await enviarDocMensal(cia('2cia'), { ...envio, unidadeId: '2cia', valores: { v4: 1, v2: 0, cam: 0 } });
+    await enviarDocMensal(cia('2cia'), { ...envio, unidadeId: '2cia', valores: { v4: 3, v2: 1, cam: 0 } });
+    const h = await getDocs(query(collection(p3, 'docsMensaisHistorico'), orderBy('em')));
+    expect(h.docs.map((d) => d.data().valores.v4)).toEqual([1, 3]);
+    expect(h.docs[0].data()).toMatchObject({ envioId: 'veiculos-apreendidos_2026-10_2cia', unidadeId: '2cia', mesRef: '2026-10' });
+    await assertFails(getDocs(collection(cia('2cia'), 'docsMensaisHistorico')));
+    await assertFails(deleteDoc(doc(cia('2cia'), 'docsMensaisHistorico', h.docs[0].id)));
+    await assertFails(deleteDoc(doc(p3, 'docsMensaisHistorico', h.docs[0].id)));
+    await assertFails(
+      addDoc(collection(cia('2cia'), 'docsMensaisHistorico'), {
+        envioId: 'veiculos-apreendidos_2026-10_2cia',
+        docId: 'veiculos-apreendidos',
+        mesRef: '2026-10',
+        unidadeId: '2cia',
+        valores: { v4: 99, v2: 0, cam: 0 }, // não é o que está no envio
+        respondidoPor: 'x',
+        em: serverTimestamp(),
+      }),
+    );
   });
 
   test('não envia pela outra Cia, não lê o da outra e não marca "gravado"', async () => {

@@ -199,7 +199,7 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
     if (!p.existente) return;
     setOcupado(true);
     try {
-      await excluirProducao(db, p.existente.id);
+      await excluirProducao(db, p.existente, autor);
       setConfirmarExclusao(false);
       setTextos(textosDe());
       setTaloes([]);
