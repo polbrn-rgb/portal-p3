@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
+import { sobDemanda } from '../../lib/sobDemanda';
 import { limparEncaminhamentosOrfaos, observarAbertosP3 } from '../../data/encaminhamentos';
 import { garantirCopiaAutomatica } from '../../data/banco';
 import { mesDaCopiaAutomatica } from '../../domain/banco';
@@ -12,27 +13,29 @@ import type { Situacao } from '../../domain/situacao';
 import { db } from '../../lib/firebase';
 import { useHash } from '../../lib/navegacao';
 import { useAoVivo, type AoVivo } from '../../lib/useAoVivo';
-import { MissoesCfp } from '../setores/PainelCfp';
 import { Recados } from '../setores/Recados';
-import { Administrador } from './Administrador';
-import { Agenda } from './Agenda';
-import { Aperfeicoamento } from './Aperfeicoamento';
-import { ChecklistOperacoes } from './ChecklistOperacoes';
-import { ControleOperacoes } from './ControleOperacoes';
-import { BancoDados } from './BancoDados';
-import { DocumentosMensais } from './DocumentosMensais';
-import { RacP3 } from './RacP3';
-import { ProducaoP3 } from './ProducaoP3';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
 import { ListaPendentes } from './ListaPendentes';
 import { MenuP3, type AbaP3 } from './MenuP3';
-import { PainelPrazos } from './PainelPrazos';
-import { PainelBatalhao } from './PainelBatalhao';
-import { PainelEstatistico } from './PainelEstatistico';
 import type { Encaminhamento } from '../../domain/encaminhamento';
-import { TdsP3 } from './TdsP3';
+
+// Telas abertas só quando escolhidas no menu: o código delas é baixado na hora.
+const Administrador = sobDemanda(() => import('./Administrador'), 'Administrador');
+const Agenda = sobDemanda(() => import('./Agenda'), 'Agenda');
+const Aperfeicoamento = sobDemanda(() => import('./Aperfeicoamento'), 'Aperfeicoamento');
+const ChecklistOperacoes = sobDemanda(() => import('./ChecklistOperacoes'), 'ChecklistOperacoes');
+const ControleOperacoes = sobDemanda(() => import('./ControleOperacoes'), 'ControleOperacoes');
+const BancoDados = sobDemanda(() => import('./BancoDados'), 'BancoDados');
+const DocumentosMensais = sobDemanda(() => import('./DocumentosMensais'), 'DocumentosMensais');
+const RacP3 = sobDemanda(() => import('./RacP3'), 'RacP3');
+const ProducaoP3 = sobDemanda(() => import('./ProducaoP3'), 'ProducaoP3');
+const PainelPrazos = sobDemanda(() => import('./PainelPrazos'), 'PainelPrazos');
+const PainelBatalhao = sobDemanda(() => import('./PainelBatalhao'), 'PainelBatalhao');
+const PainelEstatistico = sobDemanda(() => import('./PainelEstatistico'), 'PainelEstatistico');
+const TdsP3 = sobDemanda(() => import('./TdsP3'), 'TdsP3');
+const MissoesCfp = sobDemanda(() => import('../setores/PainelCfp'), 'MissoesCfp');
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
@@ -88,7 +91,9 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
     <div className="layout-p3">
       <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} semAdmin={admin === 'nao'} />
       <div className="conteudo-p3">
-        <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} admin={admin} />
+        <Suspense fallback={<p className="carregando">Carregando…</p>}>
+          <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} admin={admin} />
+        </Suspense>
       </div>
     </div>
   );
