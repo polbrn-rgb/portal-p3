@@ -29,7 +29,15 @@ na agenda do CFP e a linha na aba Operações.
 > Sempre que trocar o código do `Motor.gs` ou `Logica.gs`: **Implantar → Gerenciar implantações →** lápis →
 > Versão: **Nova versão** → **Implantar** (a URL continua a mesma).
 
-Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 5 minutos. No portal, dentro da demanda, o bloco
+Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 5 minutos.
+Várias gravações seguidas viram uma rodada só. A agenda do CFP e a aba Operações (que podem mudar fora do
+portal) são relidas quando o portal pede, quando alguma demanda mexeu nelas, ou a cada 15 minutos.
+A URL aceita no máximo 120 rodadas por hora e 30 pedidos de "Esqueci a senha" por hora; acima disso fica valendo
+só o gatilho de 5 minutos.
+
+**Cota do Google:** conta Gmail comum tem cerca de 90 minutos por dia de execução por gatilho. Rode
+**diagnostico** para ver a linha **Tempo do motor hoje** (minutos usados, nº de rodadas e as etapas mais lentas da
+última rodada). No portal, dentro da demanda, o bloco
 **Agenda e pasta** mostra ⏳ enquanto espera e ✅ quando o evento foi criado, com o botão **Abrir pasta CFP**.
 
 ## E-mails do funcional → aba Demandas Pendentes
