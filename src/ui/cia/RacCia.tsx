@@ -1,7 +1,10 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { observarProducaoDaCia } from '../../data/producao';
 import { salvarRac } from '../../data/rac';
 import { observarPrintsDoRac, salvarPrintRac, type PrintRac } from '../../data/racPrints';
 import { formatarData, hojeISO } from '../../domain/datas';
+import { racDaProducao } from '../../domain/integracao';
+import type { Producao } from '../../domain/producao';
 import {
   colunasPelotao,
   comCampo,
@@ -113,6 +116,19 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
   const s = situacaoRac(salvo, p.mes.prazo, hojeISO());
   const atual = producaoAtual(d);
   const semNome = tentou && !nome.trim();
+
+  // Produtividade mensal tirada da produção dos pelotões (só com o mês completo e só nos campos vazios).
+  // Quem confere com o QMO, corrige e envia é a Cia.
+  const producao = useAoVivo<Producao[]>((ok, e) => observarProducaoDaCia(db, p.unidade, p.mes.mes, ok, e), [p.unidade, p.mes.mes]);
+  const daProd = producao.valor ? racDaProducao(d, producao.valor, hojeISO()) : null;
+  const preencheu = useRef(false);
+  useEffect(() => {
+    if (!daProd?.completa || preencheu.current) return;
+    preencheu.current = true;
+    setD((x) => racDaProducao(x, producao.valor!, hojeISO()).rac);
+  }, [daProd, producao.valor]);
+  const diferenteDaProducao = (c: string) =>
+    daProd?.completa && c in daProd.daProducao && valorDoCampo(d, c) !== null && valorDoCampo(d, c) !== daProd.daProducao[c] ? daProd.daProducao[c] : null;
   const faltam = erros.size + avisos.filter((a) => !(d.justificativas[a.id] ?? '').trim()).length + (semNome ? 1 : 0);
 
   const mudar = (campo: string, valor: string) => setD((x) => comCampo(x, campo, lerNumero(valor)));
@@ -125,11 +141,13 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
   // Célula com campo (dentro das tabelas iguais às da apresentação) e células calculadas.
   const campo = (c: string, rotulo: string) => {
     const e = erroDe(c);
+    const prod = diferenteDaProducao(c);
     return (
       <td key={c}>
         <div className={`campo celula-rac${e ? ' com-erro' : ''}`}>
           <input inputMode="numeric" autoComplete="off" aria-label={rotulo} value={valorDoCampo(d, c) ?? ''} onChange={(ev) => mudar(c, ev.target.value)} />
           {e && <span className="erro-campo">{e}</span>}
+          {prod !== null && <span className="dica-producao">produção: {prod}</span>}
         </div>
       </td>
     );
@@ -206,6 +224,8 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
         </button>
       </div>
       {previa && <PreviaRac d={d} />}
+
+      <AvisoProducaoRac carregando={producao.carregando} erro={producao.erro} daProd={daProd} mes={d.mes} />
 
       {tentou && faltam > 0 && (
         <p className="mensagem erro" role="alert">
@@ -431,5 +451,24 @@ export function PrintsRac(p: { unidade: UnidadeRac; mes: string; prints: PrintRa
         })}
       </div>
     </fieldset>
+  );
+}
+
+function AvisoProducaoRac(p: { carregando: boolean; erro: string; daProd: ReturnType<typeof racDaProducao> | null; mes: string }) {
+  if (p.erro) return <p className="mensagem erro">Não foi possível conferir a produção dos pelotões. A produtividade fica para preencher à mão.</p>;
+  if (p.carregando || !p.daProd) return <p className="carregando">Conferindo a produção dos pelotões…</p>;
+  if (!p.daProd.completa)
+    return (
+      <p className="mensagem atencao" role="alert">
+        <strong>Produção dos pelotões de {rotuloMesLongo(p.mes)} incompleta</strong>
+        {p.daProd.turnosFaltando ? ` (faltam ${p.daProd.turnosFaltando} turno(s))` : ' (o mês ainda não terminou)'}: a Produtividade Mensal não veio
+        pré-preenchida. Complete a produção na Sala de Operações ou preencha à mão.
+      </p>
+    );
+  return (
+    <p className="mensagem aviso" role="status">
+      A Produtividade Mensal (por pelotão e os itens à parte) veio da produção dos pelotões; RE e RPM vêm com 0, porque na
+      produção eles entram no resultado do pelotão. Confira com o QMO e corrija o que for preciso: quem envia para a P/3 é a Cia.
+    </p>
   );
 }

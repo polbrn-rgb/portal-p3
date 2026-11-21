@@ -86,8 +86,8 @@ export function DocumentosMensais() {
       {incompletas.length > 0 && (
         <div className="mensagem erro" role="alert" aria-label="Produção incompleta">
           <p>
-            <strong>Produção dos pelotões de {rotuloMes(mesRef)} incompleta.</strong> Os documentos com 🔗 dessas Cias não são pré-preenchidos nem
-            podem ser enviados até a produção ser completada:
+            <strong>Produção dos pelotões de {rotuloMes(mesRef)} incompleta.</strong> Os documentos com 🔗 dessas Cias não vêm pré-preenchidos: a Cia
+            completa a produção ou preenche à mão antes de enviar.
           </p>
           <ul>
             {incompletas.map((u) => {

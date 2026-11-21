@@ -54,15 +54,19 @@ test('Documentos Mensais: vem pré-preenchido da produção dos pelotões; a Cia
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });
 
-test('Documentos Mensais: produção do mês incompleta — não pré-preenche e não envia', async ({ page }, info) => {
+test('Documentos Mensais: produção do mês incompleta — não pré-preenche, mas a Cia preenche à mão e envia', async ({ page }, info) => {
   const unidade = info.project.name === 'celular' ? '1cia' : '3cia';
   await entrar(page, unidade, SENHA_TESTE);
   await irParaAbaCia(page, 'Documentos Mensais');
   await page.getByRole('link', { name: /Vistoria de Ciclomotores/ }).click();
   await expect(page.getByRole('alert')).toContainText('incompleta');
   await expect(page.getByRole('alert')).toContainText(`faltam ${diasDoMes(mesReferencia()).length * 2} turno(s)`);
-  await expect(page.getByRole('button', { name: 'Produção incompleta' })).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('preencha à mão');
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
+  for (const campo of await page.getByRole('textbox').all()) if ((await campo.getAttribute('autocomplete')) !== 'name') await campo.fill('0');
+  await page.getByLabel('Preenchido por').fill('Sgt PM Cia');
+  await page.getByRole('button', { name: 'Conferi: enviar para a P/3' }).click();
+  await expect(page.getByRole('link', { name: /Vistoria de Ciclomotores/ })).toContainText('Enviado', { timeout: 15000 });
 });
 
 test('Documentos Mensais: lista com linhas (Distribuição A.I. CET)', async ({ page }, info) => {
