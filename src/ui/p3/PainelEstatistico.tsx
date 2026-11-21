@@ -3,54 +3,11 @@ import { demandasDoAno } from '../../data/estatisticas';
 import { hojeISO } from '../../domain/datas';
 import type { Demanda } from '../../domain/demanda';
 import { andamentoPorDemanda, type Encaminhamento } from '../../domain/encaminhamento';
-import { montarEstatisticas, type Barra } from '../../domain/estatisticas';
+import { montarEstatisticas } from '../../domain/estatisticas';
 import { db } from '../../lib/firebase';
+import { Barras, Colunas } from '../Graficos';
 
 const PRIMEIRO_ANO = 2026;
-
-/** Uma série só: barras horizontais com o valor na ponta (o valor escrito serve de tabela). */
-function Barras({ titulo, dados }: { titulo: string; dados: Barra[] }) {
-  const maior = Math.max(1, ...dados.map((d) => d.valor));
-  return (
-    <figure className="cartao grupo grafico" aria-label={titulo}>
-      <figcaption>{titulo}</figcaption>
-      {dados.length === 0 ? (
-        <p className="vazio">Sem dados.</p>
-      ) : (
-        <ul className="barras">
-          {dados.map((d) => (
-            <li key={d.rotulo} title={`${d.rotulo}: ${d.valor}`}>
-              <span className="barra-rotulo">{d.rotulo}</span>
-              <span className="barra-trilho">
-                <span className="barra" style={{ width: `${(d.valor / maior) * 100}%` }} />
-                <span className="barra-valor">{d.valor}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </figure>
-  );
-}
-
-/** Colunas por mês (jan–dez), valor em cima de cada coluna. */
-function Colunas({ titulo, dados, destaque }: { titulo: string; dados: Barra[]; destaque?: number }) {
-  const maior = Math.max(1, ...dados.map((d) => d.valor));
-  return (
-    <figure className="cartao grupo grafico" aria-label={titulo}>
-      <figcaption>{titulo}</figcaption>
-      <ol className="colunas">
-        {dados.map((d, i) => (
-          <li key={d.rotulo} title={`${d.rotulo}: ${d.valor}`} className={i === destaque ? 'atual' : ''}>
-            <span className="coluna-valor">{d.valor || ''}</span>
-            <span className="coluna" style={{ height: `${(d.valor / maior) * 100}%` }} />
-            <span className="coluna-rotulo">{d.rotulo}</span>
-          </li>
-        ))}
-      </ol>
-    </figure>
-  );
-}
 
 /** O "Dashboard" do numerador antigo, das demandas do portal no ano escolhido. */
 export function PainelEstatistico({ encs }: { encs: Encaminhamento[] }) {

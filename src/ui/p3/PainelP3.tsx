@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { limparEncaminhamentosOrfaos } from '../../data/encaminhamentos';
+import { limparEncaminhamentosOrfaos, observarAbertosP3 } from '../../data/encaminhamentos';
 import { observarOperacoes } from '../../data/operacoes';
 import { observarPendentes } from '../../data/pendentes';
 import type { Operacao } from '../../domain/operacao';
@@ -25,6 +25,9 @@ import { ListaDemandas } from './ListaDemandas';
 import { ListaPendentes } from './ListaPendentes';
 import { MenuP3, type AbaP3 } from './MenuP3';
 import { PainelPrazos } from './PainelPrazos';
+import { PainelBatalhao } from './PainelBatalhao';
+import { PainelEstatistico } from './PainelEstatistico';
+import type { Encaminhamento } from '../../domain/encaminhamento';
 import { TdsP3 } from './TdsP3';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
@@ -81,7 +84,7 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
 function abaDaRota(hash: string): AbaP3 {
   if (/^#\/(pendentes|destinar)/.test(hash)) return 'pendentes';
   if (hash.startsWith('#/operacoes')) return 'operacoes';
-  if (hash === '#/painel') return 'painel';
+  if (hash.startsWith('#/painel')) return 'painel';
   if (hash.startsWith('#/admin')) return 'admin';
   if (hash.startsWith('#/cfp')) return 'cfp';
   if (hash === '#/sala') return 'sala';
@@ -110,10 +113,22 @@ function ConteudoP3({
   if (destinar) return <DestinarPendente id={destinar[1]} />;
   const editar = /^#\/demanda\/(\d+)$/.exec(hash);
   if (editar) return <EditarDemanda id={editar[1]} />;
-  if (hash === '#/painel') {
+  if (hash.startsWith('#/painel')) {
+    const aba = hash === '#/painel/p3' ? 'p3' : hash === '#/painel/batalhao' ? 'batalhao' : 'prazos';
     return (
       <>
-        <PainelPrazos />
+        <nav className="abas abas-p3 subabas" aria-label="Painel">
+          <a href="#/painel" aria-current={aba === 'prazos' ? 'page' : undefined}>
+            Prazos
+          </a>
+          <a href="#/painel/p3" aria-current={aba === 'p3' ? 'page' : undefined}>
+            Estatístico P/3
+          </a>
+          <a href="#/painel/batalhao" aria-current={aba === 'batalhao' ? 'page' : undefined}>
+            Estatístico do Batalhão
+          </a>
+        </nav>
+        {aba === 'p3' ? <EstatisticoP3 /> : aba === 'batalhao' ? <PainelBatalhao /> : <PainelPrazos />}
       </>
     );
   }
@@ -204,4 +219,10 @@ function ConteudoP3({
       />
     </>
   );
+}
+
+/** Painel → Estatístico P/3: as demandas do ano (o "Dashboard" do numerador antigo). */
+function EstatisticoP3() {
+  const encs = useAoVivo<Encaminhamento[]>((ok, erro) => observarAbertosP3(db, ok, erro), []);
+  return <PainelEstatistico encs={encs.valor ?? []} />;
 }
