@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { camposDaUnidade, DOCUMENTOS } from '../../src/domain/documentosMensais';
-import { DA_PRODUCAO, divergencias, preencherDaProducao, racDaProducao, situacaoProducaoMes } from '../../src/domain/integracao';
+import { DA_PRODUCAO, divergencias, iccDoMes, preencherDaProducao, racDaProducao, situacaoProducaoMes } from '../../src/domain/integracao';
 import { producaoAtual, racVazio, totalPelotao } from '../../src/domain/rac';
 import { diasDoMes, IDS_ITENS, itensZerados, lerItens, pelotoesDa, type Itens, type Producao, type Talao } from '../../src/domain/producao';
 import type { UnidadeId } from '../../src/domain/unidades';
@@ -148,5 +148,47 @@ describe('produção → documentos mensais', () => {
     const ft = racDaProducao(racVazio('ft', MES), mesCompleto('ft', { armas: 1 }), HOJE);
     expect(ft.rac.pelotoes.armas.pelA).toBe(31);
     expect(ft.rac.pelotoes.armas.pelB).toBe(0);
+  });
+
+  test('Avaliação: colunas do ano anterior vêm da produção do mesmo mês do ano passado, se completa', () => {
+    const anoPassado = (itens: Partial<Itens>) =>
+      mesCompleto('1cia', itens).map((l) => ({ ...l, data: l.data.replace('2026-', '2025-'), mes: '2025-10' }));
+    const campos = camposDe('avaliacao-periodica');
+    const r = preencherDaProducao('avaliacao-periodica', campos, mesCompleto('1cia', { pessoasAbordadas: 2 }), MES, '1cia', HOJE, anoPassado({ pessoasAbordadas: 1 }));
+    expect(r.valores.abordadas_atu).toBe(124);
+    expect(r.valores.abordadas_ant).toBe(62);
+    // Mês atual incompleto: o ano anterior entra mesmo assim; ano anterior incompleto: não entra.
+    const s1 = preencherDaProducao('avaliacao-periodica', campos, [], MES, '1cia', HOJE, anoPassado({ pessoasAbordadas: 1 }));
+    expect(s1.valores).toEqual(expect.objectContaining({ abordadas_ant: 62 }));
+    expect(s1.valores).not.toHaveProperty('abordadas_atu');
+    const s2 = preencherDaProducao('avaliacao-periodica', campos, mesCompleto('1cia'), MES, '1cia', HOJE, anoPassado({}).slice(1));
+    expect(s2.valores).not.toHaveProperty('abordadas_ant');
+  });
+
+  test('RAC: mês anterior e ano anterior da produção desses meses (se completos), sem apagar o que já tinha', () => {
+    const mudarMes = (l: Producao[], de: string, para: string) => l.map((x) => ({ ...x, data: x.data.replace(de, para), mes: para }));
+    const setembro = diasDoMes('2026-09').flatMap((data) =>
+      (['pelA', 'pelB'] as const).map((pelotao) => ({ ...mesCompleto('1cia', { ait: 1 })[0], data, mes: '2026-09', pelotao })),
+    );
+    const outubro2025 = mudarMes(mesCompleto('1cia', { ait: 2 }), '2026-10', '2025-10');
+    const d = racVazio('1cia', MES);
+    d.producao.ai.mesAnterior = 99; // já veio do RAC anterior
+    const r = racDaProducao(d, [], HOJE, { mesAnterior: setembro, anoAnterior: outubro2025 });
+    expect(r.completa).toBe(false);
+    expect(r.rac.producao.ait.mesAnterior).toBe(60);
+    expect(r.rac.producao.ait.anoAnterior).toBe(124);
+    expect(r.rac.producao.ai.mesAnterior).toBe(99);
+    expect(r.rac.pelotoes.ait.pelA).toBeNull(); // o mês atual incompleto não entra
+  });
+
+  test('ICC do mês: soma das respostas da Cia às ICC com prazo no mês', () => {
+    const iccs = [
+      { id: 'a', prazo: '2026-10-15' },
+      { id: 'b', prazo: '2026-10-30' },
+      { id: 'c', prazo: '2026-11-15' },
+    ];
+    const r = (iccId: string, n: number) => ({ iccId, oficiais: 1, sargentos: 2, cabos: n });
+    expect(iccDoMes(iccs, [r('a', 10), r('b', 5), r('c', 100)], '2026-10')).toBe(21);
+    expect(iccDoMes(iccs, [r('c', 100)], '2026-10')).toBeNull();
   });
 });

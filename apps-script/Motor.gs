@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-20';
+var VERSAO_MOTOR = '2026-11-21';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -49,7 +49,9 @@ var CONFIG_P3 = {
   // Aperfeiçoamento → ICC: modelo das planilhas (cada ICC nova é uma cópia zerada, na mesma pasta)
   PLANILHA_ICC_MODELO: '1G5kd6AldoiYL8kV-mckAUf67aIBGy9LdhKzLiLNPJxw',
   // Operações → RAC: pasta onde o RAC GERAL de cada mês é arquivado ao fechar o mês
-  PASTA_RAC_ARQUIVO: '1GPMB1HBLUW2K1AALy5en0L3SpkbmjfoG'
+  PASTA_RAC_ARQUIVO: '1GPMB1HBLUW2K1AALy5en0L3SpkbmjfoG',
+  // Operações → Banco de dados: cópias de segurança (vazio = cria "Portal P3 - Banco de dados" no Drive na primeira vez)
+  PASTA_BANCO: ''
 };
 
 /** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
@@ -114,6 +116,7 @@ function diagnostico() {
   ok('Modelo do relatório (Word)', function () { return DriveApp.getFileById(CONFIG_P3.RELATORIO_MODELO).getName(); });
   ok('Pasta dos relatórios', function () { return DriveApp.getFolderById(CONFIG_P3.RELATORIO_PASTA).getName(); });
   ok('Pasta de arquivo dos Documentos Mensais', function () { return DriveApp.getFolderById(CONFIG_P3.PASTA_DOCS_MENSAIS_ARQUIVO).getName(); });
+  ok('Pasta das cópias do Banco de dados', function () { return pastaBanco_().getName(); });
   ok('Documentos Mensais (formato das planilhas)', function () {
     var cfg = obterDoc_('config/documentosMensais');
     if (!cfg) throw new Error('a P/3 ainda não abriu Operações → Documentos Mensais no portal');
@@ -311,6 +314,11 @@ function rodarMotor_(esperaMs) {
       processarRac_();
     } catch (e12) {
       console.error('RAC: ' + e12.message);
+    }
+    try {
+      processarBackupBanco_();
+    } catch (e13) {
+      console.error('Banco de dados (cópia): ' + e13.message);
     }
   } finally {
     trava.releaseLock();
@@ -1588,5 +1596,44 @@ function apagarDoRac_(mes, partes) {
   idsPrintsDoRac(mes).forEach(function (id) {
     firestore_('delete', caminhoDocs_() + '/racPrints/' + id);
     firestore_('delete', caminhoDocs_() + '/racPrintsDados/' + id);
+  });
+}
+
+// ---------- Banco de dados: cópia de segurança no Drive ----------
+
+var TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function pastaBanco_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = CONFIG_P3.PASTA_BANCO || props.getProperty('PASTA_BANCO');
+  if (id) return DriveApp.getFolderById(id);
+  var pasta = DriveApp.createFolder('Portal P3 - Banco de dados');
+  props.setProperty('PASTA_BANCO', pasta.getId());
+  return pasta;
+}
+
+/**
+ * Cópias pedidas pelo portal (backupBanco/{id}, o .xlsx em partes): cria a planilha na pasta do banco (trocando a de
+ * mesmo nome), grava o link e apaga as partes. O cabeçalho fica, com o link (lista de cópias no portal).
+ */
+function processarBackupBanco_() {
+  consultar_('backupBanco', 'status', 'pedido', 3).forEach(function (b) {
+    var cab = b.dados;
+    try {
+      var b64 = '';
+      for (var i = 0; i < cab.partes; i++) {
+        var parte = obterDoc_('backupBanco/' + b.id + '/partes/' + i);
+        if (!parte) throw new Error('A cópia chegou incompleta. Peça de novo.');
+        b64 += parte.dados;
+      }
+      var pasta = pastaBanco_();
+      var antigos = pasta.getFilesByName(cab.nome);
+      while (antigos.hasNext()) antigos.next().setTrashed(true);
+      var arq = pasta.createFile(Utilities.newBlob(Utilities.base64Decode(b64), TIPO_XLSX, cab.nome));
+      for (var k = 0; k < cab.partes; k++) firestore_('delete', caminhoDocs_() + '/backupBanco/' + b.id + '/partes/' + k);
+      gravarCampos_('backupBanco/' + b.id, { status: 'pronto', url: arq.getUrl(), prontoEm: new Date().toISOString(), erro: '' });
+    } catch (err) {
+      gravarCampos_('backupBanco/' + b.id, { status: 'erro', erro: err.message });
+    }
   });
 }

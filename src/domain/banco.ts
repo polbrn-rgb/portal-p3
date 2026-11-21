@@ -7,7 +7,7 @@
 // Nada é gravado em dobro: o banco é montado na hora a partir das coleções de origem (que nunca são zeradas).
 // Uma planilha nova pedida por escalão superior é adequada a partir daqui (ver INDICADORES) e o painel estatístico
 // do Batalhão usa a série diária (serieDiaria).
-import { daUnidade, documentosDoMes, DOCUMENTOS, type EnvioMensal } from './documentosMensais';
+import { daUnidade, documentosDoMes, DOCUMENTOS, mesReferencia, prazoDoDocumento, type EnvioMensal } from './documentosMensais';
 import { situacaoProducaoMes } from './integracao';
 import {
   GRUPOS_PRODUCAO,
@@ -261,4 +261,89 @@ export function abasDoBanco(registros: readonly RegistroBanco[]): { nome: string
     { nome: 'Cobertura', linhas: cobertura },
     { nome: 'Catálogo', linhas: catalogo },
   ];
+}
+
+// ---------- histórico e cópia de segurança ----------
+
+export type HistoricoProducao = {
+  producaoId: string;
+  unidadeId: UnidadeId;
+  mes: string;
+  acao: 'lancado' | 'corrigido' | 'excluido';
+  itens: Itens;
+  taloes: Producao['taloes'];
+  por: string;
+  em: Date | null;
+};
+export type HistoricoEnvio = {
+  envioId: string;
+  docId: string;
+  mesRef: string;
+  unidadeId: UnidadeId;
+  valores: Record<string, ValorBanco | boolean>;
+  daProducao?: Record<string, number>;
+  respondidoPor: string;
+  em: Date | null;
+};
+
+const ROTULO_ACAO = { lancado: 'lançado', corrigido: 'corrigido', excluido: 'excluído' } as const;
+const dataHora = (d: Date | null) =>
+  d
+    ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    : '';
+
+/** Abas do histórico: cada lançamento/correção/exclusão da produção e cada envio de Documento Mensal. */
+export function abasDoHistorico(producao: readonly HistoricoProducao[], envios: readonly HistoricoEnvio[]): { nome: string; linhas: Celula[][] }[] {
+  const porData = <T extends { em: Date | null }>(l: readonly T[]) => [...l].sort((a, b) => (a.em?.getTime() ?? 0) - (b.em?.getTime() ?? 0));
+  const nomeDoc = (id: string) => DOCUMENTOS.find((d) => d.id === id)?.nome ?? id;
+  return [
+    {
+      nome: 'Histórico da produção',
+      linhas: [
+        ['Quando', 'Unidade', 'Lançamento', 'Ação', 'Por', ...ITENS_PRODUCAO.map((i) => i.rotulo), 'Flagrantes'],
+        ...porData(producao).map((h) => [
+          dataHora(h.em),
+          siglaDe(h.unidadeId),
+          h.producaoId,
+          ROTULO_ACAO[h.acao] ?? h.acao,
+          h.por,
+          ...ITENS_PRODUCAO.map((i) => h.itens[i.id] ?? 0),
+          h.taloes.map((t) => `${t.numero}${t.natureza ? ` (${t.natureza})` : ''}`).join(', '),
+        ]),
+      ],
+    },
+    {
+      nome: 'Histórico dos documentos',
+      linhas: [
+        ['Quando', 'Unidade', 'Documento', 'Mês dos dados', 'Por', 'Valores enviados', 'Vindos da produção'],
+        ...porData(envios).map((h) => [
+          dataHora(h.em),
+          siglaDe(h.unidadeId),
+          nomeDoc(h.docId),
+          h.mesRef,
+          h.respondidoPor,
+          Object.entries(h.valores)
+            .filter(([, v]) => v !== '' && v !== false)
+            .map(([k, v]) => `${k}=${v}`)
+            .join('; '),
+          h.daProducao ? Object.entries(h.daProducao).map(([k, v]) => `${k}=${v}`).join('; ') : '',
+        ]),
+      ],
+    },
+  ];
+}
+
+/** "Banco de dados 8º BPM-M 2026-10.xlsx" / "... 2026-01 a 2026-10.xlsx". */
+export function nomeCopia(de: string, ate: string): string {
+  return `Banco de dados 8º BPM-M ${de === ate ? de : `${de} a ${ate}`}.xlsx`;
+}
+
+/**
+ * Mês que já pode ter a cópia automática: o mês de referência, depois do prazo do último Documento Mensal dele
+ * (aí as Cias já enviaram tudo). null = ainda não.
+ */
+export function mesDaCopiaAutomatica(hoje: string): string | null {
+  const mes = mesReferencia(hoje);
+  const ultimo = documentosDoMes(mes).reduce((m, d) => (prazoDoDocumento(d, mes) > m ? prazoDoDocumento(d, mes) : m), '');
+  return hoje > ultimo ? mes : null;
 }

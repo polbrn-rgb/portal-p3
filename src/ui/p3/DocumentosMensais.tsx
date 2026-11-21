@@ -194,8 +194,8 @@ function CartaoDocumento(p: {
       {integrado && <p className="item-info">🔗 Pré-preenchido com a produção dos pelotões; a Cia confere e envia.</p>}
       {alterados.map(({ e, campos }) => (
         <p key={e.id} className="mensagem atencao">
-          {SIGLA[e.unidadeId]} corrigiu o que veio da produção:{' '}
-          {campos.map((c) => `${nomeCampo(c)} (produção ${e.daProducao![c]} → enviado ${e.valores[c]})`).join('; ')}
+          {SIGLA[e.unidadeId]} corrigiu o que veio pré-preenchido:{' '}
+          {campos.map((c) => `${nomeCampo(c)} (veio ${e.daProducao![c]} → enviado ${e.valores[c]})`).join('; ')}
         </p>
       ))}
       {erros.map((e) => (

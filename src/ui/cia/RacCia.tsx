@@ -119,16 +119,23 @@ export function FormRacCia(p: { unidade: UnidadeId; mes: RacMes; racs: RacSalvo[
 
   // Produtividade mensal tirada da produção dos pelotões (só com o mês completo e só nos campos vazios).
   // Quem confere com o QMO, corrige e envia é a Cia.
+  // As colunas de comparação (mês anterior e ano anterior) também vêm da produção desses meses, se completos.
   const producao = useAoVivo<Producao[]>((ok, e) => observarProducaoDaCia(db, p.unidade, p.mes.mes, ok, e), [p.unidade, p.mes.mes]);
-  const daProd = producao.valor ? racDaProducao(d, producao.valor, hojeISO()) : null;
+  const prodMesAnterior = useAoVivo<Producao[]>((ok, e) => observarProducaoDaCia(db, p.unidade, m.mesAnterior, ok, e), [p.unidade, m.mesAnterior]);
+  const prodAnoAnterior = useAoVivo<Producao[]>((ok, e) => observarProducaoDaCia(db, p.unidade, m.anoAnterior, ok, e), [p.unidade, m.anoAnterior]);
+  const comparar = { mesAnterior: prodMesAnterior.valor, anoAnterior: prodAnoAnterior.valor };
+  const pronto = producao.valor && !prodMesAnterior.carregando && !prodAnoAnterior.carregando;
+  const daProd = pronto ? racDaProducao(d, producao.valor!, hojeISO(), comparar) : null;
+  const temProd = !!daProd && Object.keys(daProd.daProducao).length > 0;
   const preencheu = useRef(false);
   useEffect(() => {
-    if (!daProd?.completa || preencheu.current) return;
+    if (!temProd || preencheu.current) return;
     preencheu.current = true;
-    setD((x) => racDaProducao(x, producao.valor!, hojeISO()).rac);
-  }, [daProd, producao.valor]);
+    setD((x) => racDaProducao(x, producao.valor!, hojeISO(), comparar).rac);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temProd]);
   const diferenteDaProducao = (c: string) =>
-    daProd?.completa && c in daProd.daProducao && valorDoCampo(d, c) !== null && valorDoCampo(d, c) !== daProd.daProducao[c] ? daProd.daProducao[c] : null;
+    daProd && c in daProd.daProducao && valorDoCampo(d, c) !== null && valorDoCampo(d, c) !== daProd.daProducao[c] ? daProd.daProducao[c] : null;
   const faltam = erros.size + avisos.filter((a) => !(d.justificativas[a.id] ?? '').trim()).length + (semNome ? 1 : 0);
 
   const mudar = (campo: string, valor: string) => setD((x) => comCampo(x, campo, lerNumero(valor)));
@@ -468,7 +475,8 @@ function AvisoProducaoRac(p: { carregando: boolean; erro: string; daProd: Return
   return (
     <p className="mensagem aviso" role="status">
       A Produtividade Mensal (por pelotão e os itens à parte) veio da produção dos pelotões; RE e RPM vêm com 0, porque na
-      produção eles entram no resultado do pelotão. Confira com o QMO e corrija o que for preciso: quem envia para a P/3 é a Cia.
+      produção eles entram no resultado do pelotão. As colunas do mês anterior e do ano anterior também vêm da produção quando esses meses estão completos (e ainda vazios). Confira
+      com o QMO e corrija o que for preciso: quem envia para a P/3 é a Cia.
     </p>
   );
 }

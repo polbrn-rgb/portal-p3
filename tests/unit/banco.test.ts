@@ -135,3 +135,30 @@ describe('banco de dados', () => {
     for (const a of [banco, cobertura, catalogo]) expect(a.nome.length).toBeLessThanOrEqual(31);
   });
 });
+
+describe('cópia de segurança e histórico', () => {
+  test('cópia automática só depois do prazo do último Documento Mensal do mês de referência', async () => {
+    const { mesDaCopiaAutomatica, nomeCopia } = await import('../../src/domain/banco');
+    expect(mesDaCopiaAutomatica('2026-11-02')).toBeNull(); // prazos de novembro ainda correndo
+    expect(mesDaCopiaAutomatica('2026-11-20')).toBe('2026-10');
+    expect(nomeCopia('2026-10', '2026-10')).toBe('Banco de dados 8º BPM-M 2026-10.xlsx');
+    expect(nomeCopia('2026-01', '2026-10')).toBe('Banco de dados 8º BPM-M 2026-01 a 2026-10.xlsx');
+  });
+
+  test('abas do histórico, em ordem de quando aconteceu', async () => {
+    const { abasDoHistorico } = await import('../../src/domain/banco');
+    const [prod, docs] = abasDoHistorico(
+      [
+        { producaoId: '1cia_2026-10-01_pelA', unidadeId: '1cia', mes: '2026-10', acao: 'corrigido', itens: { ...itensZerados(), ai: 3 }, taloes: [], por: 'B', em: new Date(2026, 9, 2, 9, 5) },
+        { producaoId: '1cia_2026-10-01_pelA', unidadeId: '1cia', mes: '2026-10', acao: 'lancado', itens: { ...itensZerados(), ai: 2 }, taloes: [{ numero: '7', bopc: '', data: '2026-10-01', natureza: 'roubo' }], por: 'A', em: new Date(2026, 9, 1, 19, 0) },
+      ],
+      [{ envioId: 'x', docId: 'veiculos-apreendidos', mesRef: '2026-10', unidadeId: '2cia', valores: { v4: 1, cam: '' }, respondidoPor: 'Cb X', em: new Date(2026, 10, 3, 10, 0) }],
+    );
+    expect(prod.linhas.slice(1).map((l) => [l[0], l[3], l[4]])).toEqual([
+      ['01/10/2026 19:00', 'lançado', 'A'],
+      ['02/10/2026 09:05', 'corrigido', 'B'],
+    ]);
+    expect(prod.linhas[1].at(-1)).toBe('7 (roubo)');
+    expect(docs.linhas[1]).toEqual(['03/11/2026 10:00', '2ª CIA', 'Veículos Apreendidos', '2026-10', 'Cb X', 'v4=1', '']);
+  });
+});

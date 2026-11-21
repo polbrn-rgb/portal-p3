@@ -236,7 +236,8 @@ service cloud.firestore {
 
     // Aperfeiçoamento → ICC: a P/3 cria e encerra; as Cias veem só as abertas.
     match /iccs/{id} {
-      allow read: if ehP3() || (ehPerfil('unidade') && resource.data.status == 'aberta');
+      // As Cias leem todas (inclusive as encerradas: o Plano Diretor soma as respostas de cada mês); só respondem às abertas.
+      allow read: if ehP3() || ehPerfil('unidade');
       allow create: if ehP3()
         && request.resource.data.keys().hasOnly(['numero', 'prazo', 'status', 'arquivo', 'planilha', 'criadoEm'])
         && request.resource.data.status == 'aberta' && request.resource.data.planilha.status == 'pedida';
@@ -276,6 +277,27 @@ service cloud.firestore {
     }
 
     // RAC GERAL esperando o motor arquivar no Drive (em partes, como os PDFs). Só a P/3; o motor apaga depois.
+    // Banco de dados: cópia de segurança pedida pela P/3 (a planilha em partes; o motor grava no Drive, põe o link
+    // e apaga as partes). id = mês ("2026-10") ou período ("2026-01_2026-10").
+    match /backupBanco/{id} {
+      allow read: if ehP3();
+      allow create, update: if ehP3()
+        && request.resource.data.keys().hasOnly(['de', 'ate', 'nome', 'tamanho', 'partes', 'status', 'automatica', 'pedidoEm'])
+        && request.resource.data.de is string && request.resource.data.de.matches('^[0-9]{4}-[0-9]{2}$')
+        && request.resource.data.ate is string && request.resource.data.ate.matches('^[0-9]{4}-[0-9]{2}$')
+        && (id == request.resource.data.de && request.resource.data.de == request.resource.data.ate
+          || id == request.resource.data.de + '_' + request.resource.data.ate)
+        && request.resource.data.nome is string && request.resource.data.nome.size() <= 120
+        && request.resource.data.tamanho is int && request.resource.data.tamanho <= 41943040
+        && request.resource.data.partes is int && request.resource.data.partes > 0 && request.resource.data.partes <= 80
+        && request.resource.data.status == 'pedido' && request.resource.data.automatica is bool
+        && request.resource.data.pedidoEm == request.time;
+      match /partes/{n} {
+        allow read: if ehP3();
+        allow create, update: if ehP3() && request.resource.data.keys().hasOnly(['dados']) && request.resource.data.dados is string;
+      }
+    }
+
     match /racArquivo/{mes} {
       allow read, delete: if ehP3();
       allow create, update: if ehP3()

@@ -236,7 +236,21 @@ Tudo o que o portal guarda, **separado por Cia e por mês**, com um código fixo
   de Documento Mensal (`docsMensaisHistorico`) vira um registro que ninguém altera nem apaga (só a P/3 lê).
 - **Baixar banco completo (Excel)**: o banco em linhas (Mês × Cia × indicador), a cobertura de cada mês, o catálogo e
   todos os lançamentos da produção. Serve também de cópia de segurança: baixe todo mês e guarde no Drive.
-- A série diária por Cia (`serieDiaria`) é a base do futuro painel estatístico do Batalhão.
+- **Cópia de segurança no Drive**: todo mês, depois do prazo do último Documento Mensal do mês de referência, a primeira
+  vez que a P/3 abre o portal ele monta a planilha completa do mês (banco, lançamentos e histórico) e o motor grava na
+  pasta "Portal P3 - Banco de dados" do Drive (criada sozinha; ou informe `PASTA_BANCO` no Motor.gs). Outro período:
+  Operações → Banco de dados → "Guardar cópia no Drive". A lista de cópias, com o link, fica na mesma tela.
+- A série diária por Cia (`serieDiaria`) alimenta o Painel → Estatístico do Batalhão.
+
+### O que vem pré-preenchido (a Cia sempre confere, corrige e envia)
+
+| Onde | Campo | De onde vem |
+|---|---|---|
+| Documentos Mensais | Veículos Apreendidos, Vistoria de Ciclomotores, Escoltas, Atividades de Trânsito, Avaliação Periódica (ano atual) | produção do mês (completa) |
+| Avaliação Periódica | colunas do ano anterior | produção do mesmo mês do ano anterior (completa) |
+| Plano Diretor | policiais na ICC no mês | respostas da Cia às ICC com prazo no mês |
+| RAC | Produtividade Mensal por pelotão e itens à parte | produção do mês (completa) |
+| RAC | colunas do mês anterior e do ano anterior | produção desses meses (completa), se ainda vazias |
 
 Ao publicar mudanças na produção ou nos documentos: **primeiro as regras** (`npm run deploy:regras`), depois o site.
 As regras do lançamento da produção estão perto do limite de 1000 expressões do Firestore: cabem menos de 20 itens novos.
