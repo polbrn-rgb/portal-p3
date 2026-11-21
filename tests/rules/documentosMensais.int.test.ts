@@ -43,6 +43,12 @@ describe('envio das Cias', () => {
     expect(doMes[0].unidadeId).toBe('2cia');
   });
 
+  test('o envio guarda o que veio da produção (a P/3 vê o que a Cia corrigiu)', async () => {
+    await enviarDocMensal(cia('2cia'), { ...envio, unidadeId: '2cia', valores: { v4: 3, v2: 1, cam: 0 }, daProducao: { v4: 2, v2: 1, cam: 0 } });
+    const doMes = await quando((ok, e) => observarEnviosDoMes(p3, '2026-10', ok, e), (l) => l.length === 1);
+    expect(doMes[0].daProducao).toEqual({ v4: 2, v2: 1, cam: 0 });
+  });
+
   test('não envia pela outra Cia, não lê o da outra e não marca "gravado"', async () => {
     await enviarDocMensal(cia('2cia'), { ...envio, unidadeId: '2cia' });
     await assertFails(enviarDocMensal(cia('3cia'), { ...envio, unidadeId: '2cia' }));

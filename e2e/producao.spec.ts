@@ -45,8 +45,12 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   await form.getByLabel('Nº do talão').fill('202611200001');
   await form.getByLabel('Nº do BOPC').fill('AB1234');
   await form.getByRole('button', { name: '+ Incluir flagrante' }).click();
+  await expect(form.getByText('Escolha a natureza da ocorrência.')).toBeVisible();
+  await form.getByRole('combobox', { name: /^Natureza da ocorrência/ }).selectOption({ label: 'Tráfico de drogas' });
+  await form.getByRole('button', { name: '+ Incluir flagrante' }).click();
   await expect(form.getByRole('list', { name: 'Flagrantes anotados' })).toContainText('202611200001');
   await expect(form.getByRole('list', { name: 'Flagrantes anotados' })).toContainText('AB1234');
+  await expect(form.getByRole('list', { name: 'Flagrantes anotados' })).toContainText('Tráfico de drogas');
   await expect(form.getByRole('list', { name: 'Conferências' })).toHaveCount(0);
 
   await form.getByRole('button', { name: 'Salvar lançamento' }).click();

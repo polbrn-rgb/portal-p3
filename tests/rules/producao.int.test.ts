@@ -38,7 +38,7 @@ const lancamento = (extra: Partial<Parameters<typeof salvarProducao>[1]> = {}) =
   data: '2026-11-20',
   pelotao: 'pelA' as const,
   itens: { ...itensZerados(), pessoasAbordadas: 40, flagrante: 1, ocorrenciasComPrisao: 1, maconhaKg: 0.25, carrosRemovidos: 2 },
-  taloes: [{ numero: '20261120510801', bopc: 'XY1234', data: '2026-11-20' }],
+  taloes: [{ numero: '20261120510801', bopc: 'XY1234', data: '2026-11-20', natureza: 'trafico' as const }],
   por: 'Sd PM SALA (RE 111111)',
   ...extra,
 });
@@ -51,7 +51,7 @@ describe('produção diária dos pelotões', () => {
     const [l] = await uma((ok, e) => observarProducaoDaCia(cia('1cia'), '1cia', '2026-11', ok, e));
     expect(l).toMatchObject({ pelotao: 'pelA', lancadoPor: 'Sd PM SALA (RE 111111)', atualizadoPor: 'Cb PM OUTRO (RE 222222)' });
     expect(l.itens.pessoasAbordadas).toBe(45);
-    expect(l.taloes).toEqual([{ numero: '20261120510801', bopc: 'XY1234', data: '2026-11-20' }]);
+    expect(l.taloes).toEqual([{ numero: '20261120510801', bopc: 'XY1234', data: '2026-11-20', natureza: 'trafico' }]);
     expect(l.lancadoEm).toBeInstanceOf(Date);
   });
 
@@ -95,6 +95,31 @@ describe('produção diária dos pelotões', () => {
     await assertFails(updateDoc(doc(c, 'producao', '1cia_2026-11-21_pelA'), { lancadoPor: 'outro', atualizadoEm: serverTimestamp() }));
 
     await assertSucceeds(excluirProducao(c, '1cia_2026-11-21_pelA'));
+  });
+
+  test('lançamento antigo (com "ciclomotores removidos" e sem os itens novos) e o novo valem; item novo negativo não', async () => {
+    const c = cia('1cia');
+    const { ...antigos } = itensZerados() as Record<string, number>;
+    for (const k of ['armasBrancas', 'caminhoesApreendidos', 'trv', 'caminhoesRemovidos', 'escoltasRecebidas', 'escoltasAtendidas']) delete antigos[k];
+    for (const t of ['bike', 'ciclo', 'auto']) for (const a of ['Vist', 'Rem', 'Loc', 'Aut']) delete antigos[`${t}${a}`];
+    const base = {
+      unidadeId: '1cia',
+      data: '2026-11-22',
+      mes: '2026-11',
+      pelotao: 'pelA',
+      taloes: [{ numero: '1', bopc: '', data: '2026-11-22' }],
+      lancadoPor: 'x',
+      lancadoEm: serverTimestamp(),
+      atualizadoPor: 'x',
+      atualizadoEm: serverTimestamp(),
+    };
+    await assertSucceeds(setDoc(doc(c, 'producao', '1cia_2026-11-22_pelA'), { ...base, itens: { ...antigos, ciclomotoresRemovidos: 2 } }));
+    await assertSucceeds(salvarProducao(c, lancamento({ itens: { ...itensZerados(), cicloVist: 3, trv: 1, escoltasRecebidas: 2 } })));
+    await assertFails(salvarProducao(c, lancamento({ data: '2026-11-19', itens: { ...itensZerados(), bikeAut: -1 } })));
+    await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), trv: '1' } as never })));
+    await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), armas: true } as never })));
+    await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), armas: null } as never })));
+    await assertFails(salvarProducao(c, lancamento({ data: '2026-11-18', itens: { ...itensZerados(), escoltasAtendidas: 100000 } })));
   });
 
   test('primeiro lançamento de cada Cia (início da contagem das pendências)', async () => {

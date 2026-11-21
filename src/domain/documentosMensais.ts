@@ -604,6 +604,8 @@ export type EnvioMensal = {
   respondidoPor: string;
   gravado: boolean;
   erro?: string;
+  /** O que veio da produção dos pelotões no momento do envio (para a P/3 ver o que a Cia corrigiu). */
+  daProducao?: Record<string, number>;
 };
 
 export function idEnvio(docId: string, mesRef: string, u: UnidadeId): string {

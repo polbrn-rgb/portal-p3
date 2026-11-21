@@ -22,16 +22,19 @@ function paraEnvio(id: string, x: Partial<EnvioMensal>): EnvioMensal {
     respondidoPor: x.respondidoPor ?? '',
     gravado: x.gravado === true,
     erro: x.erro || undefined,
+    daProducao: x.daProducao && typeof x.daProducao === 'object' ? x.daProducao : undefined,
   };
 }
 
 export async function enviarDocMensal(
   db: Firestore,
-  p: { docId: string; mesRef: string; unidadeId: UnidadeId; valores: ValoresEnvio; respondidoPor: string },
+  p: { docId: string; mesRef: string; unidadeId: UnidadeId; valores: ValoresEnvio; respondidoPor: string; daProducao?: Record<string, number> },
 ): Promise<void> {
   if (!p.respondidoPor.trim()) throw new Error('Informe quem preencheu.');
+  const { daProducao, ...resto } = p;
   await setDoc(doc(db, 'docsMensais', idEnvio(p.docId, p.mesRef, p.unidadeId)), {
-    ...p,
+    ...resto,
+    ...(daProducao && Object.keys(daProducao).length ? { daProducao } : {}),
     respondidoPor: p.respondidoPor.trim(),
     gravado: false,
     erro: '',

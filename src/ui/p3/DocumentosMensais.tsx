@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { marcarFeito, observarEnviosDoMes, observarEstados, pedirArquivamento, publicarConfig } from '../../data/documentosMensais';
+import { observarProducaoDoMes } from '../../data/producao';
+import { divergencias, situacaoProducaoMes, temIntegracao, type SituacaoProducaoMes } from '../../domain/integracao';
+import type { Producao } from '../../domain/producao';
 import { rotuloMes } from '../../domain/controle';
 import { formatarData, hojeISO } from '../../domain/datas';
 import {
@@ -15,7 +18,7 @@ import {
   type EnvioMensal,
   type EstadoDocumento,
 } from '../../domain/documentosMensais';
-import { UNIDADES } from '../../domain/unidades';
+import { UNIDADES, type UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { cutucarMotor } from '../../lib/motor';
 import { useAoVivo } from '../../lib/useAoVivo';
@@ -30,6 +33,13 @@ export function DocumentosMensais() {
   const envios = useAoVivo<EnvioMensal[]>((ok, erro) => observarEnviosDoMes(db, mesRef, ok, erro), [mesRef], 'Não foi possível carregar os envios.');
   const estados = useAoVivo<Record<string, EstadoDocumento>>((ok, erro) => observarEstados(db, ok, erro), []);
   const [aviso, setAviso] = useState('');
+  // Produção dos pelotões do mês: sem ela completa, os documentos integrados não são pré-preenchidos.
+  const producao = useAoVivo<Producao[]>((ok, erro) => observarProducaoDoMes(db, mesRef, ok, erro), [mesRef], 'Não foi possível conferir a produção dos pelotões.');
+  const hoje = hojeISO();
+  const situacaoProd: Partial<Record<UnidadeId, SituacaoProducaoMes>> = producao.valor
+    ? Object.fromEntries(UNIDADES.map((u) => [u.id, situacaoProducaoMes(producao.valor!.filter((l) => l.unidadeId === u.id), mesRef, u.id, hoje)]))
+    : {};
+  const incompletas = UNIDADES.filter((u) => situacaoProd[u.id] && !situacaoProd[u.id]!.completa);
 
   // O motor lê daqui as células de cada Cia: publica de novo quando a configuração muda.
   useEffect(() => {
@@ -68,6 +78,34 @@ export function DocumentosMensais() {
           {aviso}
         </p>
       )}
+      {producao.erro && (
+        <p className="mensagem erro" role="alert">
+          {producao.erro}
+        </p>
+      )}
+      {incompletas.length > 0 && (
+        <div className="mensagem erro" role="alert" aria-label="Produção incompleta">
+          <p>
+            <strong>Produção dos pelotões de {rotuloMes(mesRef)} incompleta.</strong> Os documentos com 🔗 dessas Cias não são pré-preenchidos nem
+            podem ser enviados até a produção ser completada:
+          </p>
+          <ul>
+            {incompletas.map((u) => {
+              const sp = situacaoProd[u.id]!;
+              return (
+                <li key={u.id}>
+                  <strong>{SIGLA[u.id]}</strong>:{' '}
+                  {sp.turnosFaltando
+                    ? `${sp.turnosFaltando} turno(s) sem lançamento — ${sp.pendencias
+                        .map((x) => `${formatarData(x.data).slice(0, 5)} ${[x.faltaDia && 'dia', x.faltaNoite && 'noite'].filter(Boolean).join('/')}`)
+                        .join(', ')}`
+                    : 'o mês ainda não terminou'}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {envios.erro && (
         <p className="mensagem erro" role="alert">
           {envios.erro}
@@ -89,6 +127,7 @@ export function DocumentosMensais() {
                     mesRef={mesRef}
                     envios={(envios.valor ?? []).filter((e) => e.docId === d.id)}
                     estado={estados.valor?.[d.id]}
+                    situacaoProd={situacaoProd}
                     aoArquivar={() => arquivar(d)}
                   />
                 </li>
@@ -100,7 +139,14 @@ export function DocumentosMensais() {
   );
 }
 
-function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios: EnvioMensal[]; estado?: EstadoDocumento; aoArquivar: () => void }) {
+function CartaoDocumento(p: {
+  documento: DocumentoMensal;
+  mesRef: string;
+  envios: EnvioMensal[];
+  estado?: EstadoDocumento;
+  situacaoProd: Partial<Record<UnidadeId, SituacaoProducaoMes>>;
+  aoArquivar: () => void;
+}) {
   const d = p.documento;
   const prazo = prazoDoDocumento(d, p.mesRef);
   const portal = preenchidoPeloPortal(d);
@@ -114,6 +160,12 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
   const feito = comCias ? cias.length > 0 && prontas === cias.length : !!p.estado?.feitos?.[p.mesRef];
   const atrasado = !feito && hojeISO() > prazo;
   const erros = p.envios.filter((e) => e.erro && !e.gravado);
+  const integrado = temIntegracao(d.id);
+  const semProducao = (u: UnidadeId) => integrado && p.situacaoProd[u] !== undefined && !p.situacaoProd[u]!.completa;
+  const nomeCampo = (id: string) => d.campos?.find((c) => c.id === id)?.rotulo ?? id;
+  const alterados = p.envios
+    .map((e) => ({ e, campos: divergencias(e.daProducao, e.valores) }))
+    .filter((x) => x.campos.length);
   const [confirmando, setConfirmando] = useState(false);
 
   return (
@@ -128,8 +180,8 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
       {comCias ? (
         <ul className="chips-cias" aria-label={`Envios — ${d.nome}`}>
           {situacoes.map(({ u, s }) => (
-            <li key={u} className={`chip-cia chip-${s}`} title={s}>
-              {ICONE[s]} {SIGLA[u]}
+            <li key={u} className={`chip-cia chip-${s}`} title={semProducao(u) && s !== 'gravado' ? 'produção incompleta' : s}>
+              {semProducao(u) && s !== 'gravado' ? '⚠️' : ICONE[s]} {SIGLA[u]}
             </li>
           ))}
         </ul>
@@ -139,6 +191,13 @@ function CartaoDocumento(p: { documento: DocumentoMensal; mesRef: string; envios
           {rotuloMes(p.mesRef)}
         </label>
       )}
+      {integrado && <p className="item-info">🔗 Pré-preenchido com a produção dos pelotões; a Cia confere e envia.</p>}
+      {alterados.map(({ e, campos }) => (
+        <p key={e.id} className="mensagem atencao">
+          {SIGLA[e.unidadeId]} corrigiu o que veio da produção:{' '}
+          {campos.map((c) => `${nomeCampo(c)} (produção ${e.daProducao![c]} → enviado ${e.valores[c]})`).join('; ')}
+        </p>
+      ))}
       {erros.map((e) => (
         <p key={e.id} className="mensagem erro" role="alert">
           {SIGLA[e.unidadeId]}: {e.erro}
