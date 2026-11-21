@@ -16,7 +16,7 @@ test('Estatístico do Batalhão: totais, gráficos e Cias com turnos sem lançam
   const painel = page.getByRole('region', { name: 'Estatístico do Batalhão' });
   await expect(painel.getByRole('heading', { name: 'Estatístico do Batalhão' })).toBeVisible();
 
-  await painel.getByLabel('Mês').fill(mes);
+  await painel.getByLabel('Mês', { exact: true }).fill(mes);
   const totais = painel.getByLabel('Totais do Batalhão no mês');
   await expect(totais.locator('.numero-painel', { hasText: 'Veículos removidos ao pátio' }).locator('strong')).toHaveText(String(2 * 2 * dias));
   await expect(painel.getByRole('status', { name: 'Turnos sem lançamento' })).toContainText('1ª');

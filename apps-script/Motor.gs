@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-21';
+var VERSAO_MOTOR = '2026-11-22';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -143,6 +143,16 @@ function diagnostico() {
     if (!ss.getSheetByName(CONFIG_P3.ABA_INDICADORES)) throw new Error('aba ' + CONFIG_P3.ABA_INDICADORES + ' não encontrada');
     return ss.getName();
   });
+  ok('Tempo do motor hoje', function () {
+    var props = PropertiesService.getScriptProperties();
+    var d = JSON.parse(props.getProperty('TEMPO_DO_DIA') || '{}');
+    var u = JSON.parse(props.getProperty('ULTIMA_RODADA') || '{}');
+    if (!d.dia) return 'ainda sem rodada registrada';
+    var lentas = Object.keys(u.etapas || {}).sort(function (a, b) { return u.etapas[b] - u.etapas[a]; }).slice(0, 3)
+      .map(function (k) { return k + ' ' + (u.etapas[k] / 1000).toFixed(1) + 's'; });
+    return (d.ms / 60000).toFixed(1) + ' min em ' + d.rodadas + ' rodada(s) (' + d.portal + ' pedidas pelo portal) em ' + d.dia +
+      '. Conta Gmail comum: cerca de 90 min/dia de gatilhos. Última: ' + ((u.ms || 0) / 1000).toFixed(1) + 's (' + lentas.join(', ') + ')';
+  });
   ok('Firestore (chave)', function () {
     var p = consultarPendentes_();
     return p.length + ' demanda(s) esperando' + (p.length ? ': nº ' + p.map(function (d) { return d.dados.numero; }).join(', ') : '');
@@ -209,7 +219,7 @@ function limparExcluidas() {
 
 /** Gatilho de reserva (a cada 5 min): se outra rodada estiver trabalhando, deixa para ela. */
 function processarPendentes() {
-  rodarMotor_(1000);
+  rodarMotor_(1000, { origem: 'gatilho' });
 }
 
 /**
@@ -221,13 +231,15 @@ function doPost(e) {
   if (p.acao === 'senha') {
     // "Esqueci minha senha" da tela de login: responde sempre igual (não revela se o RE existe).
     try {
-      pedirTrocaDeSenha_(p.re);
+      if (senhaPermitida_()) pedirTrocaDeSenha_(p.re);
     } catch (err) {
       console.error('Esqueci a senha: ' + err.message);
     }
     return ContentService.createTextOutput('ok');
   }
-  rodarMotor_(25000);
+  // Várias gravações seguidas viram uma rodada só: quem esperou a vez e vê que outra rodada começou
+  // depois do seu pedido não roda de novo.
+  if (cutucadaPermitida_()) rodarMotor_(25000, { origem: 'portal', pedidoEm: Date.now() });
   return ContentService.createTextOutput('ok');
 }
 
@@ -235,94 +247,167 @@ function doGet(e) {
   return doPost(e);
 }
 
-function rodarMotor_(esperaMs) {
+// Agenda do CFP e aba Operações podem mudar fora do portal: o gatilho de 5 minutos só as relê a cada 15.
+var INTERVALO_VARREDURA_MS = 15 * 60 * 1000;
+// Rodadas pedidas pelo portal por hora (proteção da cota do Google; acima disso fica só o gatilho de 5 minutos).
+var LIMITE_CUTUCADAS_HORA = 120;
+
+/**
+ * Uma rodada do motor. opcoes.origem: 'gatilho' (5 minutos) ou 'portal' (cutucada ao salvar).
+ * opcoes.pedidoEm: hora da cutucada; se outra rodada começou depois dela, essa já viu o que foi salvo.
+ */
+function rodarMotor_(esperaMs, opcoes) {
+  opcoes = opcoes || {};
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(esperaMs)) return;
   try {
-    // Repete enquanto houver pendentes (pega também o que foi salvo durante a rodada).
-    try {
-      importarEmails_();
-    } catch (e) {
-      // Falha no Gmail não pode travar a agenda: registra e tenta de novo na próxima rodada.
-      console.error('E-mails: ' + e.message);
-    }
+    var props = PropertiesService.getScriptProperties();
+    if (opcoes.pedidoEm && Number(props.getProperty('RODADA_INICIO')) > opcoes.pedidoEm) return;
+    var comeco = Date.now();
+    props.setProperty('RODADA_INICIO', String(comeco));
+    var tempos = {};
+    var etapa = function (nome, fn) {
+      var t = Date.now();
+      try {
+        return fn();
+      } catch (e) {
+        // Uma etapa com erro não pode travar as outras: registra e tenta de novo na próxima rodada.
+        console.error(nome + ': ' + e.message);
+      } finally {
+        tempos[nome] = Date.now() - t;
+      }
+    };
+
+    etapa('E-mails', importarEmails_);
     // Busca uma fila maior que a rodada e põe por último as que já deram erro: um erro que se repete
     // (ex.: limite do Google de apagar eventos) não trava as outras. Cada demanda no máximo 1 vez por rodada.
-    var vistas = {};
-    var comeco = Date.now();
-    for (var i = 0; i < 3; i++) {
-      var pendentes = ordenarPendentes(consultarPendentes_()).filter(function (p) { return !vistas[p.nome]; });
-      if (!pendentes.length) break;
-      pendentes.slice(0, CONFIG_P3.POR_RODADA).forEach(function (p) {
-        vistas[p.nome] = true;
-        processarDemanda_(p);
-      });
-      if (Date.now() - comeco > 4 * 60 * 1000) break; // o Apps Script corta em 6 minutos
-    }
-    try {
+    var processadas = etapa('Demandas', function () {
+      var vistas = {};
+      var n = 0;
+      for (var i = 0; i < 3; i++) {
+        var pendentes = ordenarPendentes(consultarPendentes_()).filter(function (p) { return !vistas[p.nome]; });
+        if (!pendentes.length) break;
+        pendentes.slice(0, CONFIG_P3.POR_RODADA).forEach(function (p) {
+          vistas[p.nome] = true;
+          processarDemanda_(p);
+          n++;
+        });
+        if (Date.now() - comeco > 4 * 60 * 1000) break; // o Apps Script corta em 6 minutos
+      }
+      return n;
+    }) || 0;
+    etapa('Planilhas de resultado', function () {
       processarPlanilhas_();
       gravarResultados_();
-    } catch (e2) {
-      console.error('Planilhas de resultado: ' + e2.message);
+    });
+    // Leituras grandes (agenda do CFP de 14 meses e aba Operações inteira): quando o portal pede, quando
+    // alguma demanda mexeu nelas ou a cada 15 minutos.
+    var ultimaVarredura = Number(props.getProperty('VARREDURA_EM')) || 0;
+    if (opcoes.origem === 'portal' || processadas > 0 || comeco - ultimaVarredura >= INTERVALO_VARREDURA_MS) {
+      etapa('Agenda do CFP', function () { sincronizarAgendaCfp_(false); });
+      etapa('Controle de Operações', function () { sincronizarControleOperacoes_(false); });
+      props.setProperty('VARREDURA_EM', String(comeco));
     }
-    try {
-      sincronizarAgendaCfp_(false);
-    } catch (e3) {
-      console.error('Agenda do CFP: ' + e3.message);
-    }
-    try {
-      processarEap_();
-    } catch (e4) {
-      console.error('EAP: ' + e4.message);
-    }
-    try {
-      sincronizarControleOperacoes_(false);
-    } catch (e5) {
-      console.error('Controle de Operações: ' + e5.message);
-    }
-    try {
-      processarRelatorios_();
-    } catch (e6) {
-      console.error('Relatório: ' + e6.message);
-    }
-    try {
-      processarDocsMensais_();
-    } catch (e7) {
-      console.error('Documentos Mensais: ' + e7.message);
-    }
-    try {
-      processarIcc_();
-    } catch (e8) {
-      console.error('ICC: ' + e8.message);
-    }
-    try {
-      levarEfetivoManual_();
-    } catch (e9) {
-      console.error('Efetivo manual: ' + e9.message);
-    }
-    try {
-      processarEmails_();
-    } catch (e10) {
-      console.error('E-mails do portal: ' + e10.message);
-    }
-    try {
-      processarAcessos_();
-    } catch (e11) {
-      console.error('Acessos: ' + e11.message);
-    }
-    try {
-      processarRac_();
-    } catch (e12) {
-      console.error('RAC: ' + e12.message);
-    }
-    try {
-      processarBackupBanco_();
-    } catch (e13) {
-      console.error('Banco de dados (cópia): ' + e13.message);
-    }
+    etapa('EAP', processarEap_);
+    etapa('Relatório', processarRelatorios_);
+    etapa('Documentos Mensais', processarDocsMensais_);
+    etapa('ICC', processarIcc_);
+    etapa('Efetivo manual', levarEfetivoManual_);
+    etapa('E-mails do portal', processarEmails_);
+    etapa('Acessos', processarAcessos_);
+    etapa('RAC', processarRac_);
+    etapa('Banco de dados (cópia)', processarBackupBanco_);
+    etapa('Encaminhamentos sem demanda', limparEncaminhamentosOrfaos_);
+    registrarRodada_(props, opcoes.origem || 'gatilho', comeco, tempos);
   } finally {
     trava.releaseLock();
   }
+}
+
+// Status em que o encaminhamento ainda aparece na tela da Cia (igual a STATUS_PENDENTES + 'respondido' no portal).
+var STATUS_ENC_NA_TELA = ['novo', 'visualizado', 'em_andamento', 'devolvido', 'respondido'];
+
+/**
+ * Uma vez por dia: tira da tela das Cias o encaminhamento cuja demanda foi apagada direto no banco ou
+ * excluída (a lixeira do portal já apaga os dela; isto pega o que sobrou de outros caminhos).
+ */
+function limparEncaminhamentosOrfaos_(forcar) {
+  var props = PropertiesService.getScriptProperties();
+  var dia = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  if (!forcar && props.getProperty('ORFAOS_EM') === dia) return 0;
+  var r = firestore_('post', caminhoDocs_() + ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: 'encaminhamentos' }],
+      where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'IN', value: jsParaValor(STATUS_ENC_NA_TELA) } },
+      select: { fields: [{ fieldPath: 'demandaId' }] }
+    }
+  });
+  if (r.status !== 200) throw new Error('Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  var encs = r.json
+    .filter(function (x) { return x.document; })
+    .map(function (x) {
+      return { id: x.document.name.split('/').pop(), demandaId: String(camposParaJs(x.document.fields || {}).demandaId || '') };
+    });
+  var ids = [];
+  encs.forEach(function (e) { if (e.demandaId && ids.indexOf(e.demandaId) < 0) ids.push(e.demandaId); });
+  var status = {};
+  for (var i = 0; i < ids.length; i += 100) {
+    var g = firestore_('post', caminhoDocs_() + ':batchGet', {
+      documents: ids.slice(i, i + 100).map(function (id) { return caminhoDocs_() + '/demandas/' + id; }),
+      mask: { fieldPaths: ['status'] }
+    });
+    if (g.status !== 200) throw new Error('Firestore ' + g.status + ': ' + JSON.stringify(g.json));
+    g.json.forEach(function (x) {
+      if (x.found) status[x.found.name.split('/').pop()] = String(camposParaJs(x.found.fields || {}).status || 'em_aberto');
+    });
+  }
+  var orfaos = encaminhamentosOrfaos(encs, status);
+  orfaos.forEach(function (id) { firestore_('delete', caminhoDocs_() + '/encaminhamentos/' + id); });
+  if (orfaos.length) console.info(orfaos.length + ' encaminhamento(s) de demanda apagada removido(s) das Cias.');
+  props.setProperty('ORFAOS_EM', dia);
+  return orfaos.length;
+}
+
+/** Guarda o tempo da última rodada e o total do dia (o diagnóstico mostra; a cota do Google é por dia). */
+function registrarRodada_(props, origem, comeco, tempos) {
+  var total = Date.now() - comeco;
+  var dia = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var hoje = {};
+  try {
+    hoje = JSON.parse(props.getProperty('TEMPO_DO_DIA') || '{}');
+  } catch (e) {
+    hoje = {};
+  }
+  if (hoje.dia !== dia) hoje = { dia: dia, ms: 0, rodadas: 0, portal: 0 };
+  hoje.ms += total;
+  hoje.rodadas++;
+  if (origem === 'portal') hoje.portal++;
+  props.setProperties({
+    TEMPO_DO_DIA: JSON.stringify(hoje),
+    ULTIMA_RODADA: JSON.stringify({ em: new Date(comeco).toISOString(), origem: origem, ms: total, etapas: tempos })
+  });
+}
+
+// Pedidos de "Esqueci a senha" por hora, somando todos os RE (cada RE já tem 1 a cada 5 minutos).
+var LIMITE_SENHAS_HORA = 30;
+
+function senhaPermitida_() {
+  var cache = CacheService.getScriptCache();
+  var chave = 'senhas_' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyyMMddHH');
+  var n = Number(cache.get(chave)) || 0;
+  if (n >= LIMITE_SENHAS_HORA) return false;
+  cache.put(chave, String(n + 1), 3700);
+  return true;
+}
+
+/** Cutucadas do portal: no máximo LIMITE_CUTUCADAS_HORA por hora (a URL do app da web é pública). */
+function cutucadaPermitida_() {
+  var cache = CacheService.getScriptCache();
+  var chave = 'cutucadas_' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyyMMddHH');
+  var n = Number(cache.get(chave)) || 0;
+  if (n >= LIMITE_CUTUCADAS_HORA) return false;
+  cache.put(chave, String(n + 1), 3700);
+  return true;
 }
 
 function processarDemanda_(doc) {

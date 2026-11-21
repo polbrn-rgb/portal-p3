@@ -1,15 +1,20 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import type { Sessao } from '../domain/contas';
 import { auth } from '../lib/firebase';
-import { PainelUnidade } from './cia/PainelUnidade';
-import { PainelP3 } from './p3/PainelP3';
-import { PainelCfp } from './setores/PainelCfp';
-import { PainelSala } from './setores/PainelSala';
+import { sobDemanda } from '../lib/sobDemanda';
 import { Recados } from './setores/Recados';
 import { Topo } from './Topo';
-import { Agenda } from './p3/Agenda';
-import { PaginaCgp } from './cia/Cgp';
+
+// Cada perfil baixa só o código das telas dele.
+const PainelP3 = sobDemanda(() => import('./p3/PainelP3'), 'PainelP3');
+const PainelUnidade = sobDemanda(() => import('./cia/PainelUnidade'), 'PainelUnidade');
+const PainelCfp = sobDemanda(() => import('./setores/PainelCfp'), 'PainelCfp');
+const PainelSala = sobDemanda(() => import('./setores/PainelSala'), 'PainelSala');
+const Agenda = sobDemanda(() => import('./p3/Agenda'), 'Agenda');
+const PaginaCgp = sobDemanda(() => import('./cia/Cgp'), 'PaginaCgp');
+
+export const Carregando = () => <p className="carregando">Carregando…</p>;
 
 export function Inicio({ sessao }: { sessao: Sessao }) {
   return (
@@ -19,6 +24,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
           Sair
         </button>
       </Topo>
+      <Suspense fallback={<Carregando />}>
       {sessao.tipo === 'p3' && <PainelP3 admin={sessao.admin} />}
       {sessao.tipo === 'unidade' && <PainelUnidade unidade={sessao.unidade} sigla={sessao.sigla} />}
       {sessao.tipo === 'sala' && (
@@ -37,6 +43,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
           <p>Fale com a P/3 para liberar o acesso.</p>
         </section>
       )}
+      </Suspense>
     </main>
   );
 }

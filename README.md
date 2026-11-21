@@ -133,6 +133,16 @@ deixam essa conta **mudar contador** (a P/3 só avança de 1 em 1 ao cadastrar) 
 Os eventos de Prazo CPA/Cia e a pasta + agenda do CFP + aba Operações são criados por um Apps Script
 na conta da P/3, a cada 5 minutos. Instalação em `apps-script/LEIAME.md`.
 
+O motor também roda na hora quando o portal salva algo; várias gravações seguidas viram uma rodada só. A agenda do
+CFP e a aba Operações são relidas a cada 15 minutos (ou na hora, quando o portal pede ou uma demanda mexeu nelas).
+Uma vez por dia ele tira da tela das Cias os encaminhamentos cuja demanda foi apagada ou excluída. O **diagnostico**
+mostra quantos minutos o motor usou no dia (a conta Gmail tem cota diária).
+
+**Depois de atualizar este repositório, cole de novo o `Motor.gs` e o `Logica.gs` no Apps Script** (os dois têm a
+mesma versão; o diagnóstico avisa se só um foi colado) e faça **Implantar → Gerenciar implantações → Nova versão**.
+
+O site carrega as telas sob demanda: cada perfil baixa só o código dele, e as telas pesadas da P/3 só ao abrir.
+
 A página do **CFP** mostra o que está na agenda do CFP (o mesmo script copia a agenda para o portal), não o
 histórico das demandas.
 

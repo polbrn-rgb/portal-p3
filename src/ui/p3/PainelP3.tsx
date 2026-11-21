@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { limparEncaminhamentosOrfaos, observarAbertosP3 } from '../../data/encaminhamentos';
+import { Suspense, useEffect, type ReactNode } from 'react';
+import { sobDemanda } from '../../lib/sobDemanda';
+import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { garantirCopiaAutomatica } from '../../data/banco';
 import { mesDaCopiaAutomatica } from '../../domain/banco';
 import { hojeISO } from '../../domain/datas';
@@ -12,54 +13,77 @@ import type { Situacao } from '../../domain/situacao';
 import { db } from '../../lib/firebase';
 import { useHash } from '../../lib/navegacao';
 import { useAoVivo, type AoVivo } from '../../lib/useAoVivo';
-import { MissoesCfp } from '../setores/PainelCfp';
 import { Recados } from '../setores/Recados';
-import { Administrador } from './Administrador';
-import { Agenda } from './Agenda';
-import { Aperfeicoamento } from './Aperfeicoamento';
-import { ChecklistOperacoes } from './ChecklistOperacoes';
-import { ControleOperacoes } from './ControleOperacoes';
-import { BancoDados } from './BancoDados';
-import { DocumentosMensais } from './DocumentosMensais';
-import { RacP3 } from './RacP3';
-import { ProducaoP3 } from './ProducaoP3';
 import { DestinarPendente, EditarDemanda, NovaDemanda } from './FormDemanda';
 import { FormPendente } from './FormPendente';
 import { ListaDemandas } from './ListaDemandas';
 import { ListaPendentes } from './ListaPendentes';
 import { MenuP3, type AbaP3 } from './MenuP3';
-import { PainelPrazos } from './PainelPrazos';
-import { PainelBatalhao } from './PainelBatalhao';
-import { PainelEstatistico } from './PainelEstatistico';
 import type { Encaminhamento } from '../../domain/encaminhamento';
-import { TdsP3 } from './TdsP3';
+
+// Telas abertas só quando escolhidas no menu: o código delas é baixado na hora.
+const Administrador = sobDemanda(() => import('./Administrador'), 'Administrador');
+const Agenda = sobDemanda(() => import('./Agenda'), 'Agenda');
+const Aperfeicoamento = sobDemanda(() => import('./Aperfeicoamento'), 'Aperfeicoamento');
+const ChecklistOperacoes = sobDemanda(() => import('./ChecklistOperacoes'), 'ChecklistOperacoes');
+const ControleOperacoes = sobDemanda(() => import('./ControleOperacoes'), 'ControleOperacoes');
+const BancoDados = sobDemanda(() => import('./BancoDados'), 'BancoDados');
+const DocumentosMensais = sobDemanda(() => import('./DocumentosMensais'), 'DocumentosMensais');
+const RacP3 = sobDemanda(() => import('./RacP3'), 'RacP3');
+const ProducaoP3 = sobDemanda(() => import('./ProducaoP3'), 'ProducaoP3');
+const PainelPrazos = sobDemanda(() => import('./PainelPrazos'), 'PainelPrazos');
+const PainelBatalhao = sobDemanda(() => import('./PainelBatalhao'), 'PainelBatalhao');
+const PainelEstatistico = sobDemanda(() => import('./PainelEstatistico'), 'PainelEstatistico');
+const TdsP3 = sobDemanda(() => import('./TdsP3'), 'TdsP3');
+const MissoesCfp = sobDemanda(() => import('../setores/PainelCfp'), 'MissoesCfp');
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-/** Dentro de Operações: Checklist, Controle de Operações (Relatório de Indicadores), Documentos Mensais, RAC, Produtividade e Banco de dados. */
-function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos' | 'rac' | 'produtividade' | 'banco'; operacoes?: number }) {
+type SubAba = { hash: string; rotulo: string; Tela: (p: { operacoes: AoVivo<Operacao[]> }) => ReactNode };
+
+/** Sub-abas de Operações, do Painel e do CFP: a rota, o rótulo e a tela de cada uma. */
+const OPERACOES: SubAba[] = [
+  { hash: '#/operacoes', rotulo: 'Checklist Operações', Tela: ({ operacoes }) => <ChecklistOperacoes operacoes={operacoes} /> },
+  { hash: '#/operacoes/controle', rotulo: 'Controle de Operações', Tela: () => <ControleOperacoes /> },
+  { hash: '#/operacoes/documentos', rotulo: 'Documentos Mensais', Tela: () => <DocumentosMensais /> },
+  { hash: '#/operacoes/rac', rotulo: 'RAC', Tela: () => <RacP3 /> },
+  { hash: '#/operacoes/produtividade', rotulo: 'Produtividade', Tela: () => <ProducaoP3 /> },
+  { hash: '#/operacoes/banco', rotulo: 'Banco de dados', Tela: () => <BancoDados /> },
+];
+const PAINEL: SubAba[] = [
+  { hash: '#/painel', rotulo: 'Prazos', Tela: () => <PainelPrazos /> },
+  { hash: '#/painel/p3', rotulo: 'Estatístico P/3', Tela: () => <EstatisticoP3 /> },
+  { hash: '#/painel/batalhao', rotulo: 'Estatístico do Batalhão', Tela: () => <PainelBatalhao /> },
+];
+const CFP: SubAba[] = [
+  {
+    hash: '#/cfp',
+    rotulo: 'Missões e recados',
+    Tela: () => (
+      <>
+        <Recados setor="cfp" podeEnviar />
+        <MissoesCfp />
+      </>
+    ),
+  },
+  { hash: '#/cfp/tds', rotulo: 'TDS', Tela: () => <TdsP3 /> },
+];
+
+/** Barra de sub-abas + a tela da escolhida. contadores: número ao lado do rótulo (ex.: operações abertas). */
+function ComSubAbas(p: { rotulo: string; abas: SubAba[]; ativa: SubAba; operacoes: AoVivo<Operacao[]>; contadores?: Record<string, number | undefined> }) {
+  const { Tela } = p.ativa;
   return (
-    <nav className="abas abas-p3 subabas" aria-label="Operações">
-      <a href="#/operacoes" aria-current={ativa === 'checklist' ? 'page' : undefined}>
-        Checklist Operações
-        {operacoes ? <span className="contador-aba">{operacoes}</span> : null}
-      </a>
-      <a href="#/operacoes/controle" aria-current={ativa === 'controle' ? 'page' : undefined}>
-        Controle de Operações
-      </a>
-      <a href="#/operacoes/documentos" aria-current={ativa === 'documentos' ? 'page' : undefined}>
-        Documentos Mensais
-      </a>
-      <a href="#/operacoes/rac" aria-current={ativa === 'rac' ? 'page' : undefined}>
-        RAC
-      </a>
-      <a href="#/operacoes/produtividade" aria-current={ativa === 'produtividade' ? 'page' : undefined}>
-        Produtividade
-      </a>
-      <a href="#/operacoes/banco" aria-current={ativa === 'banco' ? 'page' : undefined}>
-        Banco de dados
-      </a>
-    </nav>
+    <>
+      <nav className="abas abas-p3 subabas" aria-label={p.rotulo}>
+        {p.abas.map((a) => (
+          <a key={a.hash} href={a.hash} aria-current={a === p.ativa ? 'page' : undefined}>
+            {a.rotulo}
+            {p.contadores?.[a.hash] ? <span className="contador-aba">{p.contadores[a.hash]}</span> : null}
+          </a>
+        ))}
+      </nav>
+      <Tela operacoes={p.operacoes} />
+    </>
   );
 }
 
@@ -69,11 +93,8 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
   const hash = useHash();
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
-  // Demanda apagada que ainda aparecia para a Cia: sai da tela dela.
+  // A limpeza de encaminhamentos sem demanda passou para o motor (uma vez por dia, sem depender de abrir o portal).
   useEffect(() => {
-    limparEncaminhamentosOrfaos(db)
-      .then((n) => n && console.info(`Portal P3: ${n} encaminhamento(s) de demanda apagada removido(s) das Cias.`))
-      .catch(() => undefined);
     // Cópia de segurança automática do banco de dados (o mês de referência, depois do prazo dos documentos).
     const hoje = hojeISO();
     garantirCopiaAutomatica(db, mesDaCopiaAutomatica(hoje), hoje)
@@ -88,7 +109,9 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
     <div className="layout-p3">
       <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} semAdmin={admin === 'nao'} />
       <div className="conteudo-p3">
-        <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} admin={admin} />
+        <Suspense fallback={<p className="carregando">Carregando…</p>}>
+          <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} admin={admin} />
+        </Suspense>
       </div>
     </div>
   );
@@ -127,110 +150,30 @@ function ConteudoP3({
   const editar = /^#\/demanda\/(\d+)$/.exec(hash);
   if (editar) return <EditarDemanda id={editar[1]} />;
   if (hash.startsWith('#/painel')) {
-    const aba = hash === '#/painel/p3' ? 'p3' : hash === '#/painel/batalhao' ? 'batalhao' : 'prazos';
-    return (
-      <>
-        <nav className="abas abas-p3 subabas" aria-label="Painel">
-          <a href="#/painel" aria-current={aba === 'prazos' ? 'page' : undefined}>
-            Prazos
-          </a>
-          <a href="#/painel/p3" aria-current={aba === 'p3' ? 'page' : undefined}>
-            Estatístico P/3
-          </a>
-          <a href="#/painel/batalhao" aria-current={aba === 'batalhao' ? 'page' : undefined}>
-            Estatístico do Batalhão
-          </a>
-        </nav>
-        {aba === 'p3' ? <EstatisticoP3 /> : aba === 'batalhao' ? <PainelBatalhao /> : <PainelPrazos />}
-      </>
-    );
+    const ativa = PAINEL.find((a) => a.hash === hash) ?? PAINEL[0];
+    return <ComSubAbas rotulo="Painel" abas={PAINEL} ativa={ativa} operacoes={operacoes} />;
   }
-  if (hash === '#/cfp' || hash === '#/cfp/tds') {
-    const tds = hash === '#/cfp/tds';
-    return (
-      <>
-        <nav className="abas abas-p3 subabas" aria-label="CFP">
-          <a href="#/cfp" aria-current={tds ? undefined : 'page'}>
-            Missões e recados
-          </a>
-          <a href="#/cfp/tds" aria-current={tds ? 'page' : undefined}>
-            TDS
-          </a>
-        </nav>
-        {tds ? (
-          <TdsP3 />
-        ) : (
-          <>
-            <Recados setor="cfp" podeEnviar />
-            <MissoesCfp />
-          </>
-        )}
-      </>
-    );
-  }
-  if (hash.startsWith('#/aperfeicoamento')) {
-    return (
-      <>
-        <Aperfeicoamento rota={hash} />
-      </>
-    );
-  }
+  const doCfp = CFP.find((a) => a.hash === hash);
+  if (doCfp) return <ComSubAbas rotulo="CFP" abas={CFP} ativa={doCfp} operacoes={operacoes} />;
+  if (hash.startsWith('#/aperfeicoamento')) return <Aperfeicoamento rota={hash} />;
   if (hash.startsWith('#/agenda')) return <Agenda rota={hash} />;
-  if (hash === '#/sala') {
-    return (
-      <>
-        <Recados setor="sala" podeEnviar />
-      </>
-    );
-  }
+  if (hash === '#/sala') return <Recados setor="sala" podeEnviar />;
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
-  if (
-    hash === '#/operacoes' ||
-    hash === '#/operacoes/controle' ||
-    hash === '#/operacoes/documentos' ||
-    hash === '#/operacoes/rac' ||
-    hash === '#/operacoes/produtividade' ||
-    hash === '#/operacoes/banco'
-  ) {
-    const ativa =
-      hash === '#/operacoes/controle'
-        ? 'controle'
-        : hash === '#/operacoes/documentos'
-          ? 'documentos'
-          : hash === '#/operacoes/rac'
-            ? 'rac'
-            : hash === '#/operacoes/produtividade'
-              ? 'produtividade'
-              : hash === '#/operacoes/banco'
-                ? 'banco'
-                : 'checklist';
+  const deOperacoes = OPERACOES.find((a) => a.hash === hash);
+  if (deOperacoes) {
     return (
-      <>
-        <SubAbasOperacoes ativa={ativa} operacoes={operacoes.valor?.length} />
-        {ativa === 'controle' ? (
-          <ControleOperacoes />
-        ) : ativa === 'documentos' ? (
-          <DocumentosMensais />
-        ) : ativa === 'rac' ? (
-          <RacP3 />
-        ) : ativa === 'produtividade' ? (
-          <ProducaoP3 />
-        ) : ativa === 'banco' ? (
-          <BancoDados />
-        ) : (
-          <ChecklistOperacoes operacoes={operacoes} />
-        )}
-      </>
+      <ComSubAbas
+        rotulo="Operações"
+        abas={OPERACOES}
+        ativa={deOperacoes}
+        operacoes={operacoes}
+        contadores={{ '#/operacoes': operacoes.valor?.length }}
+      />
     );
   }
   const filtro = /^#\/demandas\/(\w+)$/.exec(hash)?.[1];
   return (
-    <>
-      <ListaDemandas
-        key={filtro ?? 'todas'}
-        filtroInicial={filtro && FILTROS_VALIDOS.includes(filtro) ? (filtro as Situacao) : 'todas'}
-      />
-    </>
+    <ListaDemandas key={filtro ?? 'todas'} filtroInicial={filtro && FILTROS_VALIDOS.includes(filtro) ? (filtro as Situacao) : 'todas'} />
   );
 }
 

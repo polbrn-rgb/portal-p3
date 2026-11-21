@@ -3,8 +3,6 @@ import {
   arrayUnion,
   collection,
   doc,
-  documentId,
-  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -99,24 +97,3 @@ export async function responder(db: Firestore, e: Encaminhamento, resposta: stri
   });
 }
 
-/**
- * Encaminhamentos que ainda aparecem para as Cias mas cuja demanda não existe mais (apagada fora da
- * lixeira, ex.: direto no Firebase) ou foi excluída: são apagados. Roda quando a P/3 abre o portal.
- * Devolve quantos saíram.
- */
-export async function limparEncaminhamentosOrfaos(db: Firestore): Promise<number> {
-  const abertos = await getDocs(query(collection(db, 'encaminhamentos'), where('status', 'in', [...STATUS_PENDENTES, 'respondido'])));
-  const ids = [...new Set(abertos.docs.map((d) => String(d.data().demandaId ?? '')).filter(Boolean))];
-  const vivas = new Set<string>();
-  for (let i = 0; i < ids.length; i += 30) {
-    const r = await getDocs(query(collection(db, 'demandas'), where(documentId(), 'in', ids.slice(i, i + 30))));
-    r.docs.forEach((d) => d.data().status !== 'excluido' && vivas.add(d.id));
-  }
-  const orfaos = abertos.docs.filter((d) => !vivas.has(String(d.data().demandaId ?? '')));
-  for (let i = 0; i < orfaos.length; i += 400) {
-    const lote = writeBatch(db);
-    orfaos.slice(i, i + 400).forEach((d) => lote.delete(d.ref));
-    await lote.commit();
-  }
-  return orfaos.length;
-}

@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-21';
+var VERSAO_LOGICA = '2026-11-22';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -822,4 +822,19 @@ function idsPrintsDoRac(mes) {
     });
   });
   return ids;
+}
+
+// ---------- Encaminhamentos sem demanda (limpeza diária) ----------
+
+/**
+ * Encaminhamentos abertos cuja demanda não existe mais (apagada direto no banco) ou foi excluída:
+ * saem da tela da Cia. encs: [{ id, demandaId }]; statusDasDemandas: { id: status } das que existem.
+ */
+function encaminhamentosOrfaos(encs, statusDasDemandas) {
+  return encs
+    .filter(function (e) {
+      var st = e.demandaId ? statusDasDemandas[e.demandaId] : undefined;
+      return st === undefined || st === 'excluido';
+    })
+    .map(function (e) { return e.id; });
 }
