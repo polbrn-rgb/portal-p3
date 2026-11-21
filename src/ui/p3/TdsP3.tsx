@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { apagarFotosTds, lerFotoTds, observarFotosDoMes } from '../../data/tds';
 import { formatarData, hojeISO } from '../../domain/datas';
 import { agruparPorCfp, caminhoNoZip, FOTOS_POR_MES, mesAnterior, mesDe, nomeMes, nomeZip, type FotoTds } from '../../domain/tds';
+import { DIAS_NO_SISTEMA, textoApagaEm } from '../../domain/fotos';
 import { db } from '../../lib/firebase';
 import { base64ParaBytes } from '../../lib/imagem';
 import { useAoVivo } from '../../lib/useAoVivo';
@@ -109,7 +110,7 @@ export function TdsP3() {
       </div>
       <p className="ajuda-pendentes">
         Cada CFP manda até {FOTOS_POR_MES} fotos por mês pela página dele. Baixe o .zip do mês (uma pasta por CFP) e depois apague do sistema para
-        liberar espaço.
+        liberar espaço. Cada foto fica {DIAS_NO_SISTEMA} dias no sistema depois de enviada e então é apagada sozinha.
       </p>
       <div className="acoes-linha acoes-quebra">
         <Campo rotulo="Mês" className="campo-mes-lista">
@@ -186,6 +187,8 @@ export function TdsP3() {
                 <img src={`data:image/jpeg;base64,${f.miniatura}`} alt={`${f.assunto} (${formatarData(f.data)})`} />
                 <span className="legenda-foto">
                   {formatarData(f.data)} · {f.assunto}
+                  <br />
+                  <span className="item-info">{textoApagaEm(f.enviadoEm)}</span>
                 </span>
                 {confirmarId === f.id ? (
                   <div className="confirmar-foto" role="alertdialog" aria-label={`Confirmar exclusão da foto ${f.vaga} de ${g.cfp.nomeGuerra}`}>

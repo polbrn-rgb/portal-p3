@@ -43,6 +43,7 @@ export type FotoTds = {
   vaga: number; // 1 a 5
   miniatura: string; // base64 JPEG
   tamanho: number; // caracteres da foto em base64
+  enviadoEm: Date | null; // sai do sistema 15 dias depois (domain/fotos.ts)
 };
 
 export type ErrosEnvioTds = Partial<Record<'re' | 'data' | 'assunto' | 'fotos', string>>;

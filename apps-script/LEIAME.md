@@ -201,6 +201,12 @@ O motor agora põe por último as demandas que já deram erro, para um erro repe
 muitos eventos seguidos) não travar as outras. O erro de cada uma aparece em **Administrador → Zerar portal**.
 
 
+## Fotos com mais de 15 dias
+
+De hora em hora o motor apaga as fotos do CGP (`fotosCgp`), do TDS (`fotosTds`) e as encaminhadas à P/3
+(`fotosEncaminhadas`) com mais de 15 dias no sistema (a foto e o resumo). As que já estavam no sistema em 22/11/2026
+contam a partir dessa data. A etapa aparece no diagnóstico como "Fotos com mais de 15 dias".
+
 ## Operações → RAC: arquivar o RAC GERAL
 
 Quando a P/3 clica em **📦 Fechar mês e arquivar no Drive**, o portal encerra o mês e manda o RAC GERAL (.pptx) em

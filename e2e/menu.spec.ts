@@ -6,7 +6,7 @@ test('menu da P/3: lateral esquerda no computador, ☰ no canto superior esquerd
   await entrar(page, 'p3', SENHA_TESTE);
   const menu = page.getByRole('navigation', { name: 'Seções da P/3' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });
-  const itens = ['Numerador', 'Demandas Pendentes', 'Operações', 'Aperfeiçoamento', 'Agenda', 'CFP', 'Sala de Operações', 'Painel', '🔒 Administrador'];
+  const itens = ['Numerador', 'Demandas Pendentes', 'Operações', 'Aperfeiçoamento', 'Agenda', 'CFP', 'Sala de Operações', 'Fotos das Cias', 'Painel', '🔒 Administrador'];
 
   if (info.project.name === 'celular') {
     await expect(botao).toBeVisible();

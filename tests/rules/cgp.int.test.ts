@@ -16,6 +16,14 @@ import {
   type RecadoCgp,
 } from '../../src/data/cgp';
 import type { FotoCgp, MissaoCgp } from '../../src/domain/cgp';
+import {
+  apagarFotosEncaminhadas,
+  contarFotosEncaminhadas,
+  encaminharFotoP3,
+  lerFotoEncaminhada,
+  observarEncaminhadasDaCia,
+  observarFotosEncaminhadas,
+} from '../../src/data/fotosEncaminhadas';
 
 let env: RulesTestEnvironment;
 let n = 0;
@@ -115,5 +123,57 @@ describe('acesso do CGP (perfil cgp + Cia)', () => {
     await assertFails(enviarFotosCgp(outro(), '1cia', dados, [{ dados: 'QUJD', miniatura: '' }], 'x'));
     const fotos = await uma<FotoCgp[]>((ok, e) => observarFotosCgp(cia('1cia'), '1cia', ok, e));
     expect(fotos[0].enviadoPor).toBe('Sd PM CGP (RE 444444)');
+  });
+});
+
+describe('fotos do CGP encaminhadas à P/3', () => {
+  const dados = { descricao: 'Operação Natal', local: 'Praça', observacao: 'VTR 08101' };
+  async function fotoDa(u: '1cia' | '2cia') {
+    await enviarFotosCgp(como({ perfil: 'cgp', unidade: u, re: '444444' }), u, dados, [{ dados: 'QUJDRA==', miniatura: 'QQ==' }], 'Sd PM CGP');
+    return (await uma<FotoCgp[]>((ok, e) => observarFotosCgp(cia(u), u, ok, e)))[0];
+  }
+  const p3 = () => como({ perfil: 'p3' });
+
+  test('a Cia encaminha; a P/3 vê, baixa e apaga; a cópia fica mesmo se o CGP apagar a dele', async () => {
+    const f = await fotoDa('1cia');
+    await assertSucceeds(encaminharFotoP3(cia('1cia'), f, '1ª CIA'));
+    expect(await uma<Set<string>>((ok, e) => observarEncaminhadasDaCia(cia('1cia'), '1cia', ok, e))).toEqual(new Set([f.id]));
+    await assertSucceeds(apagarFotoCgp(cia('1cia'), f.id));
+
+    const lista = await new Promise<{ id: string; encaminhadaPor: string; descricao: string }[]>((ok, falha) => {
+      const parar = observarFotosEncaminhadas(p3(), (l) => (setTimeout(() => parar()), ok(l)), falha);
+    });
+    expect(lista.map((x) => [x.id, x.encaminhadaPor, x.descricao])).toEqual([[f.id, '1ª CIA', 'Operação Natal']]);
+    expect(await contarFotosEncaminhadas(p3())).toBe(1);
+    expect(await lerFotoEncaminhada(p3(), f.id)).toBe('QUJDRA==');
+    // A Cia não baixa nem apaga a cópia da P/3.
+    await assertFails(lerFotoEncaminhada(cia('1cia'), f.id));
+    await assertFails(apagarFotosEncaminhadas(cia('1cia'), [f.id]));
+    await assertSucceeds(apagarFotosEncaminhadas(p3(), [f.id]));
+    expect(await contarFotosEncaminhadas(p3())).toBe(0);
+  });
+
+  test('só a Cia dona da foto encaminha (nem outra Cia, nem o CGP), e a mesma foto vai uma vez', async () => {
+    const f = await fotoDa('1cia');
+    await assertFails(encaminharFotoP3(cia('2cia'), f, '2ª CIA'));
+    await assertFails(encaminharFotoP3(como({ perfil: 'cgp', unidade: '1cia', re: '444444' }), f, 'CGP'));
+    await assertFails(encaminharFotoP3(cia('2cia'), { ...f, unidadeId: '2cia' }, '2ª CIA'));
+    await assertSucceeds(encaminharFotoP3(cia('1cia'), f, '1ª CIA'));
+    await assertFails(encaminharFotoP3(cia('1cia'), f, '1ª CIA'));
+    // Outra Cia não vê o que a 1ª encaminhou.
+    await assertFails(getDocs(query(collection(cia('2cia'), 'fotosEncaminhadas'), where('unidadeId', '==', '1cia'))));
+  });
+
+  test('a cópia tem que ser fiel: texto trocado ou outra foto não entram', async () => {
+    const f = await fotoDa('1cia');
+    await assertFails(encaminharFotoP3(cia('1cia'), { ...f, descricao: 'Outra coisa' }, '1ª CIA'));
+    const c = cia('1cia');
+    const lote = writeBatch(c);
+    lote.set(doc(c, 'fotosEncaminhadasDados', f.id), { unidadeId: '1cia', dados: 'T1VUUkE=' });
+    lote.set(doc(c, 'fotosEncaminhadas', f.id), {
+      unidadeId: '1cia', descricao: f.descricao, local: f.local, observacao: f.observacao, miniatura: f.miniatura, tamanho: 8,
+      enviadoPor: f.enviadoPor, enviadoEm: serverTimestamp(), encaminhadaPor: '1ª CIA', encaminhadaEm: serverTimestamp(),
+    });
+    await assertFails(lote.commit());
   });
 });

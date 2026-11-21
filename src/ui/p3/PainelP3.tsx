@@ -1,4 +1,5 @@
-import { Suspense, useEffect, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
+import { contarFotosEncaminhadas } from '../../data/fotosEncaminhadas';
 import { sobDemanda } from '../../lib/sobDemanda';
 import { observarAbertosP3 } from '../../data/encaminhamentos';
 import { garantirCopiaAutomatica } from '../../data/banco';
@@ -35,6 +36,7 @@ const PainelPrazos = sobDemanda(() => import('./PainelPrazos'), 'PainelPrazos');
 const PainelBatalhao = sobDemanda(() => import('./PainelBatalhao'), 'PainelBatalhao');
 const PainelEstatistico = sobDemanda(() => import('./PainelEstatistico'), 'PainelEstatistico');
 const TdsP3 = sobDemanda(() => import('./TdsP3'), 'TdsP3');
+const FotosCias = sobDemanda(() => import('./FotosCias'), 'FotosCias');
 const MissoesCfp = sobDemanda(() => import('../setores/PainelCfp'), 'MissoesCfp');
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
@@ -105,9 +107,14 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
       })
       .catch((e) => console.error('Cópia automática do banco de dados:', e));
   }, []);
+  // Fotos encaminhadas pelas Cias: só a contagem (uma leitura), conferida a cada troca de tela.
+  const [fotos, setFotos] = useState<number | undefined>();
+  useEffect(() => {
+    contarFotosEncaminhadas(db).then(setFotos, () => undefined);
+  }, [hash]);
   return (
     <div className="layout-p3">
-      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} semAdmin={admin === 'nao'} />
+      <MenuP3 ativa={abaDaRota(hash)} pendentes={pendentes.valor?.length} operacoes={operacoes.valor?.length} fotos={fotos} semAdmin={admin === 'nao'} />
       <div className="conteudo-p3">
         <Suspense fallback={<p className="carregando">Carregando…</p>}>
           <ConteudoP3 hash={hash} pendentes={pendentes} operacoes={operacoes} admin={admin} />
@@ -124,6 +131,7 @@ function abaDaRota(hash: string): AbaP3 {
   if (hash.startsWith('#/admin')) return 'admin';
   if (hash.startsWith('#/cfp')) return 'cfp';
   if (hash === '#/sala') return 'sala';
+  if (hash === '#/fotos') return 'fotos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash.startsWith('#/agenda')) return 'agenda';
   return 'numerador';
@@ -158,6 +166,7 @@ function ConteudoP3({
   if (hash.startsWith('#/aperfeicoamento')) return <Aperfeicoamento rota={hash} />;
   if (hash.startsWith('#/agenda')) return <Agenda rota={hash} />;
   if (hash === '#/sala') return <Recados setor="sala" podeEnviar />;
+  if (hash === '#/fotos') return <FotosCias />;
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
   const deOperacoes = OPERACOES.find((a) => a.hash === hash);
   if (deOperacoes) {
