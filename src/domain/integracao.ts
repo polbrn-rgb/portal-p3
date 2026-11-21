@@ -8,7 +8,7 @@
 //
 // Campos que não existem na produção (crimes, naturezas de BO, escolas, EAP...) continuam digitados pela Cia.
 import { diasDoMes, pendencias, somarItens, type Itens, type PendenciaDia, type Producao } from './producao';
-import { colunasPelotao, comCampo, linhasPelotao, prodDigitadaAParte, valorDoCampo, type RacDados } from './rac';
+import { colunasPelotao, comCampo, linhasPelotao, prodDigitadaAParte, PRODUTIVIDADE, somarMeses, valorDoCampo, type RacDados } from './rac';
 import type { UnidadeId } from './unidades';
 
 type Lancs = readonly Pick<Producao, 'data' | 'pelotao' | 'itens' | 'taloes'>[];
@@ -52,6 +52,13 @@ export const DA_PRODUCAO: Record<string, Record<string, Fonte>> = {
   },
 };
 
+/** Colunas "ano anterior": as mesmas contas, sobre a produção do mesmo mês do ano anterior. */
+export const DA_PRODUCAO_ANO_ANTERIOR: Record<string, Record<string, Fonte>> = {
+  'avaliacao-periodica': Object.fromEntries(
+    Object.entries(DA_PRODUCAO['avaliacao-periodica']).map(([campo, f]) => [campo.replace(/_atu$/, '_ant'), f]),
+  ),
+};
+
 export const temIntegracao = (docId: string): boolean => docId in DA_PRODUCAO;
 
 export type SituacaoProducaoMes = {
@@ -76,26 +83,35 @@ export type PreenchimentoProducao = SituacaoProducaoMes & {
 };
 
 /** Valores do documento que saem da produção da Cia no mês (só se a produção estiver completa). */
-export function preencherDaProducao(docId: string, campos: readonly string[], lancs: Lancs, mes: string, unidade: UnidadeId, hoje: string): PreenchimentoProducao {
+export function preencherDaProducao(
+  docId: string,
+  campos: readonly string[],
+  lancs: Lancs,
+  mes: string,
+  unidade: UnidadeId,
+  hoje: string,
+  /** Produção do mesmo mês do ano anterior (colunas "ano anterior"); só entra se esse mês estiver completo. */
+  anoAnterior?: Lancs,
+): PreenchimentoProducao {
   const situacao = situacaoProducaoMes(lancs, mes, unidade, hoje);
-  const fontes = DA_PRODUCAO[docId] ?? {};
   const valores: Record<string, number> = {};
   const avisos: string[] = [];
-  if (!situacao.completa) return { ...situacao, valores, avisos };
-  const soma = somarItens(lancs);
-  const semNatureza = lancs.flatMap((l) => l.taloes).filter((t) => !t.natureza).length;
-  let pulouNatureza = false;
-  for (const campo of campos) {
-    const f = fontes[campo];
-    if (!f) continue;
-    if (f.natureza && semNatureza) {
-      pulouNatureza = true;
-      continue;
+  const aplicar = (fontes: Record<string, Fonte>, l: Lancs, quando: string) => {
+    const soma = somarItens(l);
+    const semNatureza = l.flatMap((x) => x.taloes).filter((t) => !t.natureza).length;
+    let pulou = false;
+    for (const campo of campos) {
+      const f = fontes[campo];
+      if (!f) continue;
+      if (f.natureza && semNatureza) pulou = true;
+      else valores[campo] = f.calc(soma, l);
     }
-    valores[campo] = f.calc(soma, lancs);
-  }
-  if (pulouNatureza)
-    avisos.push(`${semNatureza} flagrante(s) do mês sem a natureza da ocorrência: os flagrantes de tráfico e outros não foram pré-preenchidos.`);
+    if (pulou) avisos.push(`${semNatureza} flagrante(s) ${quando} sem a natureza da ocorrência: os flagrantes de tráfico e outros não foram pré-preenchidos.`);
+  };
+  if (situacao.completa) aplicar(DA_PRODUCAO[docId] ?? {}, lancs, 'do mês');
+  const fontesAnt = DA_PRODUCAO_ANO_ANTERIOR[docId];
+  if (fontesAnt && anoAnterior && situacaoProducaoMes(anoAnterior, somarMeses(mes, -12), unidade, hoje).completa)
+    aplicar(fontesAnt, anoAnterior, 'do mesmo mês do ano anterior');
   return { ...situacao, valores, avisos };
 }
 
@@ -117,18 +133,45 @@ export function racDaProducao(
   d: RacDados,
   lancs: Lancs,
   hoje: string,
+  /** Produção do mês anterior e do mesmo mês do ano anterior (colunas de comparação); só entram se completas. */
+  comparar: { mesAnterior?: Lancs; anoAnterior?: Lancs } = {},
 ): SituacaoProducaoMes & { rac: RacDados; daProducao: Record<string, number> } {
   const daProducao: Record<string, number> = {};
   if (d.unidade === 'btl') return { completa: false, pendencias: [], turnosFaltando: 0, rac: d, daProducao };
   const u = d.unidade;
   const situacao = situacaoProducaoMes(lancs, d.mes, u, hoje);
-  if (!situacao.completa) return { ...situacao, rac: d, daProducao };
-  const somaPel = (pel: string) => somarItens(lancs.filter((l) => l.pelotao === pel));
-  const total = somarItens(lancs);
-  for (const l of linhasPelotao(u))
-    for (const c of colunasPelotao(u)) daProducao[`pelotoes.${l.id}.${c.id}`] = c.id === 're' || c.id === 'rpm' ? 0 : somaPel(c.id)[l.id];
-  for (const id of prodDigitadaAParte(u)) daProducao[`producao.${id}.atual`] = total[id];
+  if (situacao.completa) {
+    const somaPel = (pel: string) => somarItens(lancs.filter((l) => l.pelotao === pel));
+    const total = somarItens(lancs);
+    for (const l of linhasPelotao(u))
+      for (const c of colunasPelotao(u)) daProducao[`pelotoes.${l.id}.${c.id}`] = c.id === 're' || c.id === 'rpm' ? 0 : somaPel(c.id)[l.id];
+    for (const id of prodDigitadaAParte(u)) daProducao[`producao.${id}.atual`] = total[id];
+  }
+  for (const [coluna, l, mes] of [
+    ['mesAnterior', comparar.mesAnterior, somarMeses(d.mes, -1)],
+    ['anoAnterior', comparar.anoAnterior, somarMeses(d.mes, -12)],
+  ] as const) {
+    if (!l || !situacaoProducaoMes(l, mes, u, hoje).completa) continue;
+    const total = somarItens(l);
+    for (const p of PRODUTIVIDADE) daProducao[`producao.${p.id}.${coluna}`] = total[p.id];
+  }
   let rac = d;
   for (const [campo, v] of Object.entries(daProducao)) if (valorDoCampo(rac, campo) === null) rac = comCampo(rac, campo, v);
   return { ...situacao, rac, daProducao };
+}
+
+// ---------- ICC → Plano Diretor ----------
+
+/**
+ * Policiais da Cia que participaram da ICC no mês: soma das respostas da Cia às ICC com prazo naquele mês.
+ * null = não houve ICC no mês (ou a Cia não respondeu): o campo fica para a Cia preencher.
+ */
+export function iccDoMes(
+  iccs: readonly { id: string; prazo: string }[],
+  respostas: readonly ({ iccId: string } & Record<'oficiais' | 'sargentos' | 'cabos', number>)[],
+  mes: string,
+): number | null {
+  const doMes = new Set(iccs.filter((i) => i.prazo.slice(0, 7) === mes).map((i) => i.id));
+  const r = respostas.filter((x) => doMes.has(x.iccId));
+  return r.length ? r.reduce((s, x) => s + (x.oficiais || 0) + (x.sargentos || 0) + (x.cabos || 0), 0) : null;
 }

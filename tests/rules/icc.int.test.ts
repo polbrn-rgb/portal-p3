@@ -52,7 +52,7 @@ describe('PDF da ordem', () => {
 });
 
 describe('ICC', () => {
-  test('a Cia vê só as abertas e responde a dela; a P/3 encerra', async () => {
+  test('a Cia vê as ICC e responde a dela (só nas abertas); a P/3 encerra', async () => {
     await publicar(p3);
     await assertSucceeds(getDocs(query(collection(cia('1cia'), 'iccs'), where('status', '==', 'aberta'))));
     await enviarRespostaIcc(cia('1cia'), 'icc1', '1cia', q, 'Sd PM Teste');
@@ -65,7 +65,7 @@ describe('ICC', () => {
     await assertFails(updateDoc(doc(cia('1cia'), 'iccs', 'icc1'), { status: 'encerrada' }));
 
     await encerrarIcc(p3, 'icc1');
-    await assertFails(getDoc(doc(cia('1cia'), 'iccs', 'icc1')));
+    await assertSucceeds(getDoc(doc(cia('1cia'), 'iccs', 'icc1'))); // encerrada: lê (Plano Diretor), não responde
     await assertFails(enviarRespostaIcc(cia('3cia'), 'icc1', '3cia', q, 'X')); // encerrada
     await assertFails(updateDoc(doc(p3, 'iccs', 'icc1'), { numero: '999' }));
   });

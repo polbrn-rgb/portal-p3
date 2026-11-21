@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
 import { limparEncaminhamentosOrfaos, observarAbertosP3 } from '../../data/encaminhamentos';
+import { garantirCopiaAutomatica } from '../../data/banco';
+import { mesDaCopiaAutomatica } from '../../domain/banco';
+import { hojeISO } from '../../domain/datas';
+import { cutucarMotor } from '../../lib/motor';
 import { observarOperacoes } from '../../data/operacoes';
 import { observarPendentes } from '../../data/pendentes';
 import type { Operacao } from '../../domain/operacao';
@@ -70,6 +74,15 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
     limparEncaminhamentosOrfaos(db)
       .then((n) => n && console.info(`Portal P3: ${n} encaminhamento(s) de demanda apagada removido(s) das Cias.`))
       .catch(() => undefined);
+    // Cópia de segurança automática do banco de dados (o mês de referência, depois do prazo dos documentos).
+    const hoje = hojeISO();
+    garantirCopiaAutomatica(db, mesDaCopiaAutomatica(hoje), hoje)
+      .then((mes) => {
+        if (!mes) return;
+        console.info(`Portal P3: cópia do banco de dados de ${mes} enviada para o Drive.`);
+        cutucarMotor();
+      })
+      .catch((e) => console.error('Cópia automática do banco de dados:', e));
   }, []);
   return (
     <div className="layout-p3">

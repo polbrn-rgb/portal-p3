@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { carregarFontesBanco } from '../../data/banco';
-import { abasDoBanco, INDICADORES, indicador, mesesEntre, montarBanco, ROTULO_ORIGEM, somarIndicador, type FontesBanco, type RegistroBanco } from '../../domain/banco';
+import { carregarFontesBanco, observarCopias, pedirCopia, planilhaDoBanco, type CopiaBanco } from '../../data/banco';
+import { INDICADORES, indicador, mesesEntre, montarBanco, nomeCopia, ROTULO_ORIGEM, somarIndicador, type FontesBanco, type RegistroBanco } from '../../domain/banco';
 import { rotuloMes } from '../../domain/controle';
 import { hojeISO } from '../../domain/datas';
 import { mesReferencia } from '../../domain/documentosMensais';
-import { abasDaProducao } from '../../domain/producao';
 import { UNIDADES } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
+import { cutucarMotor } from '../../lib/motor';
+import { useAoVivo } from '../../lib/useAoVivo';
 import { baixarXlsx } from '../../lib/xlsx';
 import { Campo } from '../Campo';
 
@@ -26,6 +27,9 @@ export function BancoDados() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
   const [indicadorId, setIndicadorId] = useState('producao.pessoasAbordadas');
+  const [gerando, setGerando] = useState<'' | 'baixar' | 'drive'>('');
+  const [aviso, setAviso] = useState('');
+  const copias = useAoVivo<CopiaBanco[]>((ok, e) => observarCopias(db, ok, e), [], 'Não foi possível carregar as cópias.');
 
   const valido = ehMes(de) && ehMes(ate) && de <= ate;
   const meses = fontes ? mesesEntre(fontes.de, fontes.ate) : [];
@@ -47,11 +51,24 @@ export function BancoDados() {
     setCarregando(false);
   }
 
-  function baixar() {
+  // A planilha completa: banco, cobertura, catálogo, lançamentos da produção e o histórico.
+  async function gerar(destino: 'baixar' | 'drive') {
     if (!fontes) return;
-    const ids = UNIDADES.map((u) => u.id);
-    const producao = abasDaProducao(fontes.f.producao, ids).map((a) => ({ ...a, nome: `Produção - ${a.nome}`.slice(0, 31) }));
-    baixarXlsx(`Banco de dados 8º BPM-M ${fontes.de} a ${fontes.ate}.xlsx`, [...abasDoBanco(registros), ...producao]);
+    setGerando(destino);
+    setErro('');
+    setAviso('');
+    try {
+      const xlsx = await planilhaDoBanco(db, fontes.de, fontes.ate, hoje);
+      if (destino === 'baixar') baixarXlsx(nomeCopia(fontes.de, fontes.ate), xlsx);
+      else {
+        await pedirCopia(db, { de: fontes.de, ate: fontes.ate, xlsx, automatica: false });
+        cutucarMotor();
+        setAviso('Cópia enviada: o motor guarda na pasta “Portal P3 - Banco de dados” do Drive em alguns minutos.');
+      }
+    } catch {
+      setErro('Não foi possível gerar a planilha. Verifique a conexão e tente de novo.');
+    }
+    setGerando('');
   }
 
   const reg = (mes: string, u: string) => registros.find((r) => r.mes === mes && r.unidadeId === u);
@@ -61,9 +78,14 @@ export function BancoDados() {
     <section className="painel">
       <div className="painel-cabecalho">
         <h2>Banco de dados</h2>
-        <button className="botao secundario" type="button" disabled={!fontes} onClick={baixar}>
-          Baixar banco completo (Excel)
-        </button>
+        <div className="acoes-linha acoes-quebra">
+          <button className="botao secundario" type="button" disabled={!fontes || !!gerando} onClick={() => void gerar('baixar')}>
+            {gerando === 'baixar' ? 'Gerando…' : 'Baixar banco completo (Excel)'}
+          </button>
+          <button className="botao secundario" type="button" disabled={!fontes || !!gerando} onClick={() => void gerar('drive')}>
+            {gerando === 'drive' ? 'Enviando…' : 'Guardar cópia no Drive'}
+          </button>
+        </div>
       </div>
       <p className="item-info">
         Tudo o que o portal guarda, separado por Cia e por mês: a produção dos pelotões (somada do que a Sala de Operações lança por dia), os flagrantes
@@ -90,6 +112,7 @@ export function BancoDados() {
           {erro}
         </p>
       )}
+      {aviso && <p className="mensagem aviso">{aviso}</p>}
 
       {fontes && (
         <>
@@ -190,6 +213,38 @@ export function BancoDados() {
           </div>
         </>
       )}
+
+      <h3 className="titulo-secao">Cópias de segurança no Drive</h3>
+      <p className="item-info">
+        Todo mês, depois do prazo do último Documento Mensal, o portal guarda sozinho a cópia do mês de referência (na primeira vez que a P/3 abrir o
+        portal). Para guardar outro período, carregue-o acima e use “Guardar cópia no Drive”.
+      </p>
+      {copias.erro && <p className="mensagem erro">{copias.erro}</p>}
+      {!copias.carregando && !copias.valor?.length && <p className="vazio">Nenhuma cópia guardada ainda.</p>}
+      <ul className="lista lista-copias" aria-label="Cópias de segurança">
+        {(copias.valor ?? []).map((c) => (
+          <li key={c.id} className="item-pendente">
+            <span className="item-topo">
+              <strong>{c.de === c.ate ? rotuloMes(c.de) : `${rotuloMes(c.de)} a ${rotuloMes(c.ate)}`}</strong>
+              <span className={`selo selo-doc-${c.status === 'pronto' ? 'gravado' : c.status === 'erro' ? 'erro' : 'enviado'}`}>
+                {c.status === 'pronto' ? '✅ No Drive' : c.status === 'erro' ? '❌ Erro' : '⏳ Enviando'}
+              </span>
+            </span>
+            <span className="pendente-detalhe">
+              {c.automatica ? 'Automática' : 'Pedida pela P/3'}
+              {c.url && (
+                <>
+                  {' · '}
+                  <a href={c.url} target="_blank" rel="noreferrer">
+                    Abrir no Drive
+                  </a>
+                </>
+              )}
+            </span>
+            {c.erro && <span className="mensagem erro">{c.erro}</span>}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

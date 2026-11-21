@@ -182,8 +182,8 @@ export function gerarXlsx(abas: Aba[]): Uint8Array {
 }
 
 /** Baixa o arquivo no navegador (funciona no celular também). */
-export function baixarXlsx(nomeArquivo: string, abas: Aba[]): void {
-  const dados = gerarXlsx(abas);
+export function baixarXlsx(nomeArquivo: string, abas: Aba[] | Uint8Array): void {
+  const dados = abas instanceof Uint8Array ? abas : gerarXlsx(abas);
   const url = URL.createObjectURL(
     new Blob([dados as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
   );

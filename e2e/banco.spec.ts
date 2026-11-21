@@ -30,5 +30,10 @@ test('Banco de dados: cobertura por Cia e mês e consulta de indicador', async (
   const valores = page.getByRole('table', { name: 'Valores do indicador por mês e Cia' });
   await expect(valores.getByRole('row', { name: new RegExp(rotuloMes(mes)) }).getByRole('cell').nth(1)).toHaveText(String(dias * 2));
   await expect(page.getByRole('button', { name: 'Baixar banco completo (Excel)' })).toBeEnabled();
+
+  // Cópia de segurança no Drive: o portal manda a planilha; o motor (fora do teste) grava no Drive.
+  await page.getByRole('button', { name: 'Guardar cópia no Drive' }).click();
+  await expect(page.getByText(/Cópia enviada: o motor guarda/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('list', { name: 'Cópias de segurança' }).getByRole('listitem').filter({ hasText: rotuloMes(mes) }).first()).toBeVisible();
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });

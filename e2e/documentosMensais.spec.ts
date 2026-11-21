@@ -28,7 +28,7 @@ test('Documentos Mensais: vem pré-preenchido da produção dos pelotões; a Cia
   await expect(page.getByLabel(/Veículos 2 rodas/)).toHaveValue(String(dias * 2));
   await expect(page.getByLabel(/Caminhões/)).toHaveValue('0');
   await page.getByLabel(/Caminhões/).fill('1'); // a Cia corrige na conferência
-  await expect(page.getByText('· na produção: 0')).toBeVisible();
+  await expect(page.getByText('· veio: 0')).toBeVisible();
   await page.getByLabel('Preenchido por').fill('Cb PM Teste');
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: 'Conferi: enviar para a P/3' }).click();
@@ -41,7 +41,7 @@ test('Documentos Mensais: vem pré-preenchido da produção dos pelotões; a Cia
   await expect(page.getByRole('heading', { name: 'Documentos Mensais', level: 2 })).toBeVisible();
   const veiculos = page.getByRole('article', { name: 'Veículos Apreendidos' });
   await expect(veiculos.getByRole('list', { name: /Envios/ })).toContainText(`⏳ ${sigla}`);
-  await expect(veiculos).toContainText(`${sigla} corrigiu o que veio da produção: Caminhões (produção 0 → enviado 1)`);
+  await expect(veiculos).toContainText(`${sigla} corrigiu o que veio pré-preenchido: Caminhões (veio 0 → enviado 1)`);
   // As Cias sem produção completa aparecem no alerta e com ⚠️ nos documentos integrados.
   await expect(page.getByRole('alert', { name: 'Produção incompleta' })).toContainText('1ª');
   await expect(veiculos.getByRole('list', { name: /Envios/ })).toContainText('⚠️ 1ª');

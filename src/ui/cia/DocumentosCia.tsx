@@ -3,7 +3,10 @@ import { enviarDocMensal } from '../../data/documentosMensais';
 import { buscarPolicial } from '../../data/efetivo';
 import { observarProducaoDaCia } from '../../data/producao';
 import { formatarData, hojeISO } from '../../domain/datas';
-import { divergencias, preencherDaProducao, temIntegracao } from '../../domain/integracao';
+import { observarIccs, observarRespostasIccDaUnidade } from '../../data/icc';
+import type { Icc, RespostaIcc } from '../../domain/icc';
+import { DA_PRODUCAO_ANO_ANTERIOR, divergencias, iccDoMes, preencherDaProducao, temIntegracao } from '../../domain/integracao';
+import { somarMeses } from '../../domain/rac';
 import type { Producao } from '../../domain/producao';
 import {
   camposDaUnidade,
@@ -111,21 +114,39 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
     [integrado, p.unidade, p.mesRef],
     'Não foi possível conferir a produção dos pelotões.',
   );
+  // Colunas "ano anterior" (Avaliação Periódica): a produção do mesmo mês do ano anterior, se completa.
+  const comAnoAnterior = d.id in DA_PRODUCAO_ANO_ANTERIOR;
+  const mesAnoAnterior = somarMeses(p.mesRef, -12);
+  const producaoAnoAnterior = useAoVivo<Producao[]>(
+    (ok, falha) => (comAnoAnterior ? observarProducaoDaCia(db, p.unidade, mesAnoAnterior, ok, falha) : (ok([]), () => undefined)),
+    [comAnoAnterior, p.unidade, mesAnoAnterior],
+  );
+  // Plano Diretor: policiais na ICC do mês, das respostas da Cia no módulo ICC.
+  const comIcc = d.id === 'plano-diretor';
+  const iccs = useAoVivo<Icc[]>((ok, falha) => (comIcc ? observarIccs(db, ok, falha) : (ok([]), () => undefined)), [comIcc]);
+  const respostasIcc = useAoVivo<RespostaIcc[]>(
+    (ok, falha) => (comIcc ? observarRespostasIccDaUnidade(db, p.unidade, ok, falha) : (ok([]), () => undefined)),
+    [comIcc, p.unidade],
+  );
   const pre =
-    integrado && producao.valor
-      ? preencherDaProducao(d.id, campos.map((c) => c.id), producao.valor, p.mesRef, p.unidade, hojeISO())
+    integrado && producao.valor && !producaoAnoAnterior.carregando
+      ? preencherDaProducao(d.id, campos.map((c) => c.id), producao.valor, p.mesRef, p.unidade, hojeISO(), producaoAnoAnterior.valor)
       : null;
+  const icc = comIcc && iccs.valor && respostasIcc.valor ? iccDoMes(iccs.valor, respostasIcc.valor, p.mesRef) : null;
+  // Tudo o que veio pronto (produção e ICC): ponto de partida que a Cia confere.
+  const preValores: Record<string, number> = { ...(pre?.valores ?? {}), ...(icc !== null && campos.some((c) => c.id === 'icc') ? { icc } : {}) };
+  const temPre = Object.keys(preValores).length > 0;
   const preenchido = useRef(false);
   useEffect(() => {
-    if (!pre?.completa || preenchido.current) return;
+    if (!temPre || preenchido.current) return;
     preenchido.current = true;
     // Só completa o que está vazio: não apaga o que a Cia já enviou ou está digitando.
     setRascunho((r) => {
       const n = { ...r };
-      for (const [c, v] of Object.entries(pre.valores)) if (!String(n[c] ?? '').trim()) n[c] = String(v).replace('.', ',');
+      for (const [c, v] of Object.entries(preValores)) if (!String(n[c] ?? '').trim()) n[c] = String(v).replace('.', ',');
       return n;
     });
-  }, [pre]);
+  }, [temPre, preValores]);
 
   async function enviar() {
     const { valores, erros: e } = d.lista ? valoresDaLista(d, p.unidade, linhas) : lerValores(d, p.unidade, rascunho);
@@ -142,7 +163,7 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
         unidadeId: p.unidade,
         valores,
         respondidoPor: nome,
-        daProducao: pre?.completa ? pre.valores : undefined,
+        daProducao: temPre ? preValores : undefined,
       });
       envio.catch(() => undefined);
       await Promise.race([envio, new Promise((ok) => setTimeout(ok, 3000))]);
@@ -182,6 +203,11 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
         </p>
       )}
       {integrado && <AvisoProducao carregando={producao.carregando} erro={producao.erro} pre={pre} mesRef={p.mesRef} />}
+      {comIcc && icc !== null && (
+        <p className="mensagem aviso" role="status">
+          🔗 Policiais na ICC: {icc}, somados das respostas da Cia às ICC com prazo em {rotuloMes(p.mesRef)} (Aperfeiçoamento → ICC). Confira antes de enviar.
+        </p>
+      )}
       {d.lista && <ListaCia documento={d} unidade={p.unidade} linhas={linhas} aoMudar={setLinhas} erros={erros} />}
       {grupos.map((g) => (
         <fieldset key={g.titulo || 'campos'} className="cartao grupo">
@@ -191,11 +217,11 @@ export function FormDocumentoCia(p: { documento: DocumentoMensal; unidade: Unida
               <Campo
                 key={c.id}
                 rotulo={
-                  pre?.completa && c.id in pre.valores ? (
+                  c.id in preValores ? (
                     <>
                       {c.rotulo} 🔗
-                      {divergencias(pre.valores, { [c.id]: Number(String(rascunho[c.id]).replace(',', '.')) }).length > 0 && (
-                        <span className="dica-producao"> · na produção: {String(pre.valores[c.id]).replace('.', ',')}</span>
+                      {divergencias(preValores, { [c.id]: Number(String(rascunho[c.id]).replace(',', '.')) }).length > 0 && (
+                        <span className="dica-producao"> · veio: {String(preValores[c.id]).replace('.', ',')}</span>
                       )}
                     </>
                   ) : (
