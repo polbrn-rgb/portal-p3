@@ -3738,3 +3738,34 @@ li.agenda-linha {
   white-space: nowrap;
   font-size: 0.85rem;
 }
+
+/* Estatístico do Batalhão: totais do mês com a variação (seta e texto) sobre o mesmo período do mês anterior. */
+.numeros-batalhao {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.numero-batalhao {
+  border-left-color: #2f6db3;
+}
+.numero-batalhao .variacao {
+  font-size: 0.8rem;
+  color: var(--cor-suave);
+  font-variant-numeric: tabular-nums;
+}
+.colunas-muitas .coluna {
+  width: 80%;
+}
+
+/* Estatístico do Batalhão no celular: mês e indicador um embaixo do outro, ocupando a largura. */
+@media (max-width: 699px) {
+  .painel-estatistico .filtros-estatistica {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .painel-estatistico .filtros-estatistica .campo-compacto {
+    flex: 1 1 100%;
+  }
+  .painel-estatistico .filtros-estatistica .campo-compacto :is(select, input) {
+    flex: 1;
+    min-width: 0;
+  }
+}

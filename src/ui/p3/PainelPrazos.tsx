@@ -6,7 +6,6 @@ import { montarPainel, type Prazo } from '../../domain/painel';
 import { db } from '../../lib/firebase';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { useDemandasAbertas } from '../../lib/useDemandasAbertas';
-import { PainelEstatistico } from './PainelEstatistico';
 
 function Numero({ rotulo, valor, classe, href }: { rotulo: string; valor: number; classe: string; href?: string }) {
   const conteudo = (
@@ -111,7 +110,6 @@ export function PainelPrazos() {
         </div>
       </div>
     </section>
-    <PainelEstatistico encs={encs.valor ?? []} />
     </>
   );
 }
