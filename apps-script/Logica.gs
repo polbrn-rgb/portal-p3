@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-22';
+var VERSAO_LOGICA = '2026-11-23';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -837,4 +837,20 @@ function encaminhamentosOrfaos(encs, statusDasDemandas) {
       return st === undefined || st === 'excluido';
     })
     .map(function (e) { return e.id; });
+}
+
+// ---------- Fotos: 15 dias no sistema ----------
+
+// Iguais a src/domain/fotos.ts (o teste confere).
+var FOTOS_DIAS_NO_SISTEMA = 15;
+var FOTOS_PRAZO_DESDE = '2026-11-22T03:00:00.000Z';
+
+/**
+ * Hora limite (ISO): foto gravada antes dela já passou dos 15 dias e sai do sistema. As que já estavam no
+ * sistema quando a regra começou contam a partir de FOTOS_PRAZO_DESDE. '' = nada vencido ainda.
+ */
+function limiteFotosVencidas(agoraMs) {
+  var limite = agoraMs - FOTOS_DIAS_NO_SISTEMA * 24 * 60 * 60 * 1000;
+  if (limite < Date.parse(FOTOS_PRAZO_DESDE)) return '';
+  return new Date(limite).toISOString();
 }

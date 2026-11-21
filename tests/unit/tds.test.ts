@@ -22,6 +22,7 @@ const foto = (x: Partial<FotoTds>): FotoTds => ({
   vaga: 1,
   miniatura: '',
   tamanho: 1,
+  enviadoEm: null,
   ...x,
 });
 

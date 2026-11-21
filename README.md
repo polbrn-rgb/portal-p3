@@ -79,7 +79,21 @@ Script (o perfil do CGP é gravado na conta pelo motor).
   observação (equipe, local, viatura) obrigatórios; grava quem importou (login) e a data. Baixar e apagar.
 - **CGP → Recados**: a Cia escreve para o CGP; os recados aparecem no alto da página do CGP.
 
-Banco: `cgpMissoes`, `recadosCgp`, `fotosCgp` + `fotosCgpDados`.
+- **Encaminhar à P/3** (só a Cia, não o acesso do CGP): em cada foto, ou "Encaminhar as N fotos à P/3" para as que
+  ainda não foram. Vai uma cópia: a Cia e o CGP podem apagar a deles sem tirar da P/3. A mesma foto vai uma vez só
+  ("✅ Encaminhada à P/3").
+- **P/3 → Fotos das Cias** (menu, com o número de fotos esperando): filtro por Cia, baixar uma, baixar todas em .zip
+  (uma pasta por Cia) e, depois de baixar, apagar as baixadas do sistema. Só a P/3 baixa e apaga.
+
+### Fotos: 15 dias no sistema
+
+As fotos do **CGP**, do **TDS (CFP)** e as **encaminhadas à P/3** ficam 15 dias no sistema e depois o motor apaga
+sozinho (confere de hora em hora). Para as do CGP e do TDS o prazo conta da importação; para as encaminhadas, do
+encaminhamento. Cada foto mostra "Sai do sistema em dd/mm/aaaa". As fotos que já estavam no sistema em 22/11/2026
+contam os 15 dias a partir dessa data (saem a partir de 07/12/2026). O prazo fica em `src/domain/fotos.ts` e no
+`apps-script/Logica.gs` (o teste confere que são iguais). Quem precisa apagar antes continua com o botão **Apagar**.
+
+Banco: `cgpMissoes`, `recadosCgp`, `fotosCgp` + `fotosCgpDados`, `fotosEncaminhadas` + `fotosEncaminhadasDados`.
 
 ## Produção diária dos pelotões (Sala de Operações das Cias)
 

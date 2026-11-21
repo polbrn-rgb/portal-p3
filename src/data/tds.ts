@@ -5,7 +5,7 @@ import type { FotoReduzida } from '../lib/imagem';
 
 // TDS: fotos de instrução dos CFP (fotosTds + fotosTdsDados, mesmo id). Ver domain/tds.ts.
 
-function paraFoto(id: string, x: Partial<FotoTds>): FotoTds {
+function paraFoto(id: string, x: Omit<Partial<FotoTds>, 'enviadoEm'> & { enviadoEm?: { toDate?: () => Date } | null }): FotoTds {
   return {
     id,
     mes: x.mes ?? '',
@@ -16,6 +16,7 @@ function paraFoto(id: string, x: Partial<FotoTds>): FotoTds {
     vaga: Number(x.vaga) || 0,
     miniatura: x.miniatura ?? '',
     tamanho: Number(x.tamanho) || 0,
+    enviadoEm: x.enviadoEm?.toDate?.() ?? null,
   };
 }
 

@@ -18,6 +18,7 @@ import { useAoVivo } from '../../lib/useAoVivo';
 import {
   diasDoPeriodo,
   idMissaoCgp,
+  nomeArquivoFotoCgp,
   missoesDoDia,
   proximasMissoes,
   validarFotoCgp,
@@ -35,6 +36,8 @@ import { LIMITE_ORIGINAL } from '../../domain/tds';
 import { UNIDADES, type UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { base64ParaBytes, reduzirFoto, type FotoReduzida } from '../../lib/imagem';
+import { encaminharFotoP3, observarEncaminhadasDaCia } from '../../data/fotosEncaminhadas';
+import { DIAS_NO_SISTEMA, textoApagaEm } from '../../domain/fotos';
 import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
 
@@ -219,7 +222,7 @@ export function PainelCgp(p: {
         {link('recados', '#/cgp/recados', 'Recados')}
       </nav>
       {aba === 'missoes' && <MissoesCgp unidade={p.unidade} lista={p.missoes} carregando={p.carregando} erro={p.erro} podeExcluir={!p.ehCgp} />}
-      {aba === 'fotos' && <FotosCgp unidade={p.unidade} fotos={p.fotos} carregando={p.carregandoFotos} />}
+      {aba === 'fotos' && <FotosCgp unidade={p.unidade} fotos={p.fotos} carregando={p.carregandoFotos} podeEncaminhar={!p.ehCgp} />}
       {aba === 'recados' &&
         (p.ehCgp ? (
           p.recados.length ? (
@@ -403,7 +406,15 @@ function RecadosCgp({ unidade, recados }: { unidade: UnidadeId; recados: RecadoC
 type Escolhida = { arquivo: File; url: string };
 const DADOS_VAZIOS: DadosFotoCgp = { descricao: '', local: '', observacao: '' };
 
-function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: FotoCgp[]; carregando: boolean }) {
+function FotosCgp({ unidade, fotos, carregando, podeEncaminhar }: { unidade: UnidadeId; fotos: FotoCgp[]; carregando: boolean; podeEncaminhar: boolean }) {
+  // A Cia encaminha à P/3 (o acesso do CGP não). Ids das já encaminhadas, para não mandar de novo.
+  const encaminhadas = useAoVivo<Set<string>>(
+    (ok, erro) => (podeEncaminhar ? observarEncaminhadasDaCia(db, unidade, ok, erro) : (ok(new Set()), () => undefined)),
+    [unidade, podeEncaminhar],
+  );
+  const jaFoi = encaminhadas.valor ?? new Set<string>();
+  const faltamEncaminhar = fotos.filter((f) => !jaFoi.has(f.id));
+  const [encaminhando, setEncaminhando] = useState('');
   const [dados, setDados] = useState<DadosFotoCgp>(DADOS_VAZIOS);
   const [escolhidas, setEscolhidas] = useState<Escolhida[]>([]);
   const [erros, setErros] = useState<ErrosFotoCgp>({});
@@ -462,7 +473,7 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'image/jpeg' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `CGP ${f.descricao} - ${f.local}.jpg`.replace(/[\\/:*?"<>|]/g, '-');
+      a.download = nomeArquivoFotoCgp(f);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch {
@@ -478,6 +489,23 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
       setErro('Não foi possível apagar a foto.');
     }
     setConfirmarId('');
+  }
+
+  async function encaminhar(lista: FotoCgp[]) {
+    setErro('');
+    setAviso('');
+    let feitas = 0;
+    try {
+      for (const f of lista) {
+        setEncaminhando(`Encaminhando ${feitas + 1} de ${lista.length}…`);
+        await encaminharFotoP3(db, f, autor(unidade));
+        feitas++;
+      }
+      setAviso(`${feitas} foto(s) encaminhada(s) à P/3.`);
+    } catch {
+      setErro(`Não foi possível encaminhar${feitas ? ` (${feitas} de ${lista.length} foram)` : ''}. Verifique a conexão e tente de novo.`);
+    }
+    setEncaminhando('');
   }
 
   // O valor é lido na hora (ler e.target dentro da atualização adiada pode perder o que foi digitado).
@@ -534,6 +562,18 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
         </p>
       )}
       <h3>Fotos importadas ({fotos.length})</h3>
+      <p className="item-info">
+        Cada foto fica {DIAS_NO_SISTEMA} dias no sistema depois de importada e então é apagada sozinha. Baixe antes desse prazo.
+        {podeEncaminhar && ' A foto encaminhada à P/3 fica com ela por mais ' + DIAS_NO_SISTEMA + ' dias, mesmo que seja apagada aqui.'}
+      </p>
+      {podeEncaminhar && faltamEncaminhar.length > 0 && (
+        <div className="acoes-linha">
+          <button className="botao secundario" type="button" disabled={!!encaminhando} onClick={() => encaminhar(faltamEncaminhar)}>
+            Encaminhar {faltamEncaminhar.length === 1 ? 'a foto' : `as ${faltamEncaminhar.length} fotos`} à P/3
+          </button>
+        </div>
+      )}
+      {encaminhando && <p className="carregando">{encaminhando}</p>}
       {carregando && <p className="carregando">Carregando…</p>}
       {!carregando && fotos.length === 0 && <p className="vazio">Nenhuma foto importada.</p>}
       <ul className="grade-fotos">
@@ -546,6 +586,13 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
               {f.observacao}
               <br />
               Importada por {f.enviadoPor} em {quandoFoi(f.enviadoEm)}
+              <br />
+              <span className="item-info">{textoApagaEm(f.enviadoEm)}</span>
+              {podeEncaminhar && jaFoi.has(f.id) && (
+                <>
+                  <br />✅ Encaminhada à P/3
+                </>
+              )}
             </span>
             {confirmarId === f.id ? (
               <div className="confirmar-foto" role="alertdialog" aria-label="Confirmar exclusão da foto">
@@ -562,6 +609,11 @@ function FotosCgp({ unidade, fotos, carregando }: { unidade: UnidadeId; fotos: F
                 <button className="botao secundario" type="button" onClick={() => baixar(f)}>
                   Baixar
                 </button>
+                {podeEncaminhar && !jaFoi.has(f.id) && (
+                  <button className="botao secundario" type="button" disabled={!!encaminhando} onClick={() => encaminhar([f])}>
+                    Encaminhar à P/3
+                  </button>
+                )}
                 <button className="botao secundario" type="button" onClick={() => setConfirmarId(f.id)}>
                   Apagar
                 </button>

@@ -10,6 +10,9 @@ export const COLECAO_MISSOES_CGP = 'cgpMissoes';
 export const COLECAO_RECADOS_CGP = 'recadosCgp';
 export const COLECAO_FOTOS_CGP = 'fotosCgp';
 export const COLECAO_FOTOS_CGP_DADOS = 'fotosCgpDados';
+/** Fotos do CGP que a Cia encaminhou à P/3: cópia (mesmo id da foto do CGP), a Cia e o CGP apagam as deles sem tirar da P/3. */
+export const COLECAO_FOTOS_ENCAMINHADAS = 'fotosEncaminhadas';
+export const COLECAO_FOTOS_ENCAMINHADAS_DADOS = 'fotosEncaminhadasDados';
 
 /** De onde veio a missão: demanda da P/3 (encaminhamento) ou do Numerador da Cia. */
 export type OrigemMissaoCgp = 'enc' | 'numerador';
@@ -77,6 +80,14 @@ export type FotoCgp = DadosFotoCgp & {
   enviadoPor: string;
   enviadoEm: Date | null;
 };
+
+/** Foto do CGP que chegou à P/3 (encaminhada pela Cia). */
+export type FotoEncaminhada = FotoCgp & { encaminhadaPor: string; encaminhadaEm: Date | null };
+
+/** Nome do arquivo da foto (no download e dentro do .zip). */
+export function nomeArquivoFotoCgp(f: Pick<FotoCgp, 'descricao' | 'local'>, n?: number): string {
+  return `CGP ${f.descricao} - ${f.local}${n ? ` (${n})` : ''}.jpg`.replace(/[\\/:*?"<>|]/g, '-');
+}
 
 export function validarFotoCgp(d: DadosFotoCgp, quantas: number): ErrosFotoCgp {
   const e: ErrosFotoCgp = {};
