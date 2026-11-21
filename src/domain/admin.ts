@@ -10,6 +10,7 @@ export const COLECOES_ZERAR = [
   'controleOperacoes',
   'relatorios',
   'docsMensais',
+  'docsMensaisHistorico',
   'eap',
   'eapRespostas',
   'iccs',

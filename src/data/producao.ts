@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   limit,
   onSnapshot,
@@ -9,6 +8,7 @@ import {
   runTransaction,
   serverTimestamp,
   where,
+  writeBatch,
   type DocumentData,
   type Firestore,
   type Timestamp,
@@ -20,10 +20,12 @@ import type { UnidadeId } from '../domain/unidades';
 // um lançamento por pelotão por dia. A Cia lança e corrige o dela; a P/3 lê todos.
 
 export const COLECAO_PRODUCAO = 'producao';
+/** Histórico: cada gravação e cada exclusão vira um registro que ninguém altera nem apaga (o banco não perde nada). */
+export const COLECAO_HISTORICO_PRODUCAO = 'producaoHistorico';
 
 const quando = (t: unknown): Date | null => (t as Timestamp | null | undefined)?.toDate?.() ?? null;
 
-function paraProducao(id: string, x: DocumentData): Producao {
+export function paraProducao(id: string, x: DocumentData): Producao {
   return {
     id,
     unidadeId: x.unidadeId,
@@ -52,16 +54,28 @@ export async function salvarProducao(
   p: { unidade: UnidadeId; data: string; pelotao: PelotaoId; itens: Itens; taloes: readonly Talao[]; por: string },
 ): Promise<string> {
   const ref = doc(db, COLECAO_PRODUCAO, idProducao(p.unidade, p.data, p.pelotao));
+  const itens = { ...p.itens };
+  const taloes = p.taloes.map((t) => ({ numero: normalizarTalao(t.numero), bopc: normalizarTalao(t.bopc ?? ''), data: t.data, natureza: t.natureza }));
   await runTransaction(db, async (tx) => {
     const atual = await tx.get(ref);
     const antes = atual.exists() ? atual.data() : null;
+    tx.set(doc(collection(db, COLECAO_HISTORICO_PRODUCAO)), {
+      producaoId: ref.id,
+      unidadeId: p.unidade,
+      mes: p.data.slice(0, 7),
+      acao: antes ? 'corrigido' : 'lancado',
+      itens,
+      taloes,
+      por: p.por,
+      em: serverTimestamp(),
+    });
     tx.set(ref, {
       unidadeId: p.unidade,
       data: p.data,
       mes: p.data.slice(0, 7),
       pelotao: p.pelotao,
-      itens: { ...p.itens },
-      taloes: p.taloes.map((t) => ({ numero: normalizarTalao(t.numero), bopc: normalizarTalao(t.bopc ?? ''), data: t.data, natureza: t.natureza })),
+      itens,
+      taloes,
       lancadoPor: antes ? antes.lancadoPor : p.por,
       lancadoEm: antes ? antes.lancadoEm : serverTimestamp(),
       atualizadoPor: p.por,
@@ -71,8 +85,21 @@ export async function salvarProducao(
   return ref.id;
 }
 
-export async function excluirProducao(db: Firestore, id: string): Promise<void> {
-  await deleteDoc(doc(db, COLECAO_PRODUCAO, id));
+/** Apaga o lançamento; o que ele tinha continua no histórico (com quem apagou). */
+export async function excluirProducao(db: Firestore, l: Pick<Producao, 'id' | 'unidadeId' | 'mes' | 'itens' | 'taloes'>, por: string): Promise<void> {
+  const lote = writeBatch(db);
+  lote.delete(doc(db, COLECAO_PRODUCAO, l.id));
+  lote.set(doc(collection(db, COLECAO_HISTORICO_PRODUCAO)), {
+    producaoId: l.id,
+    unidadeId: l.unidadeId,
+    mes: l.mes,
+    acao: 'excluido',
+    itens: { ...l.itens },
+    taloes: l.taloes.map((t) => ({ ...t })),
+    por,
+    em: serverTimestamp(),
+  });
+  await lote.commit();
 }
 
 /** Lançamentos de uma Cia no mês ('AAAA-MM'). */

@@ -187,6 +187,22 @@ service cloud.firestore {
       allow update: if ehDaMinhaUnidade(resource.data) && ehDaMinhaUnidade(request.resource.data) && envioMensalValido(id);
     }
 
+    // Histórico dos envios (banco de dados): cada envio e cada correção. Só é criado junto com o envio (os valores
+    // conferem com ele); ninguém altera nem apaga. A P/3 lê.
+    match /docsMensaisHistorico/{id} {
+      allow read: if ehP3();
+      allow create: if historicoEnvioValido();
+    }
+    function historicoEnvioValido() {
+      let h = request.resource.data;
+      return ehDaMinhaUnidade(h)
+        && h.keys().hasOnly(['envioId', 'docId', 'mesRef', 'unidadeId', 'valores', 'daProducao', 'respondidoPor', 'em'])
+        && h.envioId == h.docId + '_' + h.mesRef + '_' + h.unidadeId
+        && h.respondidoPor is string && h.respondidoPor.size() > 0 && h.respondidoPor.size() <= 120
+        && h.em == request.time
+        && getAfter(/databases/$(database)/documents/docsMensais/$(h.envioId)).data.valores == h.valores;
+    }
+
     // Estado de cada planilha (o motor grava); a P/3 só pede o arquivo e marca "feito".
     match /estadoDocsMensais/{docId} {
       allow read: if ehP3();
@@ -630,6 +646,26 @@ service cloud.firestore {
         && d.lancadoPor is string && d.lancadoPor.size() > 0
         && d.atualizadoPor is string && d.atualizadoPor.size() > 0
         && d.atualizadoEm == request.time;
+    }
+
+    // Histórico da produção (banco de dados): cada lançamento, correção e exclusão. Só é criado junto com a gravação
+    // (os itens e flagrantes conferem com ela; na exclusão, o lançamento existia e foi apagado). Ninguém altera nem apaga.
+    match /producaoHistorico/{id} {
+      allow read: if ehP3();
+      allow create: if historicoProducaoValido();
+    }
+    function historicoProducaoValido() {
+      let h = request.resource.data;
+      let caminho = /databases/$(database)/documents/producao/$(h.producaoId);
+      return ehDaCia(h.unidadeId)
+        && h.keys().hasOnly(['producaoId', 'unidadeId', 'mes', 'acao', 'itens', 'taloes', 'por', 'em'])
+        && h.producaoId is string && h.producaoId.matches(h.unidadeId + '_' + h.mes + '-[0-9]{2}_pel[A-D]')
+        && h.por is string && h.por.size() > 0 && h.por.size() <= 120
+        && h.em == request.time
+        && ((h.acao == 'lancado' && !exists(caminho) && getAfter(caminho).data.itens == h.itens && getAfter(caminho).data.taloes == h.taloes)
+          || (h.acao == 'corrigido' && exists(caminho) && getAfter(caminho).data.itens == h.itens && getAfter(caminho).data.taloes == h.taloes)
+          || (h.acao == 'excluido' && exists(caminho) && !existsAfter(caminho)
+            && get(caminho).data.itens == h.itens && get(caminho).data.taloes == h.taloes));
     }
 
     match /producao/{id} {

@@ -3729,3 +3729,12 @@ li.agenda-linha {
   color: var(--cor-destaque);
   font-weight: 600;
 }
+
+/* Banco de dados: cobertura de cada Cia no mês (produção, documentos, RAC). */
+.celula-cobertura {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}

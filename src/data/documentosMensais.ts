@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, where, type Firestore } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch, type Firestore } from 'firebase/firestore';
 import {
   configParaMotor,
   idEnvio,
@@ -12,7 +12,7 @@ import type { UnidadeId } from '../domain/unidades';
 // Documentos Mensais: envios das Cias ("docsMensais", id = doc_mes_unidade), estado de cada planilha
 // ("estadoDocsMensais", gravado pelo motor; a P/3 pede o arquivo e marca "feito") e a configuração que o motor lê.
 
-function paraEnvio(id: string, x: Partial<EnvioMensal>): EnvioMensal {
+export function paraEnvio(id: string, x: Partial<EnvioMensal>): EnvioMensal {
   return {
     id,
     docId: x.docId ?? '',
@@ -32,14 +32,29 @@ export async function enviarDocMensal(
 ): Promise<void> {
   if (!p.respondidoPor.trim()) throw new Error('Informe quem preencheu.');
   const { daProducao, ...resto } = p;
-  await setDoc(doc(db, 'docsMensais', idEnvio(p.docId, p.mesRef, p.unidadeId)), {
+  const id = idEnvio(p.docId, p.mesRef, p.unidadeId);
+  const comProducao = daProducao && Object.keys(daProducao).length ? { daProducao } : {};
+  const lote = writeBatch(db);
+  lote.set(doc(db, 'docsMensais', id), {
     ...resto,
-    ...(daProducao && Object.keys(daProducao).length ? { daProducao } : {}),
+    ...comProducao,
     respondidoPor: p.respondidoPor.trim(),
     gravado: false,
     erro: '',
     enviadoEm: serverTimestamp(),
   });
+  // Histórico: cada envio (e cada correção) fica guardado; o envio de cima guarda só o último.
+  lote.set(doc(collection(db, 'docsMensaisHistorico')), {
+    envioId: id,
+    docId: p.docId,
+    mesRef: p.mesRef,
+    unidadeId: p.unidadeId,
+    valores: p.valores,
+    ...comProducao,
+    respondidoPor: p.respondidoPor.trim(),
+    em: serverTimestamp(),
+  });
+  await lote.commit();
 }
 
 /** Os envios da Cia no mês de referência. */

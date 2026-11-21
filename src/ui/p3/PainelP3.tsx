@@ -15,6 +15,7 @@ import { Agenda } from './Agenda';
 import { Aperfeicoamento } from './Aperfeicoamento';
 import { ChecklistOperacoes } from './ChecklistOperacoes';
 import { ControleOperacoes } from './ControleOperacoes';
+import { BancoDados } from './BancoDados';
 import { DocumentosMensais } from './DocumentosMensais';
 import { RacP3 } from './RacP3';
 import { ProducaoP3 } from './ProducaoP3';
@@ -28,8 +29,8 @@ import { TdsP3 } from './TdsP3';
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
 
-/** Dentro de Operações: Checklist, Controle de Operações (Relatório de Indicadores), Documentos Mensais, RAC e Produtividade. */
-function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos' | 'rac' | 'produtividade'; operacoes?: number }) {
+/** Dentro de Operações: Checklist, Controle de Operações (Relatório de Indicadores), Documentos Mensais, RAC, Produtividade e Banco de dados. */
+function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle' | 'documentos' | 'rac' | 'produtividade' | 'banco'; operacoes?: number }) {
   return (
     <nav className="abas abas-p3 subabas" aria-label="Operações">
       <a href="#/operacoes" aria-current={ativa === 'checklist' ? 'page' : undefined}>
@@ -47,6 +48,9 @@ function SubAbasOperacoes({ ativa, operacoes }: { ativa: 'checklist' | 'controle
       </a>
       <a href="#/operacoes/produtividade" aria-current={ativa === 'produtividade' ? 'page' : undefined}>
         Produtividade
+      </a>
+      <a href="#/operacoes/banco" aria-current={ativa === 'banco' ? 'page' : undefined}>
+        Banco de dados
       </a>
     </nav>
   );
@@ -157,7 +161,8 @@ function ConteudoP3({
     hash === '#/operacoes/controle' ||
     hash === '#/operacoes/documentos' ||
     hash === '#/operacoes/rac' ||
-    hash === '#/operacoes/produtividade'
+    hash === '#/operacoes/produtividade' ||
+    hash === '#/operacoes/banco'
   ) {
     const ativa =
       hash === '#/operacoes/controle'
@@ -168,7 +173,9 @@ function ConteudoP3({
             ? 'rac'
             : hash === '#/operacoes/produtividade'
               ? 'produtividade'
-              : 'checklist';
+              : hash === '#/operacoes/banco'
+                ? 'banco'
+                : 'checklist';
     return (
       <>
         <SubAbasOperacoes ativa={ativa} operacoes={operacoes.valor?.length} />
@@ -180,6 +187,8 @@ function ConteudoP3({
           <RacP3 />
         ) : ativa === 'produtividade' ? (
           <ProducaoP3 />
+        ) : ativa === 'banco' ? (
+          <BancoDados />
         ) : (
           <ChecklistOperacoes operacoes={operacoes} />
         )}
