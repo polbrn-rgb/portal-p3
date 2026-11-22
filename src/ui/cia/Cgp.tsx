@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import {
+  anexarOrdemLink,
+  anexarOrdemPdf,
   apagarFotoCgp,
+  apagarOrdemCgp,
   apagarRecadoCgp,
   enviarAoCgp,
   enviarFotosCgp,
@@ -9,10 +12,13 @@ import {
   JaEnviadaAoCgp,
   lerFotoCgp,
   observarFotosCgp,
+  lerOrdemPdf,
   observarMissoesCgp,
+  observarOrdensCgp,
   observarRecadosCgp,
   type RecadoCgp,
 } from '../../data/cgp';
+import { entregarAoAparelho } from '../../data/arquivos';
 import { useHash } from '../../lib/navegacao';
 import { useAoVivo } from '../../lib/useAoVivo';
 import {
@@ -21,13 +27,18 @@ import {
   nomeArquivoFotoCgp,
   missoesDoDia,
   proximasMissoes,
+  tamanhoTexto,
+  textoOrdemApagaEm,
   validarFotoCgp,
+  validarLinkOrdem,
+  validarPdfOrdem,
   validarPeriodo,
   type DadosFotoCgp,
   type ErrosFotoCgp,
   type ErrosPeriodo,
   type FotoCgp,
   type MissaoCgp,
+  type OrdemCgp,
   type OrigemMissaoCgp,
 } from '../../domain/cgp';
 import { formatarData, hojeISO } from '../../domain/datas';
@@ -72,6 +83,9 @@ export function EnviarAoCgp(p: {
   const [erros, setErros] = useState<ErrosPeriodo>({});
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [ordem, setOrdem] = useState<EscolhaOrdem>(SEM_ORDEM);
+  const [erroOrdem, setErroOrdem] = useState('');
+  const [progresso, setProgresso] = useState('');
 
   if (ja) {
     return (
@@ -91,15 +105,27 @@ export function EnviarAoCgp(p: {
   async function enviar() {
     const e = validarPeriodo(periodo);
     setErros(e);
-    if (Object.keys(e).length) return;
+    const eOrdem = erroDaEscolha(ordem, false);
+    setErroOrdem(eOrdem);
+    if (Object.keys(e).length || eOrdem) return;
     setOcupado(true);
     setErro('');
+    let id = '';
     try {
-      await enviarAoCgp(db, { unidade: p.unidade, origem: p.origem, refId: p.refId, numero: p.numero, titulo: p.titulo, periodo, criadoPor: autor(p.unidade) });
-      setAberto(false);
+      id = await enviarAoCgp(db, { unidade: p.unidade, origem: p.origem, refId: p.refId, numero: p.numero, titulo: p.titulo, periodo, criadoPor: autor(p.unidade) });
     } catch (x) {
       setErro(x instanceof JaEnviadaAoCgp ? x.message : 'Não foi possível enviar para o CGP. Tente de novo.');
+      setOcupado(false);
+      return;
     }
+    try {
+      await gravarEscolha(ordem, { id, unidadeId: p.unidade, fim: periodo.fim }, autor(p.unidade), setProgresso);
+      setAberto(false);
+    } catch {
+      // A missão já foi; a ordem pode ser anexada depois na aba CGP.
+      setErro('A missão foi enviada, mas a ordem de serviço não. Anexe pela aba CGP → Missões.');
+    }
+    setProgresso('');
     setOcupado(false);
   }
 
@@ -135,6 +161,8 @@ export function EnviarAoCgp(p: {
           {periodoTexto(periodo)} · {dias} dia{dias > 1 ? 's' : ''}
         </p>
       )}
+      <EscolherOrdem valor={ordem} aoMudar={(v) => { setOrdem(v); setErroOrdem(''); }} erro={erroOrdem} opcional />
+      {progresso && <p className="item-info" role="status">{progresso}</p>}
       {erro && (
         <p className="mensagem erro" role="alert">
           {erro}
@@ -148,6 +176,202 @@ export function EnviarAoCgp(p: {
           Enviar para o CGP
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---------- Ordem de serviço da missão (PDF ou link do Google Drive) ----------
+
+type EscolhaOrdem = { modo: 'pdf' | 'link'; pdf: File | null; link: string };
+const SEM_ORDEM: EscolhaOrdem = { modo: 'pdf', pdf: null, link: '' };
+
+/** Sem nada escolhido: '' se a ordem é opcional; senão, o erro do que falta. */
+function erroDaEscolha(e: EscolhaOrdem, obrigatoria: boolean): string {
+  if (e.modo === 'pdf') return e.pdf ? validarPdfOrdem(e.pdf) : obrigatoria ? 'Escolha o PDF da ordem de serviço.' : '';
+  return e.link.trim() || obrigatoria ? validarLinkOrdem(e.link) : '';
+}
+
+async function gravarEscolha(e: EscolhaOrdem, m: Pick<MissaoCgp, 'id' | 'unidadeId' | 'fim'>, quem: string, aviso: (t: string) => void): Promise<boolean> {
+  if (e.modo === 'pdf' && e.pdf) {
+    aviso('Enviando a ordem de serviço…');
+    await anexarOrdemPdf(db, m, e.pdf, quem, (f) => aviso(`Enviando a ordem de serviço… ${Math.round(f * 100)}%`));
+    return true;
+  }
+  if (e.modo === 'link' && e.link.trim()) {
+    await anexarOrdemLink(db, m, e.link, quem);
+    return true;
+  }
+  return false;
+}
+
+function EscolherOrdem(p: { valor: EscolhaOrdem; aoMudar: (v: EscolhaOrdem) => void; erro: string; opcional?: boolean }) {
+  const v = p.valor;
+  const nome = useId();
+  return (
+    <fieldset className="cgp-ordem-escolha">
+      <legend>Ordem de serviço{p.opcional ? ' (opcional)' : ''}</legend>
+      <div className="opcoes-linha" role="radiogroup" aria-label="Como anexar a ordem de serviço">
+        <label className="campo-check-linha">
+          <input type="radio" name={nome} checked={v.modo === 'pdf'} onChange={() => p.aoMudar({ ...v, modo: 'pdf' })} />
+          Arquivo PDF
+        </label>
+        <label className="campo-check-linha">
+          <input type="radio" name={nome} checked={v.modo === 'link'} onChange={() => p.aoMudar({ ...v, modo: 'link' })} />
+          Link do Google Drive
+        </label>
+      </div>
+      {v.modo === 'pdf' ? (
+        <Campo rotulo="PDF da ordem de serviço (até 10 MB)" erro={p.erro} obrigatorio={!p.opcional}>
+          <input type="file" accept="application/pdf,.pdf" onChange={(e) => p.aoMudar({ ...v, pdf: e.target.files?.[0] ?? null })} />
+        </Campo>
+      ) : (
+        <Campo rotulo="Link da ordem de serviço no Google Drive" erro={p.erro} obrigatorio={!p.opcional}>
+          <input
+            type="url"
+            inputMode="url"
+            placeholder="https://drive.google.com/file/d/..."
+            value={v.link}
+            onChange={(e) => p.aoMudar({ ...v, link: e.target.value })}
+          />
+        </Campo>
+      )}
+      {v.modo === 'link' && (
+        <p className="item-info">No Drive, compartilhe o arquivo com quem vai abrir (ou "Qualquer pessoa com o link"), senão o CGP vê "Acesso negado".</p>
+      )}
+    </fieldset>
+  );
+}
+
+/** A ordem de serviço dentro da missão: o CGP abre/baixa; a Cia também anexa, troca e tira. */
+function OrdemDaMissao({ missao, ordem, podeEditar }: { missao: MissaoCgp; ordem?: OrdemCgp; podeEditar: boolean }) {
+  const [editando, setEditando] = useState(false);
+  const [escolha, setEscolha] = useState<EscolhaOrdem>(SEM_ORDEM);
+  const [erroCampo, setErroCampo] = useState('');
+  const [aviso, setAviso] = useState('');
+  const [erro, setErro] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const [aTirar, setATirar] = useState(false);
+
+  async function abrir(baixar: boolean) {
+    setErro('');
+    // A janela abre já no clique (senão o navegador bloqueia); o PDF entra nela quando chegar.
+    const janela = baixar ? null : window.open('', '_blank');
+    setOcupado(true);
+    try {
+      const { nome, blob } = await lerOrdemPdf(db, missao.id);
+      if (janela) {
+        const url = URL.createObjectURL(blob);
+        janela.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
+      } else entregarAoAparelho(nome, blob);
+    } catch {
+      janela?.close();
+      setErro('Não foi possível abrir a ordem de serviço. Tente de novo.');
+    }
+    setOcupado(false);
+  }
+
+  async function salvar() {
+    const e = erroDaEscolha(escolha, true);
+    setErroCampo(e);
+    if (e) return;
+    setOcupado(true);
+    setErro('');
+    try {
+      await gravarEscolha(escolha, missao, autor(missao.unidadeId), setAviso);
+      setEditando(false);
+      setEscolha(SEM_ORDEM);
+    } catch {
+      setErro('Não foi possível anexar a ordem de serviço. Tente de novo.');
+    }
+    setAviso('');
+    setOcupado(false);
+  }
+
+  async function tirar() {
+    setOcupado(true);
+    setErro('');
+    try {
+      await apagarOrdemCgp(db, missao.id);
+    } catch {
+      setErro('Não foi possível tirar a ordem de serviço. Tente de novo.');
+    }
+    setATirar(false);
+    setOcupado(false);
+  }
+
+  if (editando) {
+    return (
+      <div className="cartao grupo cgp-ordem" role="group" aria-label={`Ordem de serviço de ${missao.numero}`}>
+        <EscolherOrdem valor={escolha} aoMudar={(v) => { setEscolha(v); setErroCampo(''); }} erro={erroCampo} />
+        {aviso && <p className="item-info" role="status">{aviso}</p>}
+        {erro && <p className="mensagem erro" role="alert">{erro}</p>}
+        <div className="acoes-linha">
+          <button className="botao secundario" type="button" disabled={ocupado} onClick={() => setEditando(false)}>
+            Cancelar
+          </button>
+          <button className="botao destaque" type="button" disabled={ocupado} onClick={salvar}>
+            Anexar ordem de serviço
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ordem) {
+    return podeEditar ? (
+      <button className="botao secundario" type="button" onClick={() => setEditando(true)}>
+        📎 Anexar ordem de serviço
+      </button>
+    ) : (
+      <span className="pendente-detalhe">Sem ordem de serviço anexada.</span>
+    );
+  }
+
+  return (
+    <div className="cgp-ordem" role="group" aria-label={`Ordem de serviço de ${missao.numero}`}>
+      <div className="acoes-linha">
+        {ordem.tipo === 'link' ? (
+          <a className="botao destaque" href={ordem.link} target="_blank" rel="noopener noreferrer">
+            🔗 Abrir ordem de serviço (Google Drive)
+          </a>
+        ) : (
+          <>
+            <button className="botao destaque" type="button" disabled={ocupado} onClick={() => abrir(false)}>
+              📄 Abrir ordem de serviço
+            </button>
+            <button className="botao secundario" type="button" disabled={ocupado} onClick={() => abrir(true)}>
+              ⬇️ Baixar
+            </button>
+          </>
+        )}
+      </div>
+      <span className="pendente-detalhe">
+        {ordem.tipo === 'pdf' ? `${ordem.nome}${ordem.tamanho ? ` · ${tamanhoTexto(ordem.tamanho)}` : ''} · ` : ''}
+        anexada por {ordem.enviadoPor} · {textoOrdemApagaEm(ordem.fim)}
+      </span>
+      {erro && <p className="mensagem erro" role="alert">{erro}</p>}
+      {podeEditar &&
+        (aTirar ? (
+          <div className="acoes-linha" role="alertdialog" aria-label={`Confirmar retirada da ordem de ${missao.numero}`}>
+            <span>Tirar a ordem de serviço?</span>
+            <button className="botao secundario" type="button" onClick={() => setATirar(false)}>
+              Cancelar
+            </button>
+            <button className="botao perigo" type="button" disabled={ocupado} onClick={tirar}>
+              Tirar ordem
+            </button>
+          </div>
+        ) : (
+          <div className="acoes-linha">
+            <button className="botao secundario" type="button" onClick={() => setEditando(true)}>
+              Trocar ordem
+            </button>
+            <button className="botao secundario" type="button" onClick={() => setATirar(true)}>
+              Tirar ordem
+            </button>
+          </div>
+        ))}
     </div>
   );
 }
@@ -243,6 +467,8 @@ function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boo
   const [dia, setDia] = useState(hojeISO);
   const [aExcluir, setAExcluir] = useState('');
   const [aviso, setAviso] = useState('');
+  const ordens = useAoVivo<OrdemCgp[]>((ok, erro) => observarOrdensCgp(db, p.unidade, ok, erro), [p.unidade]);
+  const ordemDe = (id: string) => ordens.valor?.find((o) => o.id === id);
   const doDia = missoesDoDia(p.lista, dia);
   const proximas = proximasMissoes(p.lista, dia);
 
@@ -268,6 +494,7 @@ function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boo
         <span className="pendente-detalhe">
           {m.origem === 'numerador' ? 'Numerador da Cia' : 'Demanda da P/3'} · enviada por {m.criadoPor}
         </span>
+        <OrdemDaMissao missao={m} ordem={ordemDe(m.id)} podeEditar={p.podeExcluir} />
         {!p.podeExcluir ? null : aExcluir === m.id ? (
           <div className="acoes-linha" role="alertdialog" aria-label={`Confirmar exclusão de ${m.numero}`}>
             <span>Tirar do CGP?</span>

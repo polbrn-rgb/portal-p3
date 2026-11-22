@@ -46,6 +46,7 @@ function montar(agora = { valor: Date.parse('2026-11-21T12:00:00Z') }) {
     'importarEmails_', 'processarPlanilhas_', 'gravarResultados_', 'sincronizarAgendaCfp_', 'sincronizarControleOperacoes_',
     'processarEap_', 'processarRelatorios_', 'processarDocsMensais_', 'processarIcc_', 'levarEfetivoManual_', 'processarEmails_',
     'processarAcessos_', 'processarRac_', 'processarBackupBanco_', 'pedirTrocaDeSenha_', 'limparEncaminhamentosOrfaos_', 'apagarFotosVencidas_',
+    'apagarOrdensVencidas_',
   ];
   for (const nome of etapas) ctx[nome] = () => chamadas.push(nome);
   let fila: { nome: string; dados: Record<string, unknown> }[] = [];
@@ -77,6 +78,7 @@ describe('rodada do motor', () => {
     expect(m.chamadas).toContain('importarEmails_');
     expect(m.chamadas).toContain('processarBackupBanco_');
     expect(m.chamadas).toContain('limparEncaminhamentosOrfaos_');
+    expect(m.chamadas).toContain('apagarOrdensVencidas_');
     expect(m.chamadas.filter((c) => c.startsWith('erro:'))).toEqual([]);
     expect(m.chamadas).toContain('sincronizarAgendaCfp_');
     expect(m.chamadas).toContain('sincronizarControleOperacoes_');
@@ -200,6 +202,43 @@ describe('fotos com mais de 15 dias', () => {
     ]);
     pedidos.length = 0;
     r.agora.valor += 30 * MIN;
+    expect(apagar()).toBe(0);
+    expect(pedidos).toEqual([]);
+  });
+});
+
+describe('ordens de serviço do CGP vencidas', () => {
+  test('apaga as partes e o cabeçalho das missões que acabaram há mais de 7 dias; uma vez por dia', () => {
+    const r = montar();
+    runInNewContext(readFileSync('apps-script/Motor.gs', 'utf8'), r.ctx);
+    r.agora.valor = Date.parse('2026-12-05T12:00:00Z'); // 05/12 em Brasília -> sai o que acabou até 27/11
+    const pedidos: { metodo: string; caminho: string; corpo?: { structuredQuery?: { from: { collectionId: string }[]; where: unknown } } }[] = [];
+    r.ctx.firestore_ = (metodo: string, caminho: string, corpo?: (typeof pedidos)[number]['corpo']) => {
+      pedidos.push({ metodo, caminho, corpo });
+      if (metodo === 'post') {
+        return {
+          status: 200,
+          json: [
+            { document: { name: 'projects/p/databases/(default)/documents/ordensCgp/1cia_enc_1', fields: { partes: { integerValue: '2' } } } },
+            { document: { name: 'projects/p/databases/(default)/documents/ordensCgp/ft_numerador_2', fields: {} } },
+          ],
+        };
+      }
+      return { status: 200, json: {} };
+    };
+    const apagar = r.ctx.apagarOrdensVencidas_ as (f?: boolean) => number;
+    expect(apagar()).toBe(2);
+    const consulta = pedidos.find((p) => p.metodo === 'post')!.corpo!.structuredQuery!;
+    expect(consulta.from).toEqual([{ collectionId: 'ordensCgp' }]);
+    expect(consulta.where).toEqual({ fieldFilter: { field: { fieldPath: 'fim' }, op: 'LESS_THAN', value: { stringValue: '2026-11-28' } } });
+    expect(pedidos.filter((p) => p.metodo === 'delete').map((p) => p.caminho.split('/documents/')[1])).toEqual([
+      'ordensCgp/1cia_enc_1/partes/0',
+      'ordensCgp/1cia_enc_1/partes/1',
+      'ordensCgp/1cia_enc_1',
+      'ordensCgp/ft_numerador_2',
+    ]);
+    // No mesmo dia não consulta de novo.
+    pedidos.length = 0;
     expect(apagar()).toBe(0);
     expect(pedidos).toEqual([]);
   });

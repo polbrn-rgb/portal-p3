@@ -3,11 +3,13 @@
 //   demandas que a P/3 mandou para a Cia. Uma demanda só vai uma vez (o id é fixo: não duplica serviço).
 // - Fotos: importação sem limite, com descrição, local e observação; fica gravado quem importou e quando.
 // - Recados: a Cia escreve para o CGP.
-import { ehDataISO } from './datas';
+import { ehDataISO, formatarData, somarDias } from './datas';
 import type { UnidadeId } from './unidades';
 
 export const COLECAO_MISSOES_CGP = 'cgpMissoes';
 export const COLECAO_RECADOS_CGP = 'recadosCgp';
+/** Ordem de serviço da missão (mesmo id da missão): PDF em partes (ordensCgp/{id}/partes/{n}) ou link do Google Drive. */
+export const COLECAO_ORDENS_CGP = 'ordensCgp';
 export const COLECAO_FOTOS_CGP = 'fotosCgp';
 export const COLECAO_FOTOS_CGP_DADOS = 'fotosCgpDados';
 /** Fotos do CGP que a Cia encaminhou à P/3: cópia (mesmo id da foto do CGP), a Cia e o CGP apagam as deles sem tirar da P/3. */
@@ -64,6 +66,66 @@ export function proximasMissoes(lista: MissaoCgp[], dia: string, quantas = 10): 
     .filter((m) => m.inicio > dia)
     .sort((a, b) => a.inicio.localeCompare(b.inicio))
     .slice(0, quantas);
+}
+
+// ---------- Ordem de serviço da missão ----------
+// A Cia anexa a ordem (PDF ou link do Google Drive) para o CGP ler. O PDF fica no banco só enquanto serve:
+// o motor apaga DIAS_ORDEM_APOS_FIM dias depois do último dia da missão (e sai junto quando a missão é excluída).
+// Tem que bater com ORDENS_DIAS_APOS_FIM do apps-script/Logica.gs (o teste confere).
+
+export const DIAS_ORDEM_APOS_FIM = 7;
+/** Igual ao limite das regras do banco (10 MB). Maior que isso: use o link do Google Drive. */
+export const LIMITE_PDF_ORDEM = 10 * 1024 * 1024;
+export const LIMITE_LINK_ORDEM = 500;
+
+export type OrdemCgp = {
+  /** id da missão do CGP. */
+  id: string;
+  unidadeId: UnidadeId;
+  tipo: 'pdf' | 'link';
+  nome: string;
+  /** Só no PDF. */
+  tamanho?: number;
+  partes?: number;
+  /** Só no link. */
+  link?: string;
+  /** Último dia da missão (o motor apaga depois de DIAS_ORDEM_APOS_FIM dias). */
+  fim: string;
+  enviadoPor: string;
+  enviadoEm: Date | null;
+};
+
+/** '' quando o arquivo serve; senão, o motivo. */
+export function validarPdfOrdem(a: { name: string; type: string; size: number }): string {
+  const ehPdf = a.type === 'application/pdf' || (!a.type && /\.pdf$/i.test(a.name));
+  if (!ehPdf) return 'Escolha um arquivo PDF.';
+  if (a.size <= 0) return 'O arquivo está vazio.';
+  if (a.size > LIMITE_PDF_ORDEM) return 'PDF maior que 10 MB: coloque no Google Drive e cole o link.';
+  return '';
+}
+
+/** Link do Google Drive/Docs (https). '' quando serve; senão, o motivo. */
+export function validarLinkOrdem(link: string): string {
+  const t = link.trim();
+  if (!t) return 'Cole o link da ordem de serviço.';
+  if (t.length > LIMITE_LINK_ORDEM) return `Até ${LIMITE_LINK_ORDEM} caracteres.`;
+  if (!/^https:\/\/(drive|docs)\.google\.com\/\S+$/.test(t)) return 'Cole um link do Google Drive (https://drive.google.com/...).';
+  return '';
+}
+
+/** Dia em que a ordem sai do sistema. */
+export function ordemApagaEm(fim: string): string {
+  return somarDias(fim, DIAS_ORDEM_APOS_FIM + 1);
+}
+
+export function textoOrdemApagaEm(fim: string): string {
+  return `Sai do sistema em ${formatarData(ordemApagaEm(fim))} (${DIAS_ORDEM_APOS_FIM} dias depois do fim da missão)`;
+}
+
+/** Tamanho para a tela: "850 KB", "2,4 MB". */
+export function tamanhoTexto(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
 }
 
 // ---------- Fotos ----------

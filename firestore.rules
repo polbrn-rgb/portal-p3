@@ -561,6 +561,41 @@ service cloud.firestore {
         && request.resource.data.criadoPor is string && request.resource.data.criadoPor.size() > 0;
     }
 
+    // Ordem de serviço da missão (mesmo id da missão): PDF em partes (cabeçalho por último) ou link do Google Drive.
+    // Só a Cia anexa, troca (apaga e cria de novo) e tira; a Cia e o CGP dela leem. O motor apaga 7 dias depois do fim.
+    function ordemCgpValida(id) {
+      let o = request.resource.data;
+      let missao = /databases/$(database)/documents/cgpMissoes/$(id);
+      return ehDaCia(o.unidadeId)
+        && id.split('_')[0] == o.unidadeId
+        && exists(missao) && get(missao).data.unidadeId == o.unidadeId && get(missao).data.fim == o.fim
+        && o.keys().hasOnly(['unidadeId', 'tipo', 'nome', 'tamanho', 'partes', 'link', 'fim', 'enviadoPor', 'enviadoEm'])
+        && o.nome is string && o.nome.size() > 0 && o.nome.size() <= 200
+        && o.enviadoPor is string && o.enviadoPor.size() > 0 && o.enviadoPor.size() <= 120
+        && o.enviadoEm == request.time
+        && ((o.tipo == 'pdf' && !('link' in o)
+              && o.tamanho is int && o.tamanho > 0 && o.tamanho <= 10485760
+              && o.partes is int && o.partes > 0 && o.partes <= 20)
+          || (o.tipo == 'link' && !('partes' in o) && !('tamanho' in o)
+              && o.link is string && o.link.size() <= 500 && o.link.matches('^https://(drive|docs)[.]google[.]com/[^ ]+$')));
+    }
+
+    match /ordensCgp/{missaoId} {
+      allow get: if veCgp(missaoId.split('_')[0]);
+      allow list: if veCgp(resource.data.unidadeId);
+      allow delete: if ehDaCia(missaoId.split('_')[0]);
+      allow create: if ordemCgpValida(missaoId);
+      match /partes/{n} {
+        allow read: if veCgp(missaoId.split('_')[0]);
+        allow delete: if ehDaCia(missaoId.split('_')[0]);
+        allow create: if ehDaCia(missaoId.split('_')[0])
+          && exists(/databases/$(database)/documents/cgpMissoes/$(missaoId))
+          && n.matches('^[0-9]{1,2}$') && int(n) < 20
+          && request.resource.data.keys().hasOnly(['dados'])
+          && request.resource.data.dados is string && request.resource.data.dados.size() <= 700000;
+      }
+    }
+
     match /recadosCgp/{id} {
       allow read: if veCgp(resource.data.unidadeId);
       allow delete: if ehDaCia(resource.data.unidadeId);

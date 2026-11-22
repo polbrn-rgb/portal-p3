@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-23';
+var VERSAO_MOTOR = '2026-11-24';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -319,6 +319,7 @@ function rodarMotor_(esperaMs, opcoes) {
     etapa('Banco de dados (cópia)', processarBackupBanco_);
     etapa('Encaminhamentos sem demanda', limparEncaminhamentosOrfaos_);
     etapa('Fotos com mais de 15 dias', apagarFotosVencidas_);
+    etapa('Ordens de serviço do CGP vencidas', apagarOrdensVencidas_);
     registrarRodada_(props, opcoes.origem || 'gatilho', comeco, tempos);
   } finally {
     trava.releaseLock();
@@ -405,6 +406,36 @@ function apagarFotosVencidas_(forcar) {
   }
   if (total) console.info(total + ' foto(s) com mais de ' + FOTOS_DIAS_NO_SISTEMA + ' dias apagada(s).');
   props.setProperty('FOTOS_VENCIDAS_EM', String(agora));
+  return total;
+}
+
+/**
+ * Uma vez por dia: apaga a ordem de serviço (PDF ou link) das missões do CGP que terminaram há mais de
+ * ORDENS_DIAS_APOS_FIM dias. As partes primeiro: se o cabeçalho falhar, ele é apagado na próxima rodada.
+ */
+function apagarOrdensVencidas_(forcar) {
+  var props = PropertiesService.getScriptProperties();
+  var dia = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  if (!forcar && props.getProperty('ORDENS_VENCIDAS_EM') === dia) return 0;
+  var r = firestore_('post', caminhoDocs_() + ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: 'ordensCgp' }],
+      where: { fieldFilter: { field: { fieldPath: 'fim' }, op: 'LESS_THAN', value: { stringValue: limiteOrdensVencidas(Date.now()) } } },
+      select: { fields: [{ fieldPath: 'partes' }] },
+      limit: 300
+    }
+  });
+  if (r.status !== 200) throw new Error('ordensCgp: Firestore ' + r.status + ': ' + JSON.stringify(r.json));
+  var total = 0;
+  r.json.filter(function (x) { return x.document; }).forEach(function (x) {
+    var id = x.document.name.split('/').pop();
+    var partes = Number(camposParaJs(x.document.fields || {}).partes) || 0;
+    for (var i = 0; i < partes; i++) firestore_('delete', caminhoDocs_() + '/ordensCgp/' + id + '/partes/' + i);
+    firestore_('delete', caminhoDocs_() + '/ordensCgp/' + id);
+    total++;
+  });
+  if (total) console.info(total + ' ordem(ns) de serviço do CGP vencida(s) apagada(s).');
+  props.setProperty('ORDENS_VENCIDAS_EM', dia);
   return total;
 }
 

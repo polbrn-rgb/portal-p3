@@ -3776,3 +3776,35 @@ li.agenda-linha {
     min-width: 0;
   }
 }
+
+/* Ordem de serviço da missão do CGP */
+.cgp-ordem-escolha {
+  border: 1px solid #d0d5dd;
+  border-radius: var(--raio);
+  padding: 0.6rem 0.8rem;
+  margin: 0.5rem 0;
+  min-width: 0;
+}
+.cgp-ordem-escolha legend {
+  float: none; /* o .grupo legend flutua e espremeria a linha das opções */
+  width: auto;
+  font-weight: 700;
+  color: var(--cor-secundaria);
+  padding: 0 0.3rem;
+}
+.cgp-ordem-escolha .opcoes-linha {
+  margin-top: 0;
+}
+.cgp-ordem-escolha input[type='url'],
+.cgp-ordem-escolha input[type='file'] {
+  width: 100%;
+  min-width: 0;
+}
+.cgp-ordem {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+.cgp-ordem a.botao {
+  text-decoration: none;
+}
