@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, getDoc, type Firestore } from 'firebase/firestore';
+import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { atualizarDemanda, criarDemanda, obterDemanda } from '../../src/data/demandas';
-import { concluirOperacao, marcarItem, observarOperacoes, salvarProtocolo } from '../../src/data/operacoes';
+import { atualizarDemanda, criarDemanda, excluirDemanda, obterDemanda } from '../../src/data/demandas';
+import { concluirOperacao, marcarItem, observarOperacoes, prepararCampoOperacao, salvarProtocolo } from '../../src/data/operacoes';
 import { dadosDe, demandaVazia, type DadosDemanda } from '../../src/domain/demanda';
 import type { Operacao } from '../../src/domain/operacao';
 
@@ -81,6 +81,40 @@ describe('Checklist Operações', () => {
     await operacoesQuando((l) => l.length === 0);
     await concluirOperacao(db, n, false);
     await operacoesQuando((l) => l.length === 1);
+  });
+
+  test('excluída sai da lista', async () => {
+    const n = String(await criarDemanda(db, operacao('Operação Cancelada')));
+    await operacoesQuando((l) => l.length === 1);
+    await excluirDemanda(db, n);
+    await operacoesQuando((l) => l.length === 0);
+  });
+
+  test('mais de 30 operações em andamento (o filtro "in" dos checklists vai em grupos)', async () => {
+    const ns: string[] = [];
+    for (let i = 0; i < 32; i++) ns.push(String(await criarDemanda(db, operacao(`Operação ${i}`))));
+    await marcarItem(db, ns[31], 'osOk', true);
+    const lista = await operacoesQuando((l) => l.length === 32 && l.some((o) => o.checklist.osOk));
+    expect(lista.find((o) => o.demanda.id === ns[31])?.checklist.osOk).toBe(true);
+  });
+
+  test('operações antigas (sem o campo) ganham o valor do checklist uma vez só', async () => {
+    const semCampo = (id: string, saida: string) =>
+      env.withSecurityRulesDisabled((c) =>
+        setDoc(doc(c.firestore() as unknown as Firestore, 'demandas', id), { ...operacao(saida), numero: Number(id), status: 'em_aberto' }),
+      );
+    await semCampo('901', 'Antiga em andamento');
+    await semCampo('902', 'Antiga concluída');
+    await marcarItem(db, '902', 'osOk', true);
+    await env.withSecurityRulesDisabled((c) =>
+      setDoc(doc(c.firestore() as unknown as Firestore, 'operacoes', '902'), { concluida: true }, { merge: true }),
+    );
+
+    expect(await prepararCampoOperacao(db)).toBe(2);
+    const lista = await operacoesQuando((l) => l.length === 1);
+    expect(lista[0].demanda.id).toBe('901');
+    expect((await getDoc(doc(db, 'demandas', '902'))).data()?.operacaoEncerrada).toBe(true);
+    expect(await prepararCampoOperacao(db)).toBe(0); // já feito
   });
 
   test('Cia não lê nem altera o checklist', async () => {

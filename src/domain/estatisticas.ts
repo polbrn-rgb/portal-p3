@@ -6,6 +6,51 @@ import { ROTULO_SITUACAO, situacaoDaDemanda, type Situacao } from './situacao';
 
 export type Barra = { rotulo: string; valor: number };
 
+/** Só o que o painel usa de cada demanda (é o que fica guardado no aparelho). */
+export const CAMPOS_ESTATISTICA = [
+  'numero',
+  'dataEntrada',
+  'status',
+  'prazoCPA',
+  'prazoCia',
+  'destinos',
+  'ciasAceitas',
+  'responsavel',
+  'categoria',
+  'tipoSaida',
+] as const;
+
+export type DemandaEstatistica = Pick<Demanda, 'id' | 'numero' | 'dataEntrada' | 'status' | 'prazoCPA' | 'prazoCia' | 'responsavel' | 'categoria' | 'tipoSaida'> &
+  Partial<Pick<Demanda, 'destinos' | 'ciasAceitas'>>;
+
+export function resumoEstatistico(d: Demanda): DemandaEstatistica {
+  const r: Record<string, unknown> = { id: d.id };
+  for (const c of CAMPOS_ESTATISTICA) if (d[c] !== undefined) r[c] = d[c];
+  return r as DemandaEstatistica;
+}
+
+/** É do ano pela data de entrada (o mesmo critério da busca no banco). */
+export function ehDoAno(d: Pick<Demanda, 'dataEntrada'>, ano: number): boolean {
+  return typeof d.dataEntrada === 'string' && d.dataEntrada >= `${ano}-01-01` && d.dataEntrada <= `${ano}-12-31`;
+}
+
+/**
+ * Junta à lista guardada as demandas que mudaram desde a última vez: troca as que já estavam,
+ * acrescenta as novas e tira as que deixaram de ser do ano (data de entrada editada).
+ */
+export function juntarMudancas(
+  guardada: readonly DemandaEstatistica[],
+  mudadas: readonly DemandaEstatistica[],
+  ano: number,
+): DemandaEstatistica[] {
+  const porId = new Map(guardada.map((d) => [d.id, d]));
+  for (const d of mudadas) {
+    if (ehDoAno(d, ano)) porId.set(d.id, d);
+    else porId.delete(d.id);
+  }
+  return [...porId.values()];
+}
+
 export type Estatisticas = {
   total: number;
   doMes: number;
@@ -25,7 +70,7 @@ export const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 
 const ORDEM_STATUS: Situacao[] = ['concluido', 'em_aberto', 'respondida', 'vence_hoje', 'cia_atrasada', 'atrasado'];
 
 /** Conta por um campo de texto, do maior para o menor (empate: ordem alfabética). Vazio vira "Não informado". */
-function contar(lista: readonly Demanda[], campo: (d: Demanda) => string): Barra[] {
+function contar(lista: readonly DemandaEstatistica[], campo: (d: DemandaEstatistica) => string): Barra[] {
   const c = new Map<string, number>();
   for (const d of lista) {
     const k = campo(d).trim() || 'Não informado';
@@ -37,9 +82,9 @@ function contar(lista: readonly Demanda[], campo: (d: Demanda) => string): Barra
 }
 
 export function montarEstatisticas(
-  demandas: readonly Demanda[],
+  demandas: readonly DemandaEstatistica[],
   hoje: string,
-  andamentoDe: (d: Demanda) => Andamento | undefined = () => undefined,
+  andamentoDe: (d: DemandaEstatistica) => Andamento | undefined = () => undefined,
 ): Estatisticas {
   const lista = demandas.filter((d) => d.status !== 'excluido');
   const mesAtual = hoje.slice(0, 7);

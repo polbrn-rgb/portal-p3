@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { demandasDoAno } from '../../data/estatisticas';
 import { hojeISO } from '../../domain/datas';
-import type { Demanda } from '../../domain/demanda';
 import { andamentoPorDemanda, type Encaminhamento } from '../../domain/encaminhamento';
-import { montarEstatisticas } from '../../domain/estatisticas';
+import { montarEstatisticas, type DemandaEstatistica } from '../../domain/estatisticas';
 import { db } from '../../lib/firebase';
 import { Barras, Colunas } from '../Graficos';
 
@@ -15,7 +14,7 @@ export function PainelEstatistico({ encs }: { encs: Encaminhamento[] }) {
   const anoAtual = Number(hoje.slice(0, 4));
   const [ano, setAno] = useState(anoAtual);
   const [recarregar, setRecarregar] = useState(0);
-  const [estado, setEstado] = useState<{ carregando: boolean; erro: string; lista: Demanda[] }>({ carregando: true, erro: '', lista: [] });
+  const [estado, setEstado] = useState<{ carregando: boolean; erro: string; lista: DemandaEstatistica[] }>({ carregando: true, erro: '', lista: [] });
 
   useEffect(() => {
     let vivo = true;

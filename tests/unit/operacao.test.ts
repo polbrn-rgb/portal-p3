@@ -73,3 +73,24 @@ describe('Checklist Operações', () => {
     expect(pastaCfpDa(demanda(1, { automacao: { cfpPasta: 'https://drive/p' } }))).toBe('https://drive/p');
   });
 });
+
+describe('campo operacaoEncerrada', () => {
+  test('migração: só as que não têm o campo, com o valor do checklist', async () => {
+    const { planoCampoOperacao } = await import('../../src/domain/operacao');
+    const plano = planoCampoOperacao(
+      [{ id: '1' }, { id: '2' }, { id: '3', operacaoEncerrada: false }, { id: '4', operacaoEncerrada: true }],
+      new Set(['2', '4']),
+    );
+    expect(plano).toEqual([
+      { id: '1', valor: false },
+      { id: '2', valor: true },
+    ]);
+  });
+
+  test('grupos de até 30 (limite do filtro "in")', async () => {
+    const { emGrupos } = await import('../../src/domain/operacao');
+    const ids = Array.from({ length: 61 }, (_, i) => String(i));
+    expect(emGrupos(ids).map((g) => g.length)).toEqual([30, 30, 1]);
+    expect(emGrupos([])).toEqual([]);
+  });
+});

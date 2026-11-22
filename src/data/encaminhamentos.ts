@@ -50,8 +50,10 @@ async function decidir(
   const lote = writeBatch(db);
   lote.update(doc(db, 'encaminhamentos', e.id), { ...mudanca, atualizadoEm: agora });
   // A demanda guarda quais Cias tiveram a resposta aceita (para a situação "Cias responderam").
+  // atualizadoEm: o Painel estatístico busca só as demandas que mudaram (o aceite muda a situação).
   lote.update(doc(db, 'demandas', e.demandaId), {
     ciasAceitas: aceita ? arrayUnion(e.unidadeId) : arrayRemove(e.unidadeId),
+    atualizadoEm: agora,
   });
   lote.set(doc(collection(db, 'demandas', e.demandaId, 'historico')), { acao, unidade: e.unidadeId, em: agora });
   await lote.commit();

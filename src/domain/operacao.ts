@@ -13,6 +13,36 @@ export function ehOperacao(d: { tipoSaida: string; categoria: string }): boolean
   return (TIPOS_SAIDA_OPERACAO as readonly string[]).includes(d.tipoSaida) && d.categoria === CATEGORIA_OPERACAO;
 }
 
+/**
+ * Campo da demanda que espelha o "concluída" do checklist. O portal busca só as operações com ele = false,
+ * em vez de ler todas as operações do ano para mostrar as poucas em andamento (economia de leituras).
+ * Toda demanda nova nasce com false; concluir/desfazer no checklist grava nos dois lugares.
+ */
+export const CAMPO_OPERACAO_ENCERRADA = 'operacaoEncerrada';
+
+/** Id do documento config/migracoes que marca que as demandas antigas já ganharam o campo. */
+export const MIGRACAO_CAMPO_OPERACAO = 'campoOperacaoEncerrada';
+
+/**
+ * Demandas de operação criadas antes do campo existir: o valor que cada uma deve receber
+ * (o "concluída" do checklist). As que já têm o campo ficam como estão.
+ */
+export function planoCampoOperacao(
+  demandas: readonly { id: string; operacaoEncerrada?: unknown }[],
+  concluidas: ReadonlySet<string>,
+): { id: string; valor: boolean }[] {
+  return demandas
+    .filter((d) => typeof d.operacaoEncerrada !== 'boolean')
+    .map((d) => ({ id: d.id, valor: concluidas.has(d.id) }));
+}
+
+/** Divide em grupos de até `tamanho` (o filtro "in" do Firestore aceita no máximo 30 valores). */
+export function emGrupos<T>(lista: readonly T[], tamanho = 30): T[][] {
+  const grupos: T[][] = [];
+  for (let i = 0; i < lista.length; i += tamanho) grupos.push(lista.slice(i, i + tamanho));
+  return grupos;
+}
+
 /** O primeiro item do checklist leva o nome do documento: "Ordem de Serviço ok" ou "Ordem de Operações ok". */
 export function rotuloDoItem(item: { id: string; rotulo: string }, tipoSaida: string): string {
   if (item.id === 'osOk' && tipoSaida === 'ORDEM DE OPERAÇÕES') return 'Ordem de Operações ok';

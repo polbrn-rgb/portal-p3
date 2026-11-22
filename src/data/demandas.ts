@@ -27,6 +27,7 @@ import {
   STATUS_PENDENTES,
   type Encaminhamento,
 } from '../domain/encaminhamento';
+import { ehOperacao } from '../domain/operacao';
 import { formatarNumeroDocumento, idContadorTipo, anoDe, ID_CONTADOR_GERAL, usaNumeracaoPorTipo } from '../domain/numeracao';
 import { UNIDADES, unidadesParaEncaminhar } from '../domain/unidades';
 import { apagarArquivo } from './arquivos';
@@ -95,6 +96,8 @@ export async function criarDemandaNumerada(
       ...arquivo,
       status: 'em_aberto',
       automacaoPendente: precisaAutomacao(dados),
+      // Toda demanda nasce com o campo: se virar operação (agora ou ao editar), já aparece no checklist.
+      operacaoEncerrada: false,
       criadoEm: serverTimestamp(),
       atualizadoEm: serverTimestamp(),
     });
@@ -182,6 +185,11 @@ export async function atualizarDemanda(
         ...mudancas,
         ...(edicaoPrecisaAutomacao(meus) ? { automacaoPendente: true } : {}),
         ...(semAceite.length ? { ciasAceitas: arrayRemove(...semAceite) } : {}),
+        // Demanda antiga (de antes do campo) que vira operação ao editar: entra no checklist como em andamento.
+        // As que já eram operação recebem o campo da migração (com o "concluída" do checklist).
+        ...(typeof (snap.data() as Partial<Demanda>).operacaoEncerrada !== 'boolean' && !ehOperacao(atual)
+          ? { operacaoEncerrada: false }
+          : {}),
         atualizadoEm: agora,
       });
       tx.set(doc(collection(ref, 'historico')), { acao: 'editada', campos: meus, em: agora });
@@ -266,6 +274,7 @@ export async function excluirDemanda(db: Firestore, id: string): Promise<void> {
     status: 'excluido',
     excluidoEm: agora,
     automacaoPendente: true,
+    operacaoEncerrada: true, // sai do Checklist Operações (a busca das operações em andamento nem lê mais)
     atualizadoEm: agora,
     ...(arquivoId ? SEM_ARQUIVO : {}),
   });
