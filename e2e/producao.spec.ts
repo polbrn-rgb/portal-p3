@@ -84,11 +84,13 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   await expect(linha.getByRole('cell').nth(k - 1)).toHaveText('30');
   await expect(total.getByRole('row', { name: /^Flagrantes anotados/ }).getByRole('cell').nth(k - 1)).toHaveText('1');
 
-  // Sala de Operações → Resultados das Cias: consulta de hoje, só daquela Cia (lê só quando a sub-aba abre).
-  await irPara(page, 'Sala de Operações');
-  const salaP3 = page.getByRole('navigation', { name: 'Sala de Operações' });
-  await expect(salaP3.getByRole('link', { name: 'Recados' })).toHaveAttribute('aria-current', 'page');
-  await salaP3.getByRole('link', { name: 'Resultados das Cias' }).click();
+  await sair(page);
+
+  // Sala de Operações do batalhão → Resultados das Cias: consulta de hoje, só daquela Cia (lê só quando a sub-aba abre).
+  await entrar(page, 'sala', SENHA_TESTE);
+  const sala = page.getByRole('navigation', { name: 'Sala de Operações' });
+  await expect(sala.getByRole('button', { name: 'Resultados das operações' })).toHaveAttribute('aria-current', 'page');
+  await sala.getByRole('button', { name: 'Resultados das Cias' }).click();
   const consulta = page.getByRole('form', { name: 'Consultar resultados' });
   await consulta.getByRole('combobox', { name: 'Unidade' }).selectOption({ label: cia.sigla });
   await consulta.getByRole('button', { name: 'Consultar' }).click();

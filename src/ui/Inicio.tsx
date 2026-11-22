@@ -11,6 +11,8 @@ const PainelP3 = sobDemanda(() => import('./p3/PainelP3'), 'PainelP3');
 const PainelUnidade = sobDemanda(() => import('./cia/PainelUnidade'), 'PainelUnidade');
 const PainelCfp = sobDemanda(() => import('./setores/PainelCfp'), 'PainelCfp');
 const PainelSala = sobDemanda(() => import('./setores/PainelSala'), 'PainelSala');
+// Baixada (e lida no banco) só quando a Sala clica na sub-aba.
+const ResultadosCias = sobDemanda(() => import('./setores/ResultadosCias'), 'ResultadosCias');
 const Agenda = sobDemanda(() => import('./p3/Agenda'), 'Agenda');
 const PaginaCgp = sobDemanda(() => import('./cia/Cgp'), 'PaginaCgp');
 const PaginaSalaCia = sobDemanda(() => import('./cia/ProducaoCia'), 'PaginaSalaCia');
@@ -30,8 +32,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
       {sessao.tipo === 'unidade' && <PainelUnidade unidade={sessao.unidade} sigla={sessao.sigla} />}
       {sessao.tipo === 'sala' && (
         <>
-          <Recados setor="sala" />
-          <PainelSala />
+          <PaginaSala comResultadosCias />
           {/* Agenda própria da Sala (a do CFP não tem; quem entra pelo login do CFP não vê esta). */}
           <Agenda rota="" dono="sala" />
         </>
@@ -66,11 +67,39 @@ function PaginasCfp() {
       {pagina === 'cfp' ? (
         <PainelCfp />
       ) : (
-        <>
-          <Recados setor="sala" />
-          <PainelSala />
-        </>
+        <PaginaSala />
       )}
+    </>
+  );
+}
+
+/**
+ * Página da Sala de Operações do batalhão: recados no alto e, para a conta da Sala, duas sub-abas.
+ * "Resultados das Cias" só lê o banco quando é escolhida (e quando a Sala clica em Consultar).
+ * Quem entra pelo CFP vê a página da Sala sem essa sub-aba (as regras não deixam o CFP ler a produção das Cias).
+ */
+function PaginaSala({ comResultadosCias = false }: { comResultadosCias?: boolean }) {
+  const [aba, setAba] = useState<'operacoes' | 'cias'>('operacoes');
+  if (!comResultadosCias) {
+    return (
+      <>
+        <Recados setor="sala" />
+        <PainelSala />
+      </>
+    );
+  }
+  return (
+    <>
+      <Recados setor="sala" />
+      <nav className="abas subabas abas-cfp-sala" aria-label="Sala de Operações">
+        <button type="button" aria-current={aba === 'operacoes' ? 'page' : undefined} onClick={() => setAba('operacoes')}>
+          Resultados das operações
+        </button>
+        <button type="button" aria-current={aba === 'cias' ? 'page' : undefined} onClick={() => setAba('cias')}>
+          Resultados das Cias
+        </button>
+      </nav>
+      {aba === 'operacoes' ? <PainelSala /> : <ResultadosCias />}
     </>
   );
 }

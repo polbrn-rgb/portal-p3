@@ -25,6 +25,11 @@ service cloud.firestore {
     }
 
     // Página da Sala de Operações: a Sala e o CFP.
+    // Só a conta da Sala de Operações do batalhão (sem o CFP).
+    function ehSalaDoBatalhao() {
+      return logado() && request.auth.token.perfil == 'sala';
+    }
+
     function veSala() {
       return logado() && (request.auth.token.perfil == 'sala' || request.auth.token.perfil == 'cfp');
     }
@@ -770,7 +775,8 @@ service cloud.firestore {
 
     match /producao/{id} {
       allow get: if ehP3() || lancaProducao(id.split('_')[0]);
-      allow list: if ehP3() || lancaProducao(resource.data.unidadeId);
+      // A Sala de Operações do batalhão (só a conta da Sala; o CFP não) consulta, só para ler: Resultados das Cias.
+      allow list: if ehP3() || ehSalaDoBatalhao() || lancaProducao(resource.data.unidadeId);
       allow create: if lancaProducao(request.resource.data.unidadeId) && producaoValida(id)
         && request.resource.data.lancadoEm == request.time;
       allow update: if lancaProducao(resource.data.unidadeId) && producaoValida(id)
