@@ -385,7 +385,7 @@ function Zerar({ db }: { db: Firestore }) {
           {situacao.comErro.length > 0 && (
             <div className="mensagem erro" role="alert">
               <p>
-                <strong>{situacao.comErro.length} demanda(s) com erro na limpeza</strong> (o motor tenta de novo a cada 5
+                <strong>{situacao.comErro.length} demanda(s) com erro na limpeza</strong> (o motor tenta de novo a cada 10
                 minutos):
               </p>
               <ul className="lista-erros">
