@@ -51,6 +51,8 @@ export type Demanda = DadosDemanda & {
   /** Preenchido pelo Apps Script da P/3 (agenda, pasta CFP). */
   automacao?: Automacao;
   automacaoPendente?: boolean;
+  /** Só operações: espelha o "concluída" do checklist (o portal busca só as com false). */
+  operacaoEncerrada?: boolean;
   /** Cias cuja resposta a P/3 aceitou (gravado pela P/3 ao aceitar). */
   ciasAceitas?: UnidadeId[];
   /** PDF que veio da pendente (SEI / Ordem Verbal); some quando a demanda é finalizada. */

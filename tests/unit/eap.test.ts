@@ -75,8 +75,8 @@ describe('EAP (Cia)', () => {
 describe('planilha atrasada', () => {
   const quando = (min: number) => ({ toDate: () => new Date(Date.UTC(2026, 10, 17, 12, 0) - min * 60_000) });
   const agora = new Date(Date.UTC(2026, 10, 17, 12, 0));
-  test('pedida há mais de 15 minutos: avisa', () => {
-    expect(planilhaAtrasada({ planilha: { status: 'pedida' }, criadoEm: quando(20) }, agora)).toBe(true);
+  test('pedida há mais de 25 minutos: avisa', () => {
+    expect(planilhaAtrasada({ planilha: { status: 'pedida' }, criadoEm: quando(30) }, agora)).toBe(true);
     expect(planilhaAtrasada({ planilha: { status: 'pedida' }, criadoEm: quando(5) }, agora)).toBe(false);
     expect(planilhaAtrasada({ planilha: { status: 'pronta' }, criadoEm: quando(60) }, agora)).toBe(false);
     expect(planilhaAtrasada({ planilha: { status: 'pedida' } }, agora)).toBe(false);
@@ -88,6 +88,6 @@ describe('planilha atrasada depois de pedir de novo', () => {
     const agora = new Date(Date.UTC(2026, 10, 17, 12, 0));
     const ha = (min: number) => ({ toDate: () => new Date(agora.getTime() - min * 60_000) });
     expect(planilhaAtrasada({ planilha: { status: 'pedida', pedidaEm: ha(2) }, criadoEm: ha(120) }, agora)).toBe(false);
-    expect(planilhaAtrasada({ planilha: { status: 'pedida', pedidaEm: ha(20) }, criadoEm: ha(120) }, agora)).toBe(true);
+    expect(planilhaAtrasada({ planilha: { status: 'pedida', pedidaEm: ha(30) }, criadoEm: ha(120) }, agora)).toBe(true);
   });
 });

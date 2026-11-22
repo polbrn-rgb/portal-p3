@@ -62,3 +62,25 @@ describe('painel estatístico', () => {
     expect(s.porStatus).toEqual([{ rotulo: 'Cia Atrasada', valor: 1 }]);
   });
 });
+
+describe('painel guardado no aparelho: juntar o que mudou', () => {
+  const d = (id: string, dataEntrada: string, status: 'em_aberto' | 'concluido' = 'em_aberto') =>
+    ({ id, numero: Number(id), dataEntrada, status, prazoCPA: '', prazoCia: '', responsavel: '', categoria: '', tipoSaida: '' }) as const;
+
+  test('troca as que mudaram, acrescenta as novas e tira as que saíram do ano', async () => {
+    const { juntarMudancas } = await import('../../src/domain/estatisticas');
+    const guardada = [d('1', '2026-01-10'), d('2', '2026-02-10'), d('3', '2026-03-10')];
+    const mudadas = [d('2', '2026-02-10', 'concluido'), d('3', '2027-01-05'), d('4', '2026-04-01'), d('5', '2025-12-31')];
+    const r = juntarMudancas(guardada, mudadas, 2026);
+    expect(r.map((x) => x.id).sort()).toEqual(['1', '2', '4']);
+    expect(r.find((x) => x.id === '2')?.status).toBe('concluido');
+  });
+
+  test('guarda só os campos que o painel usa', async () => {
+    const { resumoEstatistico } = await import('../../src/domain/estatisticas');
+    const r = resumoEstatistico({ ...d('7', '2026-05-05'), saida: 'texto longo', observacao: 'x' } as never);
+    expect(Object.keys(r)).not.toContain('saida');
+    expect(Object.keys(r)).not.toContain('observacao');
+    expect(r).toMatchObject({ id: '7', numero: 7, dataEntrada: '2026-05-05' });
+  });
+});

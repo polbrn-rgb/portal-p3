@@ -19,7 +19,7 @@ export function ListaPendentes({ pendentes }: { pendentes: AoVivo<Pendente[]> })
     setAviso(
       cutucarMotor()
         ? 'Busca pedida. Os e-mails encaminhados aparecem aqui em até 1 minuto.'
-        : 'Não foi possível pedir a busca agora. Ela roda sozinha a cada 5 minutos.',
+        : 'Não foi possível pedir a busca agora. Ela roda sozinha a cada 10 minutos.',
     );
   }
 

@@ -163,7 +163,7 @@ function LancarResultado({ operacao, dia }: { operacao: OperacaoComPlanilha; dia
           {r.gravado
             ? `Gravado na planilha (dia ${formatarData(dia)}).`
             : r.erro
-              ? `Salvo, mas a planilha recusou: ${r.erro}. O sistema tenta de novo a cada 5 minutos.`
+              ? `Salvo, mas a planilha recusou: ${r.erro}. O sistema tenta de novo a cada 10 minutos.`
               : 'Salvo. Gravando na planilha…'}
         </p>
       )}

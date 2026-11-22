@@ -2,10 +2,15 @@ import {
   collection,
   collectionGroup,
   doc,
+  getCountFromServer,
   getDocs,
+  limit,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
   type DocumentReference,
   type Firestore,
@@ -73,30 +78,68 @@ export type SituacaoZeragem = {
   ultimaAtividade: string;
 };
 
-/** Quantas demandas ainda esperam o motor limpar agenda/pasta, em tempo real. */
+/**
+ * Quantas demandas ainda esperam o motor limpar agenda/pasta, em tempo real.
+ * Ao vivo só ficam as que esperam o motor e a última que ele mexeu; os totais são contagens feitas no
+ * servidor (1 leitura a cada mil demandas), refeitas quando algo muda. Antes a tela lia o banco inteiro.
+ */
 export function observarZeragem(
   db: Firestore,
   aoMudar: (situacao: SituacaoZeragem) => void,
   aoFalhar: (erro: Error) => void,
 ): () => void {
-  return onSnapshot(
-    collection(db, 'demandas'),
+  const demandas = collection(db, 'demandas');
+  let esperando: Record<string, any>[] | null = null;
+  let ultimaAtividade: string | null = null;
+  let parado = false;
+  let rodada = 0;
+
+  const recontar = async () => {
+    if (esperando === null || ultimaAtividade === null) return;
+    const minha = ++rodada;
+    const [total, zeradas, novas] = await Promise.all([
+      getCountFromServer(demandas),
+      getCountFromServer(query(demandas, where('zerada', '==', true))),
+      getCountFromServer(query(demandas, where('status', '!=', 'excluido'))),
+    ]);
+    // Só vale a contagem mais recente (duas mudanças seguidas podem responder fora de ordem).
+    if (parado || minha !== rodada) return;
+    aoMudar({
+      comErro: esperando
+        .filter((d) => d.automacao?.erro)
+        .map((d) => ({ id: d.id, numero: Number(d.numero), erro: String(d.automacao.erro) })),
+      ultimaAtividade,
+      total: total.data().count,
+      zeradas: zeradas.data().count,
+      aguardandoMotor: esperando.length,
+      novas: novas.data().count,
+    });
+  };
+  const mudou = () => recontar().catch((e: Error) => !parado && aoFalhar(e));
+
+  const pararEsperando = onSnapshot(
+    query(demandas, where('automacaoPendente', '==', true)),
     (s) => {
-      const lista = s.docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, any>);
-      const zeradas = lista.filter((d) => d.zerada === true);
-      aoMudar({
-        comErro: lista
-          .filter((d) => d.automacaoPendente === true && d.automacao?.erro)
-          .map((d) => ({ id: d.id, numero: Number(d.numero), erro: String(d.automacao.erro) })),
-        ultimaAtividade: zeradas.reduce((m, d) => (String(d.automacao?.processadoEm ?? '') > m ? String(d.automacao.processadoEm) : m), ''),
-        total: lista.length,
-        zeradas: lista.filter((d) => d.zerada === true).length,
-        aguardandoMotor: lista.filter((d) => d.automacaoPendente === true).length,
-        novas: lista.filter((d) => d.status !== 'excluido').length,
-      });
+      esperando = s.docs.map((d) => ({ ...d.data(), id: d.id }));
+      mudou();
     },
     aoFalhar,
   );
+  // Na zeragem todas as demandas estão zeradas: a última que o motor mexeu é a última atividade da limpeza.
+  const pararUltima = onSnapshot(
+    query(demandas, orderBy('automacao.processadoEm', 'desc'), limit(1)),
+    (s) => {
+      const d = s.docs[0]?.data();
+      ultimaAtividade = d?.zerada === true ? String(d.automacao?.processadoEm ?? '') : '';
+      mudou();
+    },
+    aoFalhar,
+  );
+  return () => {
+    parado = true;
+    pararEsperando();
+    pararUltima();
+  };
 }
 
 /**

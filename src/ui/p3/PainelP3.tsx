@@ -6,7 +6,7 @@ import { garantirCopiaAutomatica } from '../../data/banco';
 import { mesDaCopiaAutomatica } from '../../domain/banco';
 import { hojeISO } from '../../domain/datas';
 import { cutucarMotor } from '../../lib/motor';
-import { observarOperacoes } from '../../data/operacoes';
+import { observarOperacoes, prepararCampoOperacao } from '../../data/operacoes';
 import { observarPendentes } from '../../data/pendentes';
 import type { Operacao } from '../../domain/operacao';
 import type { Pendente } from '../../domain/pendente';
@@ -106,6 +106,12 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
         cutucarMotor();
       })
       .catch((e) => console.error('Cópia automática do banco de dados:', e));
+  }, []);
+  // Uma vez só: as operações antigas ganham o campo que o menu usa para ler só as em andamento.
+  useEffect(() => {
+    prepararCampoOperacao(db)
+      .then((n) => n && console.info(`Portal P3: ${n} operação(ões) antiga(s) preparada(s) para o checklist.`))
+      .catch((e) => console.error('Preparar operações antigas:', e));
   }, []);
   // Fotos encaminhadas pelas Cias: só a contagem (uma leitura), conferida a cada troca de tela.
   const [fotos, setFotos] = useState<number | undefined>();

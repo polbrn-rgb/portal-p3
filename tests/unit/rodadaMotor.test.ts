@@ -84,10 +84,10 @@ describe('rodada do motor', () => {
     expect(m.chamadas).toContain('sincronizarControleOperacoes_');
   });
 
-  test('gatilho seguinte, sem nada novo: não relê agenda do CFP nem aba Operações antes de 15 minutos', () => {
+  test('gatilho seguinte, sem nada novo: não relê agenda do CFP nem aba Operações na rodada seguinte, só na outra (~20 min)', () => {
     m.ctx.processarPendentes();
     m.limpar();
-    m.agora.valor += 5 * MIN;
+    m.agora.valor += 10 * MIN;
     m.ctx.processarPendentes();
     expect(m.chamadas).toContain('importarEmails_');
     expect(m.chamadas).not.toContain('sincronizarAgendaCfp_');

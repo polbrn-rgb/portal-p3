@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, setDoc, type Firestore } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import {
   alterarStatus,
@@ -179,17 +179,29 @@ describe('excluirDemanda', () => {
 });
 
 describe('Painel estatístico: demandas do ano', () => {
-  test('pega só as do ano pela data de entrada, sem as excluídas, e guarda por 10 minutos', async () => {
+  test('pega só as do ano pela data de entrada, sem as excluídas; reabrindo, busca só o que mudou', async () => {
     const { demandasDoAno } = await import('../../src/data/estatisticas');
-    await criarDemanda(db, { ...dados('Do ano'), dataEntrada: '2026-03-10' });
-    await criarDemanda(db, { ...dados('Fim do ano'), dataEntrada: '2026-12-31' });
+    const numeros = (l: { numero: number }[]) => l.map((d) => d.numero).sort((a, b) => a - b);
+    const doAno = await criarDemanda(db, { ...dados('Do ano'), dataEntrada: '2026-03-10' });
+    const fim = await criarDemanda(db, { ...dados('Fim do ano'), dataEntrada: '2026-12-31' });
     await criarDemanda(db, { ...dados('Ano que vem'), dataEntrada: '2027-01-01' });
     const excluida = await criarDemanda(db, { ...dados('Excluída'), dataEntrada: '2026-05-05' });
     await excluirDemanda(db, String(excluida));
 
-    expect((await demandasDoAno(db, 2026, true)).map((d) => d.saida).sort()).toEqual(['Do ano', 'Fim do ano']);
-    await criarDemanda(db, { ...dados('Nova'), dataEntrada: '2026-04-01' });
-    expect(await demandasDoAno(db, 2026)).toHaveLength(2); // guardado
-    expect(await demandasDoAno(db, 2026, true)).toHaveLength(3); // Atualizar
+    expect(numeros(await demandasDoAno(db, 2026, true))).toEqual([doAno, fim]);
+    // Nova demanda: entra sem precisar do "Atualizar".
+    const nova = await criarDemanda(db, { ...dados('Nova'), dataEntrada: '2026-04-01' });
+    expect(numeros(await demandasDoAno(db, 2026))).toEqual([doAno, fim, nova].sort((a, b) => a - b));
+    // Data de entrada editada para outro ano: sai do ano.
+    const d = (await obterDemanda(db, String(fim)))!;
+    await atualizarDemanda(db, d.id, dadosDe(d), { ...dadosDe(d), dataEntrada: '2027-02-01' });
+    expect(numeros(await demandasDoAno(db, 2026))).toEqual([doAno, nova].sort((a, b) => a - b));
+    // Concluída: a situação muda no painel.
+    await alterarStatus(db, String(nova), 'concluido');
+    expect((await demandasDoAno(db, 2026)).find((x) => x.numero === nova)?.status).toBe('concluido');
+    // Apagada direto no banco (ex.: zeragem): a contagem não bate e o painel lê tudo de novo.
+    await env.withSecurityRulesDisabled((c) => deleteDoc(doc(c.firestore() as unknown as Firestore, 'demandas', String(doAno))));
+    expect(numeros(await demandasDoAno(db, 2026))).toEqual([nova]);
+    expect(numeros(await demandasDoAno(db, 2026, true))).toEqual([nova]); // Atualizar
   });
 });

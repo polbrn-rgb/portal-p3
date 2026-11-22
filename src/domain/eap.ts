@@ -46,10 +46,10 @@ export type Eap = DadosEap & {
   criadoEm?: { toDate: () => Date } | null;
 };
 
-/** A cópia da planilha sai em até 5 minutos; passou de 15 (desde o último pedido), o motor provavelmente está com problema. */
+/** A cópia da planilha sai em até 10 minutos; passou de 25 (desde o último pedido), o motor provavelmente está com problema. */
 export function planilhaAtrasada(e: Pick<Eap, 'planilha' | 'criadoEm'>, agora: Date): boolean {
   const criado = (e.planilha?.pedidaEm ?? e.criadoEm)?.toDate?.();
-  return e.planilha?.status === 'pedida' && Boolean(criado) && agora.getTime() - criado!.getTime() > 15 * 60 * 1000;
+  return e.planilha?.status === 'pedida' && Boolean(criado) && agora.getTime() - criado!.getTime() > 25 * 60 * 1000;
 }
 
 export type PolicialEap = {

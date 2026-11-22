@@ -201,7 +201,7 @@ export function RacBatalhao({ m, racs }: { m: RacMes; racs: RacSalvo[] }) {
       )}
       {arq?.status === 'pedido' && (
         <p className="mensagem aviso-rac" role="status">
-          ⏳ Arquivando {arq.nome} no Drive… o motor leva até 5 minutos.
+          ⏳ Arquivando {arq.nome} no Drive… o motor leva até 10 minutos.
         </p>
       )}
       {arq?.status === 'erro' && (

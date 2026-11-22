@@ -1,7 +1,7 @@
 # Motor da agenda e da pasta CFP (Apps Script)
 
 Roda na conta **8bpmmp3@gmail.com**, separado da planilha do numerador (não mexe nos scripts que já existem).
-A cada 5 minutos ele cria/move os eventos de Prazo CPA e Prazo Cia, e para o CFP cria a pasta, o evento
+A cada 10 minutos ele cria/move os eventos de Prazo CPA e Prazo Cia, e para o CFP cria a pasta, o evento
 na agenda do CFP e a linha na aba Operações.
 
 ## Instalação (uma vez)
@@ -21,7 +21,7 @@ na agenda do CFP e a linha na aba Operações.
 5. No editor, escolha a função **instalarAutomacao** e clique em **Executar**. Autorize o acesso
    (Agenda, Drive, Planilhas). No **Registro de execução** deve aparecer `Conexão OK`.
 
-6. **Para agendar na hora (sem esperar 5 minutos):** **Implantar → Nova implantação →** engrenagem →
+6. **Para agendar na hora (sem esperar 10 minutos):** **Implantar → Nova implantação →** engrenagem →
    **App da Web**. Descrição: `Portal P3`; **Executar como: Eu**; **Quem pode acessar: Qualquer pessoa** →
    **Implantar**. Copie a **URL do app da Web** (termina em `/exec`) e mande para colocar no portal.
    O endereço só faz o motor rodar: não recebe nem devolve nenhum dado.
@@ -29,11 +29,11 @@ na agenda do CFP e a linha na aba Operações.
 > Sempre que trocar o código do `Motor.gs` ou `Logica.gs`: **Implantar → Gerenciar implantações →** lápis →
 > Versão: **Nova versão** → **Implantar** (a URL continua a mesma).
 
-Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 5 minutos.
+Pronto: o portal chama o motor ao salvar, e de reserva ele roda sozinho a cada 10 minutos.
 Várias gravações seguidas viram uma rodada só. A agenda do CFP e a aba Operações (que podem mudar fora do
-portal) são relidas quando o portal pede, quando alguma demanda mexeu nelas, ou a cada 15 minutos.
+portal) são relidas quando o portal pede, quando alguma demanda mexeu nelas, ou a cada ~20 minutos (de 2 em 2 rodadas).
 A URL aceita no máximo 120 rodadas por hora e 30 pedidos de "Esqueci a senha" por hora; acima disso fica valendo
-só o gatilho de 5 minutos.
+só o gatilho de 10 minutos.
 
 **Cota do Google:** conta Gmail comum tem cerca de 90 minutos por dia de execução por gatilho. Rode
 **diagnostico** para ver a linha **Tempo do motor hoje** (minutos usados, nº de rodadas e as etapas mais lentas da
@@ -73,7 +73,7 @@ Depois de colar esta versão, rode **instalarAutomacao** de novo (ele cria o gat
 ## Página do CFP = agenda do CFP
 
 A página **Missões do CFP** do portal mostra o que está na **agenda do CFP** (`AGENDA_CFP`), e não o histórico
-das demandas. A cada rodada (a cada 5 minutos, ou na hora pelo botão **Atualizar agora**) o motor lê os eventos
+das demandas. A cada rodada (a cada 10 minutos, ou na hora pelo botão **Atualizar agora**) o motor lê os eventos
 de 60 dias atrás até 1 ano à frente (`AGENDA_CFP_DIAS_ANTES` / `AGENDA_CFP_DIAS_DEPOIS`) e grava no portal.
 
 - Evento criado, mudado de data ou apagado **direto na agenda** aparece igual no portal.
@@ -177,7 +177,7 @@ O `.clasprc.json` dá acesso à conta: nunca coloque no repositório, só no seg
   Cap = Chefe Seção Operacional, Sgt = Encarregado, Cb/Sd = Auxiliar de operações). A do Capitão vai em todos os
   e-mails; a de quem envia, em "Transmitido por".
 - Na tela do EAP, **✉️ Montar e-mail** → confere a prévia → **Enviar e-mail**. O portal lança a MSG ELETRÔNICA no
-  Numerador (dá o nº), e o motor envia pelo Gmail da P/3 em até 5 minutos, com as assinaturas no corpo e os anexos
+  Numerador (dá o nº), e o motor envia pelo Gmail da P/3 em até 10 minutos, com as assinaturas no corpo e os anexos
   (planilha do EAP em Excel e/ou PDF). Enviado: a demanda fica finalizada e o PDF sai do banco.
 - Erro no envio aparece na tela com **Tentar de novo** (mesmo nº, não lança outra demanda).
 - Depois de colar o `Motor.gs` novo, faça **Nova versão** da implantação (veja acima).
@@ -215,3 +215,13 @@ partes para o banco. Na rodada seguinte o motor monta o arquivo e cria na pasta 
 arquivo e os prints daquele mês. Os números do RAC ficam no portal.
 
 A pasta tem de ser da conta **8bpmmp3@gmail.com** (ou compartilhada com ela como editora).
+
+## Atualização: gatilho de 10 minutos (novembro/2026)
+
+O gatilho de reserva passou de 5 para **10 minutos**, para gastar metade da cota diária de 90 minutos da conta Gmail.
+Quem salva pelo portal continua sendo atendido na hora (o portal chama a URL do app da Web); os 10 minutos só valem
+quando essa chamada falha ou para o que muda fora do portal (e-mails do funcional, agenda do CFP, aba Operações).
+
+**Depois de publicar esta versão, rode `instalarAutomacao` uma vez pelo editor.** A publicação pelo GitHub troca o
+código, mas não troca o gatilho: sem esse passo ele continua rodando a cada 5 minutos. Confira em **Acionadores**
+(ícone de relógio) que `processarPendentes` aparece como "A cada 10 minutos", ou rode **diagnostico**.
