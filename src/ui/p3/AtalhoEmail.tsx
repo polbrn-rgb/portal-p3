@@ -36,7 +36,7 @@ type Props = {
 
 /**
  * Atalho de e-mail: monta a mensagem eletrônica no padrão da P/3, mostra a prévia e envia pelo Gmail da P/3
- * (o motor manda em até 5 minutos). Ao enviar, lança a MSG ELETRÔNICA no Numerador, que dá o número.
+ * (o motor manda em até 10 minutos). Ao enviar, lança a MSG ELETRÔNICA no Numerador, que dá o número.
  */
 export function AtalhoEmail({ atalho, refId, inicial, demanda, planilha }: Props) {
   const listas = useListas();
@@ -266,7 +266,7 @@ function situacao(e: EmailEnviado): string {
     return quando ? `Enviado em ${quando.toLocaleDateString('pt-BR')} às ${quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Enviado';
   }
   if (e.status === 'erro') return `Erro: ${e.erro || 'desconhecido'}`;
-  return 'Na fila (sai em até 5 minutos)…';
+  return 'Na fila (sai em até 10 minutos)…';
 }
 
 function HistoricoEmails({ lista }: { lista: EmailEnviado[] }) {

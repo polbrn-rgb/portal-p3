@@ -43,10 +43,10 @@ export function StatusAutomacao({ demandaId }: { demandaId: string }) {
           Abrir pasta CFP
         </a>
       )}
-      {d.automacaoPendente && !a.erro && <p className="item-info">O Apps Script da P/3 atualiza a agenda em até 5 minutos.</p>}
+      {d.automacaoPendente && !a.erro && <p className="item-info">O Apps Script da P/3 atualiza a agenda em até 10 minutos.</p>}
       {a.erro && (
         <p className="mensagem erro" role="alert">
-          Falha na agenda/pasta: {a.erro}. O Apps Script tenta de novo a cada 5 minutos.
+          Falha na agenda/pasta: {a.erro}. O Apps Script tenta de novo a cada 10 minutos.
         </p>
       )}
     </fieldset>

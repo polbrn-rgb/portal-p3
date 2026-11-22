@@ -309,7 +309,7 @@ function DetalheEap({ eap }: { eap: Eap }) {
                 <strong>diagnostico</strong> e confira a linha “Arquivos do script”.
               </p>
             ) : (
-              <p className="mensagem aviso">Criando a cópia da planilha na pasta do Drive (até 5 minutos)…</p>
+              <p className="mensagem aviso">Criando a cópia da planilha na pasta do Drive (até 10 minutos)…</p>
             )}
             <BotaoTentarPlanilha id={eap.id} />
           </>

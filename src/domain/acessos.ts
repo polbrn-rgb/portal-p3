@@ -133,7 +133,7 @@ export function rotuloAcesso(a: Pick<Acesso, 'perfil' | 'unidade' | 'admin'>): s
 export function situacaoAcesso(a: Acesso): { texto: string; classe: string } {
   if (a.excluir) return { texto: 'Excluindo…', classe: 'selo-em_aberto' };
   if (a.status === 'erro') return { texto: `Erro: ${a.erro || 'desconhecido'}`, classe: 'selo-atrasado' };
-  if (a.sincronizar || a.status === 'pendente') return { texto: 'Criando/atualizando (até 5 min)…', classe: 'selo-em_aberto' };
+  if (a.sincronizar || a.status === 'pendente') return { texto: 'Criando/atualizando (até 10 min)…', classe: 'selo-em_aberto' };
   if (!a.ativo) return { texto: 'Bloqueado', classe: 'selo-atrasado' };
   return { texto: 'Ativo', classe: 'selo-concluido' };
 }

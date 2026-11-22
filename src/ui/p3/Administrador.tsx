@@ -367,7 +367,7 @@ function Zerar({ db }: { db: Firestore }) {
           <p>
             <strong>Etapa 1 de 2 feita.</strong>{' '}
             {situacao.aguardandoMotor > 0
-              ? `O motor está limpando agenda e pastas: faltam ${situacao.aguardandoMotor} de ${situacao.total} demanda(s). Ele roda a cada 5 minutos; pode deixar esta tela aberta.`
+              ? `O motor está limpando agenda e pastas: faltam ${situacao.aguardandoMotor} de ${situacao.total} demanda(s). Ele roda a cada 10 minutos; pode deixar esta tela aberta.`
               : 'O motor já limpou agenda e pastas. Falta apagar as demandas e definir o número inicial.'}
           </p>
           {situacao.aguardandoMotor > 0 && (

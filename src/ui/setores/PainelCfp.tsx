@@ -53,7 +53,7 @@ export function MissoesCfp() {
       </div>
       <p className="item-info">
         Direto da agenda do CFP
-        {agenda?.conferidoEm ? ` · conferida em ${horaDe(agenda.conferidoEm)}` : ''}. O que mudar na agenda aparece aqui em até 15 minutos.
+        {agenda?.conferidoEm ? ` · conferida em ${horaDe(agenda.conferidoEm)}` : ''}. O que mudar na agenda aparece aqui em até 20 minutos.
       </p>
       <div className="acoes-linha">
         <label className="campo">

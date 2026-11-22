@@ -235,7 +235,7 @@ function FormAcesso({ db, existente, aoTerminar }: { db: Firestore; existente: A
               {novo ? 'Limpar' : 'Cancelar'}
             </button>
           </div>
-          {novo && <p className="pendente-detalhe">Ao cadastrar, o policial recebe no e-mail funcional o link para criar a senha (em até 5 minutos).</p>}
+          {novo && <p className="pendente-detalhe">Ao cadastrar, o policial recebe no e-mail funcional o link para criar a senha (em até 10 minutos).</p>}
         </>
       )}
     </form>

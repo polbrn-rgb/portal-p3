@@ -1,7 +1,7 @@
 /**
  * MOTOR DO PORTAL P3 (Apps Script na conta 8bpmmp3@gmail.com)
  *
- * Roda na hora em que o portal salva (app da web) e, de reserva, a cada 5 minutos.
+ * Roda na hora em que o portal salva (app da web) e, de reserva, a cada 10 minutos.
  * Procura demandas marcadas com "automacaoPendente" no Firestore e:
  *  - Prazo CPA / Prazo Cia -> evento de dia inteiro na agenda principal (como o painel do numerador);
  *  - Adicionar e gerar pasta CFP -> pasta (com P3 e CFP), evento na agenda do CFP com o link da pasta
@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-27';
+var VERSAO_MOTOR = '2026-11-28';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -54,12 +54,12 @@ var CONFIG_P3 = {
   PASTA_BANCO: ''
 };
 
-/** Rode UMA vez pelo editor: liga o motor a cada 5 minutos. */
+/** Rode UMA vez pelo editor: liga o motor a cada 10 minutos. */
 function instalarAutomacao() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'processarPendentes') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('processarPendentes').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('processarPendentes').timeBased().everyMinutes(10).create();
   // O resumo diário por e-mail foi retirado: apaga o gatilho antigo, se ainda existir.
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'enviarResumoDiario' || t.getHandlerFunction() === 'sincronizarEfetivo') ScriptApp.deleteTrigger(t);
@@ -103,7 +103,7 @@ function diagnostico() {
     if (!ss.getSheetByName(CONFIG_P3.ABA_OPERACOES)) throw new Error('aba Operações não encontrada em ' + ss.getName());
     return ss.getName();
   });
-  ok('Gatilho de 5 minutos', function () {
+  ok('Gatilho de 10 minutos', function () {
     var n = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'processarPendentes'; }).length;
     if (!n) throw new Error('não instalado: rode instalarAutomacao');
     return 'instalado';
@@ -217,7 +217,7 @@ function limparExcluidas() {
   Logger.log(excluidas.length + ' demanda(s) excluída(s); ' + limpas + ' tinham algo para limpar. Página do CFP atualizada.');
 }
 
-/** Gatilho de reserva (a cada 5 min): se outra rodada estiver trabalhando, deixa para ela. */
+/** Gatilho de reserva (a cada 10 min): se outra rodada estiver trabalhando, deixa para ela. */
 function processarPendentes() {
   rodarMotor_(1000, { origem: 'gatilho' });
 }
@@ -247,13 +247,14 @@ function doGet(e) {
   return doPost(e);
 }
 
-// Agenda do CFP e aba Operações podem mudar fora do portal: o gatilho de 5 minutos só as relê a cada 15.
-var INTERVALO_VARREDURA_MS = 15 * 60 * 1000;
-// Rodadas pedidas pelo portal por hora (proteção da cota do Google; acima disso fica só o gatilho de 5 minutos).
+// Agenda do CFP e aba Operações podem mudar fora do portal: o gatilho de 10 minutos só as relê a cada 2 rodadas
+// (19 min e não 20, porque o Google não dispara o gatilho no segundo exato).
+var INTERVALO_VARREDURA_MS = 19 * 60 * 1000;
+// Rodadas pedidas pelo portal por hora (proteção da cota do Google; acima disso fica só o gatilho de 10 minutos).
 var LIMITE_CUTUCADAS_HORA = 120;
 
 /**
- * Uma rodada do motor. opcoes.origem: 'gatilho' (5 minutos) ou 'portal' (cutucada ao salvar).
+ * Uma rodada do motor. opcoes.origem: 'gatilho' (10 minutos) ou 'portal' (cutucada ao salvar).
  * opcoes.pedidoEm: hora da cutucada; se outra rodada começou depois dela, essa já viu o que foi salvo.
  */
 function rodarMotor_(esperaMs, opcoes) {
@@ -301,7 +302,7 @@ function rodarMotor_(esperaMs, opcoes) {
       gravarResultados_();
     });
     // Leituras grandes (agenda do CFP de 14 meses e aba Operações inteira): quando o portal pede, quando
-    // alguma demanda mexeu nelas ou a cada 15 minutos.
+    // alguma demanda mexeu nelas ou a cada ~20 minutos.
     var ultimaVarredura = Number(props.getProperty('VARREDURA_EM')) || 0;
     if (opcoes.origem === 'portal' || processadas > 0 || comeco - ultimaVarredura >= INTERVALO_VARREDURA_MS) {
       etapa('Agenda do CFP', function () { sincronizarAgendaCfp_(false); });
@@ -497,7 +498,7 @@ function processarDemanda_(doc) {
 
   feito.erro = erros.join(' | ');
   feito.processadoEm = new Date().toISOString();
-  // Com erro, continua pendente: o gatilho tenta de novo a cada 5 minutos até dar certo.
+  // Com erro, continua pendente: o gatilho tenta de novo a cada 10 minutos até dar certo.
   gravarResultado_(doc, feito, erros.length > 0);
 }
 
@@ -892,7 +893,7 @@ var MEIA_HORA_MS = 30 * 60 * 1000;
 
 /**
  * Lê a agenda do CFP e grava os eventos em agendaCfp/eventos (a página do CFP mostra só isso).
- * Evento criado, mudado ou apagado direto na agenda aparece no portal na próxima rodada (até 5 min).
+ * Evento criado, mudado ou apagado direto na agenda aparece no portal na próxima rodada (até 10 min).
  * Para não gastar gravações, só grava se a agenda mudou (ou a cada meia hora, para o "conferido às").
  */
 function sincronizarAgendaCfp_(forcar) {

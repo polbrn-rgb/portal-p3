@@ -199,7 +199,7 @@ function CartaoOperacao({ operacao, aoConcluir }: { operacao: Operacao; aoConclu
 
             {item.id === 'resultadoOk' && planilha && (
               <div className="detalhe-item">
-                {planilha.status === 'pedida' && <span>Gerando a planilha na pasta do CFP… (até 5 minutos)</span>}
+                {planilha.status === 'pedida' && <span>Gerando a planilha na pasta do CFP… (até 10 minutos)</span>}
                 {planilha.status === 'erro' && (
                   <span className="erro-campo">
                     Não foi possível gerar: {planilha.erro}{' '}

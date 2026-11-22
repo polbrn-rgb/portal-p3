@@ -208,7 +208,7 @@ export function ResponderEap({ r }: { r: RespostaEap }) {
         /* sem armazenamento: segue */
       }
       await enviarRespostaEap(db, r.id, blocos, nome);
-      setAviso('Enviado à P/3. O efetivo vai para a aba da sua Cia na planilha em até 5 minutos.');
+      setAviso('Enviado à P/3. O efetivo vai para a aba da sua Cia na planilha em até 10 minutos.');
     } catch {
       setAviso('Não foi possível enviar. Verifique a conexão e tente de novo.');
     } finally {
