@@ -519,13 +519,16 @@ service cloud.firestore {
         && d.tipoSaida is string && d.tipoSaida.size() > 0
         && d.dataEntrada is string && d.dataEntrada.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && d.prazo is string && d.observacao is string && d.observacao.size() <= 5000
+        && d.get('quemOrdenou', '') is string && d.get('quemOrdenou', '').size() <= 120
         && d.status in ['em_aberto', 'concluida'];
     }
 
     match /demandasCia/{demandaId} {
       allow read, delete: if ehDaCia(resource.data.unidadeId);
       // O número tem que ser o que o contador da Cia acabou de dar (na mesma gravação).
+      // Ordem Verbal: quem deu a ordem é obrigatório (as antigas, sem o campo, continuam podendo ser concluídas).
       allow create: if ehDaCia(request.resource.data.unidadeId) && demandaCiaValida()
+        && (request.resource.data.origem != 'Ordem Verbal' || request.resource.data.get('quemOrdenou', '').size() > 0)
         && request.resource.data.status == 'em_aberto'
         && request.resource.data.contadorId.split('_')[0] == request.resource.data.unidadeId
         && demandaId == request.resource.data.contadorId + '_' + string(request.resource.data.sequencia)
@@ -534,7 +537,7 @@ service cloud.firestore {
       // O número, o tipo, a Cia e a data de entrada não mudam.
       allow update: if ehDaCia(resource.data.unidadeId) && demandaCiaValida()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['saida', 'origem', 'numeroOrigem', 'prazo', 'responsavel', 'observacao', 'status', 'agendaId', 'atualizadoPor', 'atualizadoEm']);
+          .hasOnly(['saida', 'origem', 'numeroOrigem', 'quemOrdenou', 'prazo', 'responsavel', 'observacao', 'status', 'agendaId', 'atualizadoPor', 'atualizadoEm']);
     }
 
     // CGP de cada Cia/FT: a Cia administra; o CGP (acesso por RE, perfil 'cgp' + unidade) entra só na página dele.
@@ -562,7 +565,7 @@ service cloud.firestore {
     }
 
     // Ordem de serviço da missão (mesmo id da missão): PDF em partes (cabeçalho por último) ou link do Google Drive.
-    // Só a Cia anexa, troca (apaga e cria de novo) e tira; a Cia e o CGP dela leem. O motor apaga 7 dias depois do fim.
+    // Só a Cia anexa, troca (apaga e cria de novo) e tira; a Cia e o CGP dela leem. O motor apaga 1 dia depois do fim.
     function ordemCgpValida(id) {
       let o = request.resource.data;
       let missao = /databases/$(database)/documents/cgpMissoes/$(id);

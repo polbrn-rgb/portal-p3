@@ -76,4 +76,33 @@ describe('numerador das Cias', () => {
     await excluirDemandaCia(cia1, d);
     expect((await getDocs(query(collection(cia1, COLECAO_AGENDA_SETORES), where('dono', '==', '1cia')))).size).toBe(0);
   });
+
+  test('Ordem Verbal: o banco recusa sem quem deu a ordem; a antiga sem o campo ainda conclui', async () => {
+    await expect(criarDemandaCia(cia2, '2cia', dados({ origem: 'Ordem Verbal' }), '2ª CIA')).rejects.toThrow(/quem deu a ordem/);
+    // Mesmo pulando a tela: sem o campo, o banco não aceita; com ele, a mesma gravação passa.
+    const { writeBatch } = await import('firebase/firestore');
+    const gravar = (quemOrdenou: string) => {
+      const lote = writeBatch(cia2);
+      lote.set(doc(cia2, 'contadoresCia', '2cia_2027_OFICIO'), { ultimo: 1, unidadeId: '2cia' });
+      lote.set(doc(cia2, COLECAO_DEMANDAS_CIA, '2cia_2027_OFICIO_1'), {
+        ...dados({ origem: 'Ordem Verbal', quemOrdenou }), unidadeId: '2cia', contadorId: '2cia_2027_OFICIO', ano: 2027, sequencia: 1,
+        numeroDocumento: 'OFÍCIO 8BPMM-001/203/27', status: 'em_aberto', agendaId: '', criadoPor: '2ª CIA',
+      });
+      return lote.commit();
+    };
+    await assertFails(gravar(''));
+    await assertSucceeds(gravar('Maj PM Beltrano'));
+    expect((await ler(cia2, '2cia_2027_OFICIO_1')).quemOrdenou).toBe('Maj PM Beltrano');
+
+    // Demanda gravada antes do campo existir (sem quemOrdenou): continua podendo ser concluída.
+    const { quemOrdenou: _semCampo, ...vazia } = demandaCiaVazia('2027-02-01');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), COLECAO_DEMANDAS_CIA, 'antiga'), {
+        ...vazia, saida: 'Antiga', origem: 'Ordem Verbal', unidadeId: '2cia',
+        contadorId: '2cia_2027_OFICIO', ano: 2027, sequencia: 99, numeroDocumento: 'x', status: 'em_aberto', agendaId: '', criadoPor: '2ª CIA',
+      });
+    });
+    const antiga = await ler(cia2, 'antiga');
+    await assertSucceeds(alterarStatusDemandaCia(cia2, antiga, 'concluida', '2ª CIA'));
+  });
 });

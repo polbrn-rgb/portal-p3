@@ -18,6 +18,7 @@ import {
   formatarNumeroCia,
   idContadorCia,
   normalizarDemandaCia,
+  textoOrdemVerbal,
   tituloDoPrazo,
   validarDemandaCia,
   type DadosDemandaCia,
@@ -47,7 +48,10 @@ function gravarEventoDoPrazo(
   const base = normalizarCompromisso({
     ...compromissoVazio(p.dados.prazo),
     titulo: `${concluida ? '✔ ' : ''}${tituloDoPrazo(p.numeroDocumento, p.dados.saida)}`.slice(0, 200),
-    descricao: [p.dados.responsavel && `Responsável: ${p.dados.responsavel}`, p.dados.observacao].filter(Boolean).join('\n').slice(0, 5000),
+    descricao: [p.dados.responsavel && `Responsável: ${p.dados.responsavel}`, textoOrdemVerbal(p.dados), p.dados.observacao]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 5000),
     cor: concluida ? 'verde' : 'laranja',
   });
   tx.set(doc(db, COLECAO_AGENDA_SETORES, idAgendaDe(p.demandaId)), {
@@ -146,7 +150,14 @@ export function observarDemandasCia(
 ): () => void {
   return onSnapshot(
     query(collection(db, COLECAO_DEMANDAS_CIA), where('unidadeId', '==', unidade)),
-    (s) => aoMudar(s.docs.map((x) => ({ ...(x.data() as Omit<DemandaCia, 'id'>), id: x.id }))),
+    // quemOrdenou: as demandas de antes do campo não têm.
+    (s) =>
+      aoMudar(
+        s.docs.map((x) => {
+          const d = x.data() as Omit<DemandaCia, 'id'>;
+          return { ...d, quemOrdenou: d.quemOrdenou ?? '', id: x.id };
+        }),
+      ),
     aoFalhar,
   );
 }

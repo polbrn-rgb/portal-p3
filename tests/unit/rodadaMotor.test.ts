@@ -208,10 +208,10 @@ describe('fotos com mais de 15 dias', () => {
 });
 
 describe('ordens de serviço do CGP vencidas', () => {
-  test('apaga as partes e o cabeçalho das missões que acabaram há mais de 7 dias; uma vez por dia', () => {
+  test('apaga as partes e o cabeçalho das missões que acabaram antes de hoje; uma vez por dia', () => {
     const r = montar();
     runInNewContext(readFileSync('apps-script/Motor.gs', 'utf8'), r.ctx);
-    r.agora.valor = Date.parse('2026-12-05T12:00:00Z'); // 05/12 em Brasília -> sai o que acabou até 27/11
+    r.agora.valor = Date.parse('2026-11-28T12:00:00Z'); // 28/11 em Brasília -> sai o que acabou até 27/11
     const pedidos: { metodo: string; caminho: string; corpo?: { structuredQuery?: { from: { collectionId: string }[]; where: unknown } } }[] = [];
     r.ctx.firestore_ = (metodo: string, caminho: string, corpo?: (typeof pedidos)[number]['corpo']) => {
       pedidos.push({ metodo, caminho, corpo });

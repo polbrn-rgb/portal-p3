@@ -8,7 +8,9 @@ import {
   demandaCiaVazia,
   formatarNumeroCia,
   ordenarDemandasCia,
+  ORIGEM_ORDEM_VERBAL,
   ROTULO_STATUS_CIA,
+  textoOrdemVerbal,
   validarDemandaCia,
   type DadosDemandaCia,
   type DemandaCia,
@@ -19,8 +21,20 @@ import { db } from '../../lib/firebase';
 import { irPara } from '../../lib/navegacao';
 import { quemSou } from '../../lib/quemSou';
 import { Campo } from '../Campo';
-import type { MissaoCgp } from '../../domain/cgp';
-import { EnviarAoCgp, missaoDe } from './Cgp';
+import { validarPeriodo, type ErrosPeriodo, type MissaoCgp } from '../../domain/cgp';
+import {
+  AVISO_ORDEM_FALHOU,
+  CamposPeriodoCgp,
+  EnviarAoCgp,
+  EscolherOrdem,
+  enviarMissaoComOrdem,
+  erroDaEscolha,
+  missaoDe,
+  periodoSugerido,
+  SEM_ORDEM,
+  type EscolhaOrdem,
+  type PeriodoCgpTela,
+} from './Cgp';
 
 // Numerador próprio da Cia/FT: cria a demanda com número (8BPMM-001/103/27…) e põe o prazo na agenda da Cia.
 // Não distribui para ninguém.
@@ -38,7 +52,7 @@ export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; 
   const concluidas = ordenada.filter((d) => d.status === 'concluida');
   const busca = texto.trim().toLowerCase();
   const visiveis = (aba === 'abertas' ? abertas : concluidas).filter(
-    (d) => !busca || `${d.numeroDocumento} ${d.saida} ${d.responsavel} ${d.numeroOrigem}`.toLowerCase().includes(busca),
+    (d) => !busca || `${d.numeroDocumento} ${d.saida} ${d.responsavel} ${d.numeroOrigem} ${d.quemOrdenou}`.toLowerCase().includes(busca),
   );
 
   return (
@@ -83,6 +97,7 @@ export function ListaNumeradorCia(p: { unidade: UnidadeId; lista: DemandaCia[]; 
                   </span>
                 </span>
                 <span className="item-saida">{d.saida}</span>
+                {textoOrdemVerbal(d) && <span className="item-info">{textoOrdemVerbal(d)}</span>}
                 <span className="item-info">
                   <span className="item-cat">{d.responsavel}</span>
                   <span className="item-prazo">
@@ -109,6 +124,14 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
   const [erro, setErro] = useState('');
   const [criada, setCriada] = useState('');
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  // Só na demanda nova: já mandar para o CGP (com período e, se quiser, a ordem de serviço).
+  const [paraCgp, setParaCgp] = useState(false);
+  const [periodoCgp, setPeriodoCgp] = useState<PeriodoCgpTela>(() => periodoSugerido());
+  const [errosCgp, setErrosCgp] = useState<ErrosPeriodo>({});
+  const [ordemCgp, setOrdemCgp] = useState<EscolhaOrdem>(SEM_ORDEM);
+  const [erroOrdemCgp, setErroOrdemCgp] = useState('');
+  const [progresso, setProgresso] = useState('');
+  const [resultadoCgp, setResultadoCgp] = useState<'' | 'ok' | 'sem-ordem' | 'falhou'>('');
 
   const mudar = <K extends keyof DadosDemandaCia>(campo: K, valor: DadosDemandaCia[K]) => setDados((d) => ({ ...d, [campo]: valor }));
 
@@ -127,16 +150,42 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
     ev.preventDefault();
     const e = validarDemandaCia(dados);
     setErros(e);
-    if (Object.keys(e).length) return;
+    const comCgp = !existente && paraCgp;
+    const eCgp = comCgp ? validarPeriodo(periodoCgp) : {};
+    const eOrdem = comCgp ? erroDaEscolha(ordemCgp, false) : '';
+    setErrosCgp(eCgp);
+    setErroOrdemCgp(eOrdem);
+    if (Object.keys(e).length || Object.keys(eCgp).length || eOrdem) return;
     void executar(async () => {
       if (existente) {
         await atualizarDemandaCia(db, existente, dados, autor(unidade));
         irPara('#/numerador');
-      } else {
-        const r = await criarDemandaCia(db, unidade, dados, autor(unidade));
-        setCriada(r.numeroDocumento);
+        return;
       }
+      const r = await criarDemandaCia(db, unidade, dados, autor(unidade));
+      let cgp: typeof resultadoCgp = '';
+      if (comCgp) {
+        // O número já saiu: se o CGP falhar, a demanda fica e dá para enviar depois, abrindo a demanda.
+        try {
+          const env = await enviarMissaoComOrdem(
+            { unidade, origem: 'numerador', refId: r.id, numero: r.numeroDocumento, titulo: dados.saida.trim(), periodo: periodoCgp },
+            ordemCgp,
+            setProgresso,
+          );
+          cgp = env.ordemOk ? 'ok' : 'sem-ordem';
+        } catch {
+          cgp = 'falhou';
+        }
+      }
+      setResultadoCgp(cgp);
+      setCriada(r.numeroDocumento);
     });
+  }
+
+  function mudarPrazo(prazo: string) {
+    mudar('prazo', prazo);
+    // Enquanto a Cia não mexe no período do CGP, o último dia acompanha o prazo.
+    setPeriodoCgp((p) => (p.fim === periodoSugerido(dados.prazo).fim ? { ...p, fim: periodoSugerido(prazo).fim } : p));
   }
 
   if (criada) {
@@ -146,6 +195,11 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
           <p>Demanda registrada</p>
           <strong className="numero-gerado">{criada}</strong>
           {dados.prazo && <p>Prazo de {formatarData(dados.prazo)} colocado na Agenda.</p>}
+          {resultadoCgp === 'ok' && <p>✅ Enviada para o CGP.</p>}
+          {resultadoCgp === 'sem-ordem' && <p className="mensagem erro">{AVISO_ORDEM_FALHOU}</p>}
+          {resultadoCgp === 'falhou' && (
+            <p className="mensagem erro">Não foi possível enviar para o CGP. Abra a demanda no Numerador e use "Enviar para o CGP".</p>
+          )}
           <div className="acoes-linha">
             <a className="botao secundario" href="#/numerador">
               Voltar ao Numerador
@@ -156,6 +210,10 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
               onClick={() => {
                 setCriada('');
                 setDados(comResponsavel(demandaCiaVazia(hojeISO())));
+                setParaCgp(false);
+                setPeriodoCgp(periodoSugerido());
+                setOrdemCgp(SEM_ORDEM);
+                setResultadoCgp('');
               }}
             >
               Nova demanda
@@ -203,9 +261,20 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
               ))}
             </select>
           </Campo>
-          <Campo rotulo="Nº da origem" erro={erros.numeroOrigem}>
-            <input value={dados.numeroOrigem} onChange={(e) => mudar('numeroOrigem', e.target.value)} />
-          </Campo>
+          {dados.origem === ORIGEM_ORDEM_VERBAL ? (
+            <Campo rotulo="Quem deu a ordem" erro={erros.quemOrdenou} obrigatorio>
+              <input
+                value={dados.quemOrdenou}
+                maxLength={120}
+                placeholder="Ex.: Cap PM Fulano"
+                onChange={(e) => mudar('quemOrdenou', e.target.value)}
+              />
+            </Campo>
+          ) : (
+            <Campo rotulo="Nº da origem" erro={erros.numeroOrigem}>
+              <input value={dados.numeroOrigem} onChange={(e) => mudar('numeroOrigem', e.target.value)} />
+            </Campo>
+          )}
         </div>
       </fieldset>
 
@@ -223,7 +292,7 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
             </select>
           </Campo>
           <Campo rotulo="Prazo (vai para a Agenda)" erro={erros.prazo}>
-            <input type="date" value={dados.prazo} onChange={(e) => mudar('prazo', e.target.value)} />
+            <input type="date" value={dados.prazo} onChange={(e) => mudarPrazo(e.target.value)} />
           </Campo>
           <Campo rotulo="Responsável (quem está logado)" erro={erros.responsavel}>
             <input value={dados.responsavel} readOnly />
@@ -234,6 +303,23 @@ export function FormNumeradorCia({ unidade, existente, missoesCgp = [] }: { unid
         </Campo>
       </fieldset>
 
+      {!existente && (
+        <fieldset className="cartao grupo" aria-label="CGP">
+          <legend>CGP</legend>
+          <label className="campo-check-linha">
+            <input type="checkbox" checked={paraCgp} onChange={(e) => setParaCgp(e.target.checked)} />
+            Enviar também para o CGP
+          </label>
+          {paraCgp && (
+            <>
+              <CamposPeriodoCgp periodo={periodoCgp} aoMudar={(v) => { setPeriodoCgp(v); setErrosCgp({}); }} erros={errosCgp} />
+              <EscolherOrdem valor={ordemCgp} aoMudar={(v) => { setOrdemCgp(v); setErroOrdemCgp(''); }} erro={erroOrdemCgp} opcional />
+            </>
+          )}
+        </fieldset>
+      )}
+
+      {progresso && <p className="item-info" role="status">{progresso}</p>}
       {erro && (
         <p className="mensagem erro" role="alert">
           {erro}

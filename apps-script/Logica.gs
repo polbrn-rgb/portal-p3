@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-24';
+var VERSAO_LOGICA = '2026-11-25';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -839,18 +839,18 @@ function encaminhamentosOrfaos(encs, statusDasDemandas) {
     .map(function (e) { return e.id; });
 }
 
-// ---------- Ordem de serviço do CGP: sai 7 dias depois do fim da missão ----------
+// ---------- Ordem de serviço do CGP: sai 1 dia depois do fim da missão ----------
 
 // Igual a DIAS_ORDEM_APOS_FIM do src/domain/cgp.ts (o teste confere).
-var ORDENS_DIAS_APOS_FIM = 7;
+var ORDENS_DIAS_APOS_FIM = 1;
 
 /**
  * Dia limite (AAAA-MM-DD, horário de Brasília): ordem de missão que terminou antes dele sai do sistema.
- * Missão que acaba em 27/11 fica com a ordem até 04/12 e sai em 05/12.
+ * Missão que acaba em 27/11 fica com a ordem até o fim de 27/11 e sai em 28/11.
  */
 function limiteOrdensVencidas(agoraMs) {
   var brasilia = new Date(agoraMs - 3 * 60 * 60 * 1000); // Brasília: UTC-3, sem horário de verão
-  var d = new Date(Date.UTC(brasilia.getUTCFullYear(), brasilia.getUTCMonth(), brasilia.getUTCDate() - ORDENS_DIAS_APOS_FIM));
+  var d = new Date(Date.UTC(brasilia.getUTCFullYear(), brasilia.getUTCMonth(), brasilia.getUTCDate() - ORDENS_DIAS_APOS_FIM + 1));
   return d.toISOString().slice(0, 10);
 }
 
