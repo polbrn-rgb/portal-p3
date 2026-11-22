@@ -196,3 +196,30 @@ describe('somas, pendências e planilha', () => {
     expect(nomePlanilha('2026-11', '1cia')).toBe('Produtividade 1ª CIA 2026-11.xlsx');
   });
 });
+
+describe('P/3 → Resultados das Cias', () => {
+  test('período: datas, ordem, futuro e no máximo 31 dias', async () => {
+    const { erroPeriodo } = await import('../../src/domain/producao');
+    const hoje = '2026-11-22';
+    expect(erroPeriodo('2026-11-22', '2026-11-22', hoje)).toBe('');
+    expect(erroPeriodo('2026-10-23', '2026-11-22', hoje)).toBe('');
+    expect(erroPeriodo('2026-10-22', '2026-11-22', hoje)).toBe('Escolha no máximo 31 dias.');
+    expect(erroPeriodo('2026-11-21', '2026-11-20', hoje)).toBe('A data inicial é depois da final.');
+    expect(erroPeriodo('2026-11-23', '2026-11-23', hoje)).toBe('A data inicial ainda não chegou.');
+    expect(erroPeriodo('', '2026-11-20', hoje)).toBe('Informe as duas datas.');
+  });
+
+  test('só os itens com valor e a ordem dos lançamentos', async () => {
+    const { itensComValor, itensZerados, ordenarLancamentos } = await import('../../src/domain/producao');
+    const a = { ...itensZerados(), pessoasAbordadas: 3 };
+    const b = { ...itensZerados(), maconhaKg: 0.5 };
+    expect(itensComValor([a, b])).toEqual(['pessoasAbordadas', 'maconhaKg']);
+    expect(itensComValor([itensZerados()])).toEqual([]);
+    const l = ordenarLancamentos([
+      { data: '2026-11-20', pelotao: 'pelD' as const },
+      { data: '2026-11-21', pelotao: 'pelB' as const },
+      { data: '2026-11-20', pelotao: 'pelA' as const },
+    ]);
+    expect(l.map((x) => `${x.data} ${x.pelotao}`)).toEqual(['2026-11-21 pelB', '2026-11-20 pelA', '2026-11-20 pelD']);
+  });
+});

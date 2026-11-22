@@ -263,6 +263,11 @@ histórico das demandas.
   da P/3: escolhe o mês, vê as miniaturas por CFP, **⬇️ Baixar fotos (.zip)** (uma pasta por CFP) e, depois de baixar,
   **🗑️ Apagar do sistema** (com confirmação).
 - **Sala Op.**: o botão **Recado para a Sala**, que funciona igual: aparece no alto da página da Sala de Operações.
+- **Sala de Operações → Resultados das Cias**: o que as Salas de Operações das Cias e da FT lançaram, por dia de serviço.
+  Escolha o período (até 31 dias) e a unidade (ou todas): totais por unidade e do 8º BPM/M, só com os itens que tiveram
+  valor, os flagrantes (talão, BOPC e natureza) e cada lançamento com quem lançou. Para poupar a cota do Firebase, a
+  tela **não fica ouvindo o banco**: lê só quando a sub-aba é aberta (hoje, todas as unidades) e quando se clica em
+  **Consultar** (~1 leitura por pelotão que lançou no período).
 
 ## Backup
 

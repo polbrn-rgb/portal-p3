@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, irPara, irParaAbaCia, sair } from './ajuda';
+import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 // Sala de Operações da Cia: o pelotão lança a produção do turno (com os flagrantes: talão e BOPC) e a P/3 vê no total do mês.
@@ -83,4 +83,22 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   expect(k).toBeGreaterThan(0);
   await expect(linha.getByRole('cell').nth(k - 1)).toHaveText('30');
   await expect(total.getByRole('row', { name: /^Flagrantes anotados/ }).getByRole('cell').nth(k - 1)).toHaveText('1');
+
+  // Sala de Operações → Resultados das Cias: consulta de hoje, só daquela Cia (lê só quando a sub-aba abre).
+  await irPara(page, 'Sala de Operações');
+  const salaP3 = page.getByRole('navigation', { name: 'Sala de Operações' });
+  await expect(salaP3.getByRole('link', { name: 'Recados' })).toHaveAttribute('aria-current', 'page');
+  await salaP3.getByRole('link', { name: 'Resultados das Cias' }).click();
+  const consulta = page.getByRole('form', { name: 'Consultar resultados' });
+  await consulta.getByRole('combobox', { name: 'Unidade' }).selectOption({ label: cia.sigla });
+  await consulta.getByRole('button', { name: 'Consultar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: cia.sigla })).toContainText('1 lançamento(s)');
+  const doDia = page.getByRole('table', { name: 'Resultados do período por unidade' });
+  await expect(doDia.getByRole('row', { name: /^Pessoas abordadas/ })).toContainText('30');
+  await expect(doDia.getByRole('row', { name: /^Maconha/ })).toContainText('0,5');
+  await expect(page.getByRole('list', { name: 'Flagrantes do período' })).toContainText('AB1234');
+  await expect(page.getByRole('list', { name: 'Flagrantes do período' })).toContainText('Tráfico de drogas');
+  await page.getByText(`${cia.sigla}: 1 lançamento(s)`).click();
+  await expect(page.getByRole('list', { name: `Lançamentos de ${cia.sigla}` })).toContainText('Pel A (dia)');
+  expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
 });

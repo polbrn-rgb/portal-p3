@@ -3813,3 +3813,13 @@ li.agenda-linha {
 .cgp-ordem a.botao {
   text-decoration: none;
 }
+
+/* P/3 → Sala de Operações → Resultados das Cias: período e unidade; no celular quebra a linha. */
+.filtros-resultados {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.filtros-resultados .campo {
+  flex: 1 1 140px;
+  min-width: 0;
+}
