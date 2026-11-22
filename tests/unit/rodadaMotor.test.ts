@@ -45,7 +45,7 @@ function montar(agora = { valor: Date.parse('2026-11-21T12:00:00Z') }) {
   const etapas = [
     'importarEmails_', 'processarPlanilhas_', 'gravarResultados_', 'sincronizarAgendaCfp_', 'sincronizarControleOperacoes_',
     'processarEap_', 'processarRelatorios_', 'processarDocsMensais_', 'processarIcc_', 'levarEfetivoManual_', 'processarEmails_',
-    'processarAcessos_', 'processarRac_', 'processarBackupBanco_', 'pedirTrocaDeSenha_', 'limparEncaminhamentosOrfaos_', 'apagarFotosVencidas_',
+    'processarAcessos_', 'processarSenhasSalaCia_', 'processarRac_', 'processarBackupBanco_', 'pedirTrocaDeSenha_', 'limparEncaminhamentosOrfaos_', 'apagarFotosVencidas_',
     'apagarOrdensVencidas_',
   ];
   for (const nome of etapas) ctx[nome] = () => chamadas.push(nome);
@@ -79,6 +79,7 @@ describe('rodada do motor', () => {
     expect(m.chamadas).toContain('processarBackupBanco_');
     expect(m.chamadas).toContain('limparEncaminhamentosOrfaos_');
     expect(m.chamadas).toContain('apagarOrdensVencidas_');
+    expect(m.chamadas).toContain('processarSenhasSalaCia_');
     expect(m.chamadas.filter((c) => c.startsWith('erro:'))).toEqual([]);
     expect(m.chamadas).toContain('sincronizarAgendaCfp_');
     expect(m.chamadas).toContain('sincronizarControleOperacoes_');

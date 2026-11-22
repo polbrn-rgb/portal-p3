@@ -4,7 +4,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_MOTOR do Motor.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_LOGICA = '2026-11-25';
+var VERSAO_LOGICA = '2026-11-26';
 
 var SIGLAS_P3 = {
   TODAS: 'TODAS', '1cia': '1ª CIA', '2cia': '2ª CIA', '3cia': '3ª CIA', '4cia': '4ª CIA', '5cia': '5ª CIA',
@@ -790,6 +790,18 @@ function claimsDoAcesso(a) {
   if (a.perfil === 'unidade' || a.perfil === 'cgp') c.unidade = a.unidade;
   if (a.perfil === 'p3' && a.admin === true) c.admin = true;
   return c;
+}
+
+var UNIDADES_SALA_CIA = ['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft'];
+
+/** Conta da Sala de Operações da Cia (igual a emailSalaCia em src/domain/salaCia.ts). */
+function emailSalaCia(unidade) {
+  return 'sala-' + unidade + '@' + DOMINIO_LOGIN_ACESSO;
+}
+
+/** Perfil da conta da Sala de Operações da Cia: só a Sala daquela Cia. */
+function claimsSalaCia(unidade) {
+  return { perfil: 'salaCia', unidade: unidade };
 }
 
 /** E-mail com o link de senha (primeiro acesso ou troca). */

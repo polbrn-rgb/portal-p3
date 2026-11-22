@@ -5,6 +5,7 @@ import { garantirContas } from '../scripts/contas-admin';
 import { emailDeLogin } from '../src/domain/acessos';
 import { TODAS_CONTAS } from '../src/domain/contas';
 import { mesReferencia } from '../src/domain/documentosMensais';
+import { emailSalaCia } from '../src/domain/salaCia';
 import { diasDoMes, idProducao, itensZerados } from '../src/domain/producao';
 import { SENHA_TESTE } from './dados';
 
@@ -32,6 +33,15 @@ export default async function globalSetup() {
       .catch(async () => (await auth.createUser({ email, password: SENHA_TESTE })).uid);
     if (displayName) await auth.updateUser(uid, { displayName });
     await auth.setCustomUserClaims(uid, claims);
+  }
+  // Sala de Operações da FT (conta que o motor cria quando a P/3 gera a senha).
+  {
+    const email = emailSalaCia('ft');
+    const uid = await auth
+      .getUserByEmail(email)
+      .then((u) => u.uid)
+      .catch(async () => (await auth.createUser({ email, password: SENHA_TESTE })).uid);
+    await auth.setCustomUserClaims(uid, { perfil: 'salaCia', unidade: 'ft' });
   }
   await getFirestore(app)
     .doc('efetivo/123456')
