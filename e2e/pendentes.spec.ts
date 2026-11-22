@@ -54,7 +54,8 @@ test('Ordem Verbal pede quem deu a ordem e leva isso para a demanda', async ({ p
 
   await cartao.getByRole('link', { name: 'Dar destino' }).click();
   await expect(page.getByLabel(/^Origem/)).toHaveValue('Ordem Verbal');
-  await expect(page.getByLabel('Observação')).toHaveValue('Ordem verbal de Cmt Btl.');
+  await expect(page.getByLabel(/^Quem deu a ordem/)).toHaveValue('Cmt Btl');
+  await expect(page.getByLabel('Nº da origem')).toHaveCount(0);
 });
 
 test('descartar pede confirmação e pode ser desfeito', async ({ page }, info) => {

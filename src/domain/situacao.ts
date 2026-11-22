@@ -59,6 +59,7 @@ export function filtrarDemandas<T extends Demanda>(
       String(d.numero),
       d.saida,
       d.numeroOrigem,
+      d.quemOrdenou ?? '',
       d.numeroSaida,
       d.responsavel,
       d.categoria,

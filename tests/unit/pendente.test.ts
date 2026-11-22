@@ -131,7 +131,8 @@ describe('dar destino', () => {
 
   test('Ordem Verbal registra quem deu a ordem', () => {
     const d = demandaDaPendente(pendente({ tipo: 'ordem_verbal', quemOrdenou: 'Cmt Btl' }), base);
-    expect(d).toMatchObject({ origem: 'Ordem Verbal', observacao: 'Ordem verbal de Cmt Btl.' });
+    expect(d).toMatchObject({ origem: 'Ordem Verbal', quemOrdenou: 'Cmt Btl', observacao: '' });
+    expect(validarDemanda(d)).toEqual({});
   });
 
   test('e-mail sem assunto deixa o resumo para a P/3 escrever', () => {

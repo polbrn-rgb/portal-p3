@@ -332,6 +332,7 @@ function ItemDemanda({ demanda: d, hoje, andamento }: PropsItem) {
         <span className={`selo selo-${situacao}`}>{ROTULO_SITUACAO[situacao]}</span>
       </span>
       <span className="item-saida">{d.saida}</span>
+      {d.origem === 'Ordem Verbal' && d.quemOrdenou && <span className="item-info">Ordem verbal de {d.quemOrdenou}</span>}
       {d.observacao.trim() && (
         <span className="item-obs" title={d.observacao}>
           📝 {d.observacao.trim()}

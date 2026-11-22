@@ -183,6 +183,9 @@ histórico das demandas.
   Ordem Verbal são lançados pelos botões **+ SEI** e **+ Ordem Verbal**. **Dar destino** abre a demanda nova já
   preenchida; ao salvar, ela ganha número e sai das pendentes.
 - **Numerador**: as demandas com número (abertas e concluídas).
+- **Ordem Verbal no Numerador** (igual ao das Cias): com a origem "Ordem Verbal", o campo "Nº da origem" vira **Quem
+  deu a ordem** (obrigatório). Aparece na lista ("Ordem verbal de …") e entra na busca. A pendente de Ordem Verbal já
+  leva o nome para esse campo ao dar destino. Na aba Operações do CFP, vai na coluna do nº da origem.
 - **Excluir demanda**: lixeira 🗑️ ao lado de cada demanda do Numerador, com confirmação. Some do Numerador, das
   Cias e do Checklist Operações; o motor apaga os eventos dela nas agendas (inclusive a do CFP) e manda a pasta do CFP
   para a lixeira do Drive (recuperável por 30 dias). O número não é
