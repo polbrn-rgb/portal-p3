@@ -54,6 +54,12 @@ describe('validarDemanda', () => {
   test('origem SEI exige o número do processo', () => {
     expect(validarDemanda(valida({ origem: 'SEI' })).numeroOrigem).toBe('Informe o número do processo SEI.');
     expect(validarDemanda(valida({ origem: 'SEI', numeroOrigem: '006.00001/2026' })).numeroOrigem).toBeUndefined();
+    // Ordem Verbal: quem deu a ordem é obrigatório (igual ao Numerador das Cias); nas outras origens o campo é limpo.
+    expect(validarDemanda(valida({ origem: 'Ordem Verbal' })).quemOrdenou).toBe('Informe quem deu a ordem.');
+    expect(validarDemanda(valida({ origem: 'Ordem Verbal', quemOrdenou: 'x'.repeat(121) })).quemOrdenou).toBeTruthy();
+    expect(validarDemanda(valida({ origem: 'Ordem Verbal', quemOrdenou: 'Cmt Btl' })).quemOrdenou).toBeUndefined();
+    expect(normalizarDemanda(valida({ origem: 'Ordem Verbal', quemOrdenou: ' Cmt Btl ' })).quemOrdenou).toBe('Cmt Btl');
+    expect(normalizarDemanda(valida({ origem: 'E-mail', quemOrdenou: 'Cmt Btl' })).quemOrdenou).toBe('');
   });
 
   test('prazo da Cia não pode passar do prazo do CPA', () => {

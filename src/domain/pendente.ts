@@ -128,7 +128,6 @@ export function numeroOrigemDoEmail(p: Pick<Pendente, 'texto' | 'remetente'>): s
 
 /** "Dar destino": a demanda nova já vem com a entrada preenchida a partir da pendente. */
 export function demandaDaPendente(p: Pendente, base: DadosDemanda): DadosDemanda {
-  const observacao = p.tipo === 'ordem_verbal' && p.quemOrdenou ? `Ordem verbal de ${p.quemOrdenou}.` : base.observacao;
   const numeroOrigem =
     p.tipo === 'sei' ? (p.numeroSei ?? '') : p.tipo === 'email' ? numeroOrigemDoEmail(p) || base.numeroOrigem : base.numeroOrigem;
   return {
@@ -136,8 +135,8 @@ export function demandaDaPendente(p: Pendente, base: DadosDemanda): DadosDemanda
     dataEntrada: ehDataISO(p.dataEntrada) ? p.dataEntrada : base.dataEntrada,
     origem: ORIGEM_DO_TIPO[p.tipo],
     numeroOrigem,
+    quemOrdenou: p.tipo === 'ordem_verbal' ? (p.quemOrdenou ?? '').trim() : '',
     saida: p.assunto === '(sem assunto)' ? '' : p.assunto,
-    observacao,
   };
 }
 

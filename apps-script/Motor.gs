@@ -583,7 +583,7 @@ function adicionarOperacao_(d) {
   if (aba.getLastRow() >= 3) {
     aba.getRange(3, 1, 1, aba.getLastColumn()).copyTo(linha, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
   }
-  aba.getRange('A2:G2').setValues([[maiorSeq + 1, d.saida, '8º BPM/M', d.numeroOrigem || '', d.origem || 'P/3',
+  aba.getRange('A2:G2').setValues([[maiorSeq + 1, d.saida, '8º BPM/M', d.numeroOrigem || d.quemOrdenou || '', d.origem || 'P/3',
     dataLocal(d.inicioBtl), dataLocal(d.terminoBtl)]]);
   ['A2', 'C2', 'E2', 'F2', 'G2'].forEach(function (c) { aba.getRange(c).setHorizontalAlignment('center'); });
 }

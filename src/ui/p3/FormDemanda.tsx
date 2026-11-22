@@ -19,6 +19,8 @@ import {
   type DadosDemanda,
   type Demanda,
   type ErrosDemanda,
+  LIMITE_QUEM_ORDENOU,
+  ORIGEM_ORDEM_VERBAL,
 } from '../../domain/demanda';
 import { RESPOSTAS, URL_PLANILHA_EVENTO } from '../../domain/listas';
 import { opcoesDoCampo } from '../../domain/listasConfig';
@@ -332,13 +334,24 @@ function FormDemanda({ existente, pendente }: { existente?: Demanda; pendente?: 
               ))}
             </select>
           </Campo>
-          <Campo rotulo={ehSEI ? 'Nº do processo SEI' : 'Nº da origem'} erro={erros.numeroOrigem} obrigatorio={ehSEI}>
-            <input
-              value={dados.numeroOrigem}
-              inputMode={ehSEI ? 'numeric' : 'text'}
-              onChange={(e) => mudar('numeroOrigem', e.target.value)}
-            />
-          </Campo>
+          {dados.origem === ORIGEM_ORDEM_VERBAL ? (
+            <Campo rotulo="Quem deu a ordem" erro={erros.quemOrdenou} obrigatorio>
+              <input
+                value={dados.quemOrdenou}
+                maxLength={LIMITE_QUEM_ORDENOU}
+                placeholder="Ex.: Cap PM Fulano"
+                onChange={(e) => mudar('quemOrdenou', e.target.value)}
+              />
+            </Campo>
+          ) : (
+            <Campo rotulo={ehSEI ? 'Nº do processo SEI' : 'Nº da origem'} erro={erros.numeroOrigem} obrigatorio={ehSEI}>
+              <input
+                value={dados.numeroOrigem}
+                inputMode={ehSEI ? 'numeric' : 'text'}
+                onChange={(e) => mudar('numeroOrigem', e.target.value)}
+              />
+            </Campo>
+          )}
         </div>
       </fieldset>
 

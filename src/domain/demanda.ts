@@ -21,6 +21,8 @@ export type DadosDemanda = {
   dataEntrada: string;
   origem: Origem | '';
   numeroOrigem: string;
+  /** Origem "Ordem Verbal": quem deu a ordem (obrigatório). */
+  quemOrdenou: string;
   tipoSaida: TipoSaida | '';
   saida: string;
   meioSaida: MeioSaida | '';
@@ -58,11 +60,15 @@ export type Demanda = DadosDemanda & {
 
 export type ErrosDemanda = Partial<Record<keyof DadosDemanda, string>>;
 
+export const ORIGEM_ORDEM_VERBAL = 'Ordem Verbal';
+export const LIMITE_QUEM_ORDENOU = 120;
+
 export function demandaVazia(hoje: string): DadosDemanda {
   return {
     dataEntrada: hoje,
     origem: '',
     numeroOrigem: '',
+    quemOrdenou: '',
     tipoSaida: 'OFÍCIO',
     saida: '',
     meioSaida: 'SEI',
@@ -103,6 +109,8 @@ export function normalizarDemanda(d: DadosDemanda): DadosDemanda {
   return {
     ...d,
     numeroOrigem: d.numeroOrigem.trim(),
+    // Só a Ordem Verbal tem "quem deu a ordem".
+    quemOrdenou: d.origem === ORIGEM_ORDEM_VERBAL ? (d.quemOrdenou ?? '').trim() : '',
     saida: d.saida.trim(),
     numeroSaida: d.numeroSaida.trim(),
     observacao: d.observacao.trim(),
@@ -122,6 +130,11 @@ export function validarDemanda(d: DadosDemanda, listas: Listas = listasPadrao())
   if (!ehDataISO(d.dataEntrada)) erros.dataEntrada = 'Informe a data de entrada.';
   if (d.origem && !tem('origens', d.origem)) erros.origem = 'Origem inválida.';
   if (d.origem === 'SEI' && !d.numeroOrigem.trim()) erros.numeroOrigem = 'Informe o número do processo SEI.';
+  if (d.origem === ORIGEM_ORDEM_VERBAL) {
+    const quem = (d.quemOrdenou ?? '').trim();
+    if (!quem) erros.quemOrdenou = 'Informe quem deu a ordem.';
+    else if (quem.length > LIMITE_QUEM_ORDENOU) erros.quemOrdenou = `Até ${LIMITE_QUEM_ORDENOU} caracteres.`;
+  }
   if (!d.saida.trim()) erros.saida = 'Informe a demanda (resumo).';
   if (!d.categoria || !tem('categorias', d.categoria)) erros.categoria = 'Escolha a categoria.';
   if (!d.tipoSaida || !tem('tiposSaida', d.tipoSaida)) erros.tipoSaida = 'Escolha o tipo de saída.';
@@ -156,6 +169,7 @@ export const ROTULO_CAMPO: Record<keyof DadosDemanda, string> = {
   dataEntrada: 'Data de entrada',
   origem: 'Origem',
   numeroOrigem: 'Nº da origem',
+  quemOrdenou: 'Quem deu a ordem',
   tipoSaida: 'Tipo de saída',
   saida: 'Demanda (resumo)',
   meioSaida: 'Meio de saída',
