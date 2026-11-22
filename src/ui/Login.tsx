@@ -4,6 +4,8 @@ import { type FormEvent, useState } from 'react';
 import { emailDeLogin, reBase } from '../domain/acessos';
 import { CONTAS, emailDaConta, type ContaId } from '../domain/contas';
 import { mensagemErroLogin } from '../domain/mensagens';
+import { emailSalaCia } from '../domain/salaCia';
+import { UNIDADES, type UnidadeId } from '../domain/unidades';
 import { auth } from '../lib/firebase';
 import { pedirTrocaDeSenha } from '../lib/motor';
 import { Topo } from './Topo';
@@ -27,19 +29,34 @@ function codigoDoErro(erro: unknown): string {
   return (erro as { code?: string }).code ?? '';
 }
 
-/** Login por RE (individual). A entrada antiga, por unidade, fica num link até todos terem acesso próprio. */
+type ModoLogin = 're' | 'antiga' | 'salaCia';
+
+function lerModo(): ModoLogin {
+  try {
+    const m = localStorage.getItem(CHAVE_MODO);
+    if (m === 'antiga' || m === 'salaCia') return m;
+  } catch {
+    /* sem armazenamento */
+  }
+  return 're';
+}
+
+const ROTULO_MODO: Record<ModoLogin, string> = {
+  re: 'Entrar com RE e senha pessoal',
+  salaCia: 'Entrar na Sala de Operações da Cia',
+  antiga: 'Entrar com a conta da unidade (antiga)',
+};
+
+/**
+ * Login por RE (individual). A Sala de Operações de cada Cia entra com a senha que a P/3 gerou; a entrada antiga,
+ * por unidade, fica num link até todos terem acesso próprio.
+ */
 export function Login() {
-  const [antiga, setAntiga] = useState(() => {
+  const [modo, setModo] = useState<ModoLogin>(lerModo);
+  const trocar = (v: ModoLogin) => {
+    setModo(v);
     try {
-      return localStorage.getItem(CHAVE_MODO) === 'antiga';
-    } catch {
-      return false;
-    }
-  });
-  const trocar = (v: boolean) => {
-    setAntiga(v);
-    try {
-      localStorage.setItem(CHAVE_MODO, v ? 'antiga' : 're');
+      localStorage.setItem(CHAVE_MODO, v);
     } catch {
       /* sem armazenamento */
     }
@@ -47,13 +64,94 @@ export function Login() {
   return (
     <main className="tela">
       <Topo />
-      {antiga ? <LoginUnidade /> : <LoginRE />}
-      <p className="troca-login">
-        <button className="botao-link" type="button" onClick={() => trocar(!antiga)}>
-          {antiga ? 'Entrar com RE e senha pessoal' : 'Entrar com a conta da unidade (antiga)'}
-        </button>
-      </p>
+      {modo === 'antiga' ? <LoginUnidade /> : modo === 'salaCia' ? <LoginSalaCia /> : <LoginRE />}
+      {(['re', 'salaCia', 'antiga'] as const)
+        .filter((m) => m !== modo)
+        .map((m) => (
+          <p key={m} className="troca-login">
+            <button className="botao-link" type="button" onClick={() => trocar(m)}>
+              {ROTULO_MODO[m]}
+            </button>
+          </p>
+        ))}
     </main>
+  );
+}
+
+const CHAVE_SALA = 'portalp3.ultimaSalaCia';
+
+/** Sala de Operações da Cia/FT: escolhe a Cia e digita a senha que a P/3 entregou. Esqueceu: pede à P/3 uma nova. */
+function LoginSalaCia() {
+  const [unidade, setUnidade] = useState<UnidadeId | ''>(() => {
+    try {
+      const v = localStorage.getItem(CHAVE_SALA);
+      return UNIDADES.some((u) => u.id === v) ? (v as UnidadeId) : '';
+    } catch {
+      return '';
+    }
+  });
+  const [senha, setSenha] = useState('');
+  const [erros, setErros] = useState<{ unidade?: string; senha?: string }>({});
+  const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  async function entrar(evento: FormEvent) {
+    evento.preventDefault();
+    setErro('');
+    setAviso('');
+    const e: { unidade?: string; senha?: string } = {};
+    if (!unidade) e.unidade = 'Escolha a Cia.';
+    if (!senha) e.senha = 'Digite a senha.';
+    setErros(e);
+    if (!unidade || !senha) return;
+    setEnviando(true);
+    try {
+      try {
+        localStorage.setItem(CHAVE_SALA, unidade);
+      } catch {
+        /* sem armazenamento */
+      }
+      await signInWithEmailAndPassword(auth, emailSalaCia(unidade), senha);
+    } catch (falha) {
+      setErro(mensagemErroLogin(codigoDoErro(falha)));
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <form className="cartao formulario" onSubmit={entrar} noValidate>
+      <h2>Sala de Operações da Cia</h2>
+      <Campo rotulo="Cia" erro={erros.unidade} obrigatorio>
+        <select value={unidade} onChange={(e) => setUnidade(e.target.value as UnidadeId | '')}>
+          <option value="">Escolha…</option>
+          {UNIDADES.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.sigla}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo rotulo="Senha" erro={erros.senha} obrigatorio>
+        <InputSenha autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} />
+      </Campo>
+      {erro && (
+        <p className="mensagem erro" role="alert">
+          {erro}
+        </p>
+      )}
+      {aviso && (
+        <p className="mensagem aviso" role="status">
+          {aviso}
+        </p>
+      )}
+      <button className="botao destaque" type="submit" disabled={enviando}>
+        {enviando ? 'Entrando…' : 'Entrar'}
+      </button>
+      <button className="botao-link" type="button" onClick={() => setAviso('A senha da Sala de Operações é gerada pela P/3. Peça uma senha nova à P/3.')}>
+        Esqueci a senha
+      </button>
+    </form>
   );
 }
 

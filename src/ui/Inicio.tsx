@@ -13,6 +13,7 @@ const PainelCfp = sobDemanda(() => import('./setores/PainelCfp'), 'PainelCfp');
 const PainelSala = sobDemanda(() => import('./setores/PainelSala'), 'PainelSala');
 const Agenda = sobDemanda(() => import('./p3/Agenda'), 'Agenda');
 const PaginaCgp = sobDemanda(() => import('./cia/Cgp'), 'PaginaCgp');
+const PaginaSalaCia = sobDemanda(() => import('./cia/ProducaoCia'), 'PaginaSalaCia');
 
 export const Carregando = () => <p className="carregando">Carregando…</p>;
 
@@ -37,6 +38,7 @@ export function Inicio({ sessao }: { sessao: Sessao }) {
       )}
       {sessao.tipo === 'cfp' && <PaginasCfp />}
       {sessao.tipo === 'cgp' && <PaginaCgp unidade={sessao.unidade} sigla={sessao.sigla} />}
+      {sessao.tipo === 'salaCia' && <PaginaSalaCia unidade={sessao.unidade} sigla={sessao.sigla} />}
       {sessao.tipo === 'sem-perfil' && (
         <section className="cartao" role="alert">
           <h2>Conta sem perfil</h2>

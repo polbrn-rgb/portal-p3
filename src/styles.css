@@ -2685,6 +2685,24 @@ fieldset:has(> .erro-campo) > legend {
   gap: 16px;
 }
 
+/* ---------- Sala de Operações → Senhas das Cias (P/3) ---------- */
+.senha-gerada {
+  display: grid;
+  gap: 8px;
+}
+
+.senha-sala {
+  font-size: 1.4rem;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.titulo-sala-cia {
+  margin: 0 0 8px;
+}
+
 /* ---------- Operações → RAC (Cias e FT) ---------- */
 .formulario-rac .grupo {
   gap: 10px;

@@ -29,9 +29,9 @@ import {
   type Producao,
   type Talao,
 } from '../../domain/producao';
-import type { UnidadeId } from '../../domain/unidades';
+import { UNIDADES, type UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
-import { irPara } from '../../lib/navegacao';
+import { irPara, useHash } from '../../lib/navegacao';
 import { quemSou } from '../../lib/quemSou';
 import { useAoVivo } from '../../lib/useAoVivo';
 import { baixarXlsx } from '../../lib/xlsx';
@@ -53,7 +53,19 @@ function quando(d: Date | null): string {
   return `${formatarData(hojeISO(d))} às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function SalaDaCia({ unidade, sigla, hash }: { unidade: UnidadeId; sigla: string; hash: string }) {
+/** Quem entra pela conta da Sala de Operações da Cia (senha gerada pela P/3): só esta página. */
+export function PaginaSalaCia({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) {
+  const hash = useHash();
+  return (
+    <section aria-label={sigla}>
+      <h2 className="titulo-sala-cia">{sigla}</h2>
+      <SalaDaCia unidade={unidade} sigla={UNIDADES.find((u) => u.id === unidade)?.sigla ?? sigla} hash={hash} autor={sigla} />
+    </section>
+  );
+}
+
+/** autor: o que vai em "Lançado por" quando o login não é individual (padrão: a sigla da Cia). */
+export function SalaDaCia({ unidade, sigla, hash, autor }: { unidade: UnidadeId; sigla: string; hash: string; autor?: string }) {
   const resumo = hash.startsWith('#/sala/mes');
   const rota = lerRota(hash);
   return (
@@ -69,13 +81,13 @@ export function SalaDaCia({ unidade, sigla, hash }: { unidade: UnidadeId; sigla:
       {resumo ? (
         <ResumoDoMes unidade={unidade} sigla={sigla} />
       ) : (
-        <LancarProducao key={`${rota.data ?? ''}_${rota.pelotao ?? ''}`} unidade={unidade} sigla={sigla} dataInicial={rota.data} pelotaoInicial={rota.pelotao} />
+        <LancarProducao key={`${rota.data ?? ''}_${rota.pelotao ?? ''}`} unidade={unidade} sigla={sigla} autor={autor} dataInicial={rota.data} pelotaoInicial={rota.pelotao} />
       )}
     </>
   );
 }
 
-function LancarProducao(p: { unidade: UnidadeId; sigla: string; dataInicial?: string; pelotaoInicial?: PelotaoId }) {
+function LancarProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; dataInicial?: string; pelotaoInicial?: PelotaoId }) {
   const hoje = hojeISO();
   const [data, setData] = useState(p.dataInicial && p.dataInicial <= hoje ? p.dataInicial : hoje);
   const [pelotao, setPelotao] = useState<PelotaoId | ''>(p.pelotaoInicial ?? '');
@@ -130,7 +142,7 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; dataInicial?: st
       {lancs.carregando && <p className="carregando">Carregando…</p>}
       {!lancs.carregando && !pelotao && <p className="vazio">Escolha o pelotão para lançar.</p>}
       {!lancs.carregando && pelotao && /^\d{4}-\d{2}-\d{2}$/.test(data) && data <= hoje && (
-        <FormProducao key={`${data}_${pelotao}`} unidade={p.unidade} sigla={p.sigla} data={data} pelotao={pelotao} existente={existente} />
+        <FormProducao key={`${data}_${pelotao}`} unidade={p.unidade} sigla={p.sigla} autor={p.autor} data={data} pelotao={pelotao} existente={existente} />
       )}
     </section>
   );
@@ -139,7 +151,7 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; dataInicial?: st
 const textosDe = (itens?: Itens): Record<ItemId, string> =>
   Object.fromEntries(ITENS_PRODUCAO.map((i) => [i.id, itens ? textoQuantidade(itens[i.id], 'decimal' in i && i.decimal) : ''])) as Record<ItemId, string>;
 
-function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelotao: PelotaoId; existente?: Producao }) {
+function FormProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; data: string; pelotao: PelotaoId; existente?: Producao }) {
   const [textos, setTextos] = useState<Record<ItemId, string>>(() => textosDe(p.existente?.itens));
   const [taloes, setTaloes] = useState<Talao[]>(() => p.existente?.taloes ?? []);
   const [novoTalao, setNovoTalao] = useState<Talao>({ numero: '', bopc: '', data: p.data, natureza: '' });
@@ -149,7 +161,7 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; data: string; pelo
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
-  const autor = quemSou() ?? p.sigla;
+  const autor = quemSou() ?? p.autor ?? p.sigla;
 
   // Conferências na hora (só quando os números estão válidos).
   const numeros = Object.fromEntries(

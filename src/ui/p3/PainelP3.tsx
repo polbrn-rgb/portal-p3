@@ -37,6 +37,7 @@ const PainelBatalhao = sobDemanda(() => import('./PainelBatalhao'), 'PainelBatal
 const PainelEstatistico = sobDemanda(() => import('./PainelEstatistico'), 'PainelEstatistico');
 const TdsP3 = sobDemanda(() => import('./TdsP3'), 'TdsP3');
 const FotosCias = sobDemanda(() => import('./FotosCias'), 'FotosCias');
+const SenhasSalaCia = sobDemanda(() => import('./SenhasSalaCia'), 'SenhasSalaCia');
 const MissoesCfp = sobDemanda(() => import('../setores/PainelCfp'), 'MissoesCfp');
 
 const FILTROS_VALIDOS = ['atrasado', 'vence_hoje', 'cia_atrasada', 'respondida', 'em_aberto'];
@@ -69,6 +70,10 @@ const CFP: SubAba[] = [
     ),
   },
   { hash: '#/cfp/tds', rotulo: 'TDS', Tela: () => <TdsP3 /> },
+];
+const SALA: SubAba[] = [
+  { hash: '#/sala', rotulo: 'Recados', Tela: () => <Recados setor="sala" podeEnviar /> },
+  { hash: '#/sala/senhas', rotulo: 'Senhas das Cias', Tela: () => <SenhasSalaCia /> },
 ];
 
 /** Barra de sub-abas + a tela da escolhida. contadores: número ao lado do rótulo (ex.: operações abertas). */
@@ -130,7 +135,7 @@ function abaDaRota(hash: string): AbaP3 {
   if (hash.startsWith('#/painel')) return 'painel';
   if (hash.startsWith('#/admin')) return 'admin';
   if (hash.startsWith('#/cfp')) return 'cfp';
-  if (hash === '#/sala') return 'sala';
+  if (hash.startsWith('#/sala')) return 'sala';
   if (hash === '#/fotos') return 'fotos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash.startsWith('#/agenda')) return 'agenda';
@@ -165,7 +170,8 @@ function ConteudoP3({
   if (doCfp) return <ComSubAbas rotulo="CFP" abas={CFP} ativa={doCfp} operacoes={operacoes} />;
   if (hash.startsWith('#/aperfeicoamento')) return <Aperfeicoamento rota={hash} />;
   if (hash.startsWith('#/agenda')) return <Agenda rota={hash} />;
-  if (hash === '#/sala') return <Recados setor="sala" podeEnviar />;
+  const daSala = SALA.find((a) => a.hash === hash);
+  if (daSala) return <ComSubAbas rotulo="Sala de Operações" abas={SALA} ativa={daSala} operacoes={operacoes} />;
   if (hash === '#/fotos') return <FotosCias />;
   if (hash === '#/pendentes') return <ListaPendentes pendentes={pendentes} />;
   const deOperacoes = OPERACOES.find((a) => a.hash === hash);

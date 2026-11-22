@@ -1,3 +1,4 @@
+import { siglaSalaCia } from './salaCia';
 import { UNIDADES, type UnidadeId } from './unidades';
 
 // Conta única da P/3. As Cias usam o mesmo Gmail com "+id" (ex.: 8bpmmp3+1cia@gmail.com):
@@ -26,6 +27,8 @@ export type Sessao =
   | { tipo: 'unidade'; unidade: UnidadeId; sigla: string }
   /** CGP de uma Cia (acesso por RE): só a página do CGP daquela Cia. */
   | { tipo: 'cgp'; unidade: UnidadeId; sigla: string }
+  /** Sala de Operações de uma Cia (conta da Sala, senha gerada pela P/3): só a Sala de Operações daquela Cia. */
+  | { tipo: 'salaCia'; unidade: UnidadeId; sigla: string }
   | { tipo: SetorId; sigla: string }
   | { tipo: 'sem-perfil' };
 
@@ -73,6 +76,10 @@ export function sessaoDosClaims(claims: Record<string, unknown>): Sessao {
   if (claims.perfil === 'cgp') {
     const unidade = UNIDADES.find((u) => u.id === claims.unidade);
     if (unidade) return { tipo: 'cgp', unidade: unidade.id, sigla: `CGP ${unidade.sigla}` };
+  }
+  if (claims.perfil === 'salaCia') {
+    const unidade = UNIDADES.find((u) => u.id === claims.unidade);
+    if (unidade) return { tipo: 'salaCia', unidade: unidade.id, sigla: siglaSalaCia(unidade.id) };
   }
   const setor = SETORES.find((s) => s.id === claims.perfil);
   if (setor) return { tipo: setor.id, sigla: setor.sigla };

@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-25';
+var VERSAO_MOTOR = '2026-11-26';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -315,6 +315,7 @@ function rodarMotor_(esperaMs, opcoes) {
     etapa('Efetivo manual', levarEfetivoManual_);
     etapa('E-mails do portal', processarEmails_);
     etapa('Acessos', processarAcessos_);
+    etapa('Senhas da Sala das Cias', processarSenhasSalaCia_);
     etapa('RAC', processarRac_);
     etapa('Banco de dados (cópia)', processarBackupBanco_);
     etapa('Encaminhamentos sem demanda', limparEncaminhamentosOrfaos_);
@@ -1696,6 +1697,44 @@ function processarAcessos_() {
       gravarCampos_('acessos/' + x.id, campos);
     } catch (err) {
       gravarCampos_('acessos/' + x.id, { sincronizar: false, status: 'erro', erro: err.message });
+    }
+  });
+}
+
+/**
+ * Sala de Operações de cada Cia: a P/3 grava senhasSalaCia/{cia} com a senha nova (ou só o bloqueio). Aqui a conta
+ * sala-{cia}@... é criada se ainda não existe, recebe a senha e o perfil, e os aparelhos logados com a senha antiga
+ * saem (validSince). A senha é apagada do banco logo depois de aplicada.
+ */
+function processarSenhasSalaCia_() {
+  consultar_('senhasSalaCia', 'sincronizar', true, 10).forEach(function (x) {
+    var s = x.dados;
+    var unidade = x.id;
+    try {
+      if (UNIDADES_SALA_CIA.indexOf(unidade) < 0) throw new Error('Cia desconhecida: ' + unidade);
+      var email = emailSalaCia(unidade);
+      var achou = contas_('accounts:lookup', { email: [email] });
+      var conta = achou.users && achou.users.length ? achou.users[0] : null;
+      var senha = String(s.senha || '');
+      if (!conta) {
+        if (!senha) throw new Error('a Sala ainda não tem senha: gere uma senha');
+        conta = contas_('accounts', { email: email, password: senha, displayName: 'Sala de Operações ' + unidade });
+      }
+      var mudar = {
+        localId: conta.localId,
+        customAttributes: JSON.stringify(claimsSalaCia(unidade)),
+        disableUser: s.ativo === false
+      };
+      if (senha) {
+        mudar.password = senha;
+        mudar.validSince = String(Math.floor(Date.now() / 1000));
+      }
+      contas_('accounts:update', mudar);
+      gravarCampos_('senhasSalaCia/' + unidade, {
+        senha: '', sincronizar: false, status: 'ok', erro: '', aplicadoEm: new Date().toISOString()
+      });
+    } catch (err) {
+      gravarCampos_('senhasSalaCia/' + unidade, { senha: '', sincronizar: false, status: 'erro', erro: err.message });
     }
   });
 }
