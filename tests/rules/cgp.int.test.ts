@@ -1,21 +1,25 @@
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch, type Firestore } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import {
+  anexarOrdemLink,
   apagarFotoCgp,
+  apagarOrdemCgp,
   enviarAoCgp,
   enviarFotosCgp,
   enviarRecadoCgp,
   excluirMissaoCgp,
   JaEnviadaAoCgp,
   lerFotoCgp,
+  lerOrdemPdf,
   observarFotosCgp,
   observarMissoesCgp,
+  observarOrdensCgp,
   observarRecadosCgp,
   type RecadoCgp,
 } from '../../src/data/cgp';
-import type { FotoCgp, MissaoCgp } from '../../src/domain/cgp';
+import type { FotoCgp, MissaoCgp, OrdemCgp } from '../../src/domain/cgp';
 import {
   apagarFotosEncaminhadas,
   contarFotosEncaminhadas,
@@ -175,5 +179,83 @@ describe('fotos do CGP encaminhadas à P/3', () => {
       enviadoPor: f.enviadoPor, enviadoEm: serverTimestamp(), encaminhadaPor: '1ª CIA', encaminhadaEm: serverTimestamp(),
     });
     await assertFails(lote.commit());
+  });
+});
+
+describe('ordem de serviço da missão do CGP', () => {
+  const cgp = (u = '1cia') => como({ perfil: 'cgp', unidade: u, re: '444444' });
+  const DRIVE = 'https://drive.google.com/file/d/1AbCdEf/view?usp=sharing';
+
+  /** PDF já em partes, como o portal grava (o envio usa FileReader, que só existe no navegador). */
+  async function gravarPdf(c: Firestore, id: string, cab: Record<string, unknown> = {}) {
+    await setDoc(doc(c, 'ordensCgp', id, 'partes', '0'), { dados: 'JVBE' });
+    await setDoc(doc(c, 'ordensCgp', id, 'partes', '1'), { dados: 'Rg==' });
+    await setDoc(doc(c, 'ordensCgp', id), {
+      unidadeId: '1cia', tipo: 'pdf', nome: 'OS 123.pdf', tamanho: 4, partes: 2, fim: '2026-11-27', enviadoPor: '1ª CIA', enviadoEm: serverTimestamp(), ...cab,
+    });
+  }
+
+  test('a Cia anexa o PDF; ela e o CGP dela abrem; outra Cia e o CGP de outra não', async () => {
+    const id = await enviarAoCgp(cia('1cia'), missao());
+    await gravarPdf(cia('1cia'), id);
+    const l = await uma<OrdemCgp[]>((ok, e) => observarOrdensCgp(cgp(), '1cia', ok, e));
+    expect(l.map((o) => [o.id, o.tipo, o.nome, o.fim, o.enviadoPor])).toEqual([[id, 'pdf', 'OS 123.pdf', '2026-11-27', '1ª CIA']]);
+    const { nome, blob } = await lerOrdemPdf(cgp(), id);
+    expect(nome).toBe('OS 123.pdf');
+    expect(Buffer.from(await blob.arrayBuffer()).toString()).toBe('%PDF');
+    await assertSucceeds(lerOrdemPdf(cia('1cia'), id));
+
+    await assertFails(lerOrdemPdf(cia('2cia'), id));
+    await assertFails(lerOrdemPdf(cgp('2cia'), id));
+    await assertFails(getDocs(query(collection(cia('2cia'), 'ordensCgp'), where('unidadeId', '==', '1cia'))));
+    await assertFails(getDocs(collection(como({ perfil: 'p3' }), 'ordensCgp', id, 'partes')));
+  });
+
+  test('o CGP e outra Cia não anexam nem tiram; não anexa sem missão, com outro fim ou acima do limite', async () => {
+    const id = await enviarAoCgp(cia('1cia'), missao());
+    await assertFails(anexarOrdemLink(cgp(), { id, unidadeId: '1cia', fim: '2026-11-27' }, DRIVE, 'CGP'));
+    await assertFails(setDoc(doc(cgp(), 'ordensCgp', id, 'partes', '0'), { dados: 'JVBE' }));
+    await assertFails(anexarOrdemLink(cia('2cia'), { id, unidadeId: '1cia', fim: '2026-11-27' }, DRIVE, '2ª CIA'));
+    // Missão que não existe / fim diferente do da missão.
+    await assertFails(anexarOrdemLink(cia('1cia'), { id: '1cia_enc_nao_existe', unidadeId: '1cia', fim: '2026-11-27' }, DRIVE, '1ª CIA'));
+    await assertFails(setDoc(doc(cia('1cia'), 'ordensCgp', '1cia_enc_nao_existe', 'partes', '0'), { dados: 'JVBE' }));
+    await assertFails(anexarOrdemLink(cia('1cia'), { id, unidadeId: '1cia', fim: '2026-12-31' }, DRIVE, '1ª CIA'));
+    // Acima de 10 MB, mais de 20 partes, link e partes juntos.
+    await assertFails(gravarPdf(cia('1cia'), id, { tamanho: 10485761 }));
+    await assertFails(gravarPdf(cia('1cia'), id, { partes: 21 }));
+    await assertFails(gravarPdf(cia('1cia'), id, { link: DRIVE }));
+    await assertFails(setDoc(doc(cia('1cia'), 'ordensCgp', id, 'partes', '20'), { dados: 'JVBE' }));
+
+    // As partes que sobraram das tentativas recusadas saem antes (o portal sempre apaga antes de anexar).
+    await apagarOrdemCgp(cia('1cia'), id);
+    await gravarPdf(cia('1cia'), id);
+    // Sem update: para trocar, apaga e anexa de novo.
+    await assertFails(setDoc(doc(cia('1cia'), 'ordensCgp', id), { nome: 'outro.pdf' }, { merge: true }));
+    await assertFails(apagarOrdemCgp(cgp(), id));
+    await assertFails(apagarOrdemCgp(cia('2cia'), id));
+  });
+
+  test('link: só do Google Drive; trocar o PDF pelo link apaga as partes', async () => {
+    const id = await enviarAoCgp(cia('1cia'), missao());
+    const m = { id, unidadeId: '1cia' as const, fim: '2026-11-27' };
+    await expect(anexarOrdemLink(cia('1cia'), m, 'https://exemplo.com/os.pdf', '1ª CIA')).rejects.toThrow(/Google Drive/);
+    await assertFails(
+      setDoc(doc(cia('1cia'), 'ordensCgp', id), {
+        unidadeId: '1cia', tipo: 'link', nome: 'x', link: 'https://exemplo.com/os.pdf', fim: '2026-11-27', enviadoPor: '1ª CIA', enviadoEm: serverTimestamp(),
+      }),
+    );
+    await gravarPdf(cia('1cia'), id);
+    await anexarOrdemLink(cia('1cia'), m, DRIVE, '1ª CIA');
+    const l = await uma<OrdemCgp[]>((ok, e) => observarOrdensCgp(cgp(), '1cia', ok, e));
+    expect(l.map((o) => [o.tipo, o.link])).toEqual([['link', DRIVE]]);
+    expect((await getDocs(collection(cia('1cia'), 'ordensCgp', id, 'partes'))).size).toBe(0);
+  });
+
+  test('excluir a missão do CGP tira a ordem junto', async () => {
+    const id = await enviarAoCgp(cia('1cia'), missao());
+    await gravarPdf(cia('1cia'), id);
+    await excluirMissaoCgp(cia('1cia'), id);
+    expect((await getDoc(doc(cia('1cia'), 'ordensCgp', id))).exists()).toBe(false);
+    expect((await getDocs(collection(cia('1cia'), 'ordensCgp', id, 'partes'))).size).toBe(0);
   });
 });

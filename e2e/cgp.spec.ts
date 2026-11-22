@@ -24,9 +24,11 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
 
   await page.getByRole('button', { name: '➕ Enviar para o CGP' }).click();
   const caixa = page.getByRole('group', { name: 'Enviar para o CGP' });
-  await caixa.getByLabel('De').fill(hoje);
-  await caixa.getByLabel('Até').fill(fim);
+  await caixa.getByRole('textbox', { name: 'De', exact: true }).fill(hoje);
+  await caixa.getByRole('textbox', { name: 'Até', exact: true }).fill(fim);
   await expect(caixa).toContainText('11 dias');
+  // Ordem de serviço junto com a missão (opcional): PDF.
+  await caixa.locator('input[type="file"]').setInputFiles({ name: 'OS 4cia.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 teste') });
   await caixa.getByRole('button', { name: 'Enviar para o CGP' }).click();
   await expect(page.getByText(/Já enviada para o CGP/)).toBeVisible();
   await expect(page.getByRole('button', { name: '➕ Enviar para o CGP' })).toHaveCount(0);
@@ -34,6 +36,9 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   await irParaAbaCia(page, 'CGP');
   await expect(page.getByRole('heading', { name: 'Missões do CGP' })).toBeVisible();
   await expect(page.getByRole('article', { name: assunto })).toBeVisible();
+  await expect(page.getByRole('article', { name: assunto }).getByRole('button', { name: '📄 Abrir ordem de serviço' })).toBeVisible();
+  await expect(page.getByRole('article', { name: assunto })).toContainText('OS 4cia.pdf');
+  await expect(page.getByRole('article', { name: assunto })).toContainText(/Sai do sistema em \d{2}\/\d{2}\/\d{4}/);
 
   // Recado
   await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Recados' }).click();
@@ -73,6 +78,12 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   await expect(page.locator('#menu-unidade')).toHaveCount(0);
   await expect(page.getByRole('article', { name: assunto })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Excluir do CGP' })).toHaveCount(0);
+  // O CGP baixa a ordem de serviço, mas não troca nem tira.
+  const ordemCgp = page.getByRole('article', { name: assunto });
+  const baixouOrdem = page.waitForEvent('download');
+  await ordemCgp.getByRole('button', { name: /Baixar$/ }).click();
+  expect((await baixouOrdem).suggestedFilename()).toBe('OS 4cia.pdf');
+  await expect(ordemCgp.getByRole('button', { name: /Trocar ordem|Tirar ordem/ })).toHaveCount(0);
   await expect(page.getByText(`Recado ${assunto}`)).toBeVisible();
   await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Importação de fotos' }).click();
   await expect(page.getByRole('img', { name: `Operação — Praça ${assunto}` })).toHaveCount(3);
@@ -100,6 +111,15 @@ test('CGP da Cia: enviar com período, aviso de já enviada, fotos e recado', as
   // Excluir do CGP: a demanda volta a poder ser enviada
   await page.getByRole('navigation', { name: 'Página do CGP' }).getByRole('link', { name: 'Missões' }).click();
   const art = page.getByRole('article', { name: assunto });
+  // A Cia troca o PDF pelo link do Google Drive.
+  await art.getByRole('button', { name: 'Trocar ordem' }).click();
+  await art.getByRole('radio', { name: 'Link do Google Drive' }).check();
+  await art.getByLabel(/^Link da ordem de serviço/).fill('https://exemplo.com/os.pdf');
+  await art.getByRole('button', { name: 'Anexar ordem de serviço' }).click();
+  await expect(art.getByText(/Cole um link do Google Drive/)).toBeVisible();
+  await art.getByLabel(/^Link da ordem de serviço/).fill('https://drive.google.com/file/d/1AbC/view');
+  await art.getByRole('button', { name: 'Anexar ordem de serviço' }).click();
+  await expect(art.getByRole('link', { name: '🔗 Abrir ordem de serviço (Google Drive)' })).toHaveAttribute('href', 'https://drive.google.com/file/d/1AbC/view');
   await art.getByRole('button', { name: 'Excluir do CGP' }).click();
   await art.getByRole('button', { name: 'Excluir' }).click();
   await expect(page.getByRole('article', { name: assunto })).toHaveCount(0);

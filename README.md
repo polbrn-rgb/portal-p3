@@ -75,6 +75,14 @@ Script (o perfil do CGP é gravado na conta pelo motor).
   período (de/até, no calendário) e mostra quantos dias são. A mesma demanda só vai uma vez: depois de enviada,
   aparece "✅ Já enviada para o CGP" no lugar do botão (e "✅ CGP" na lista). Para mudar, exclua na aba CGP.
 - **CGP → Missões**: o que foi enviado, por dia e as próximas, com **Excluir do CGP**.
+- **Ordem de serviço da missão**: a Cia anexa ao enviar para o CGP (opcional) ou depois, na própria missão
+  (**📎 Anexar ordem de serviço**, **Trocar ordem**, **Tirar ordem**). Pode ser **PDF de até 10 MB** ou **link do Google
+  Drive** (PDF maior, ou que já está no Drive; o arquivo precisa estar compartilhado com quem vai abrir). O CGP vê
+  **📄 Abrir ordem de serviço** / **⬇️ Baixar** (ou **🔗 Abrir** no link), mas não troca nem tira. Só a Cia dona e o CGP
+  dela abrem (nem a P/3, nem outra Cia). O PDF fica no banco só enquanto serve: o motor apaga **7 dias depois do último
+  dia da missão** (confere uma vez por dia), e excluir a missão do CGP tira a ordem junto. Com ~140 ordens por ciclo
+  de ~1 MB, ocupa no máximo uns 190 MB (no banco o PDF fica 1/3 maior) dos 1 GB do plano gratuito, e o espaço volta a cada limpeza. O prazo fica em
+  `src/domain/cgp.ts` e no `apps-script/Logica.gs` (o teste confere que são iguais).
 - **CGP → Importação de fotos**: sem limite de quantidade; descrição (Operação, Intensificação…), local e
   observação (equipe, local, viatura) obrigatórios; grava quem importou (login) e a data. Baixar e apagar.
 - **CGP → Recados**: a Cia escreve para o CGP; os recados aparecem no alto da página do CGP.
@@ -93,7 +101,7 @@ encaminhamento. Cada foto mostra "Sai do sistema em dd/mm/aaaa". As fotos que j�
 contam os 15 dias a partir dessa data (saem a partir de 07/12/2026). O prazo fica em `src/domain/fotos.ts` e no
 `apps-script/Logica.gs` (o teste confere que são iguais). Quem precisa apagar antes continua com o botão **Apagar**.
 
-Banco: `cgpMissoes`, `recadosCgp`, `fotosCgp` + `fotosCgpDados`, `fotosEncaminhadas` + `fotosEncaminhadasDados`.
+Banco: `cgpMissoes`, `ordensCgp` (+ `ordensCgp/{id}/partes`), `recadosCgp`, `fotosCgp` + `fotosCgpDados`, `fotosEncaminhadas` + `fotosEncaminhadasDados`.
 
 ## Produção diária dos pelotões (Sala de Operações das Cias)
 

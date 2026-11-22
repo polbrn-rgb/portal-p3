@@ -4,7 +4,7 @@ import { dividirEmPartes, type ArquivoRef } from '../domain/icc';
 // Arquivos (PDF) guardados no próprio banco, em partes de até ~700 KB: arquivos/{id} e arquivos/{id}/partes/{n}.
 // Só a P/3 envia e apaga; a P/3 e as Cias baixam.
 
-function paraBase64(arquivo: Blob): Promise<string> {
+export function paraBase64(arquivo: Blob): Promise<string> {
   return new Promise((ok, falha) => {
     const r = new FileReader();
     r.onload = () => ok(String(r.result).split(',')[1] ?? '');
@@ -40,15 +40,18 @@ export async function baixarArquivo(db: Firestore, id: string): Promise<{ nome: 
   const lidas = await getDocs(collection(db, 'arquivos', id, 'partes'));
   const porOrdem = lidas.docs.sort((a, b) => Number(a.id) - Number(b.id)).map((d) => String(d.data().dados ?? ''));
   if (porOrdem.length !== partes) throw new Error('Arquivo incompleto.');
-  const bin = atob(porOrdem.join(''));
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return { nome, blob: new Blob([bytes], { type: tipo }) };
+  return { nome, blob: base64ParaBlob(porOrdem.join(''), tipo) };
 }
 
-/** Baixa e entrega o arquivo ao navegador (também no celular). */
-export async function salvarNoAparelho(db: Firestore, id: string): Promise<void> {
-  const { nome, blob } = await baixarArquivo(db, id);
+export function base64ParaBlob(base64: string, tipo: string): Blob {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: tipo });
+}
+
+/** Entrega o arquivo ao navegador (também no celular). */
+export function entregarAoAparelho(nome: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -57,4 +60,10 @@ export async function salvarNoAparelho(db: Firestore, id: string): Promise<void>
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Baixa e entrega o arquivo ao navegador (também no celular). */
+export async function salvarNoAparelho(db: Firestore, id: string): Promise<void> {
+  const { nome, blob } = await baixarArquivo(db, id);
+  entregarAoAparelho(nome, blob);
 }
