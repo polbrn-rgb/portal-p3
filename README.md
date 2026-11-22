@@ -61,6 +61,13 @@ Número no mesmo formato da P/3, com a seção da Cia: `OFÍCIO 8BPMM-001/103/27
 Força Tática = 703). A sequência é por Cia e por tipo de saída e volta para 001 todo ano (ano da data de entrada).
 Contadores em `contadoresCia/{cia}_{ano}_{TIPO}`; demandas em `demandasCia`. Uma Cia não vê o numerador da outra.
 
+- **Ordem Verbal**: com a origem "Ordem Verbal", o campo "Nº da origem" vira **Quem deu a ordem** (obrigatório, até 120
+  caracteres; o banco também confere ao criar). Aparece na lista ("Ordem verbal de …"), entra na busca e na descrição
+  do evento da Agenda. Demandas antigas sem o campo continuam podendo ser concluídas; ao editar, o campo é pedido.
+- **Enviar também para o CGP** (só na demanda nova): marque a caixa, escolha o período (o último dia acompanha o prazo)
+  e, se quiser, a ordem de serviço. Ao gerar o número, a missão já vai para o CGP. Se o envio ao CGP falhar, o número
+  continua valendo e dá para enviar depois, abrindo a demanda.
+
 ## CGP e Sala de Operações das Cias/FT
 
 Cada Cia/FT tem as abas **CGP** e **Sala de Operações** (esta ainda em construção). A Cia administra o CGP, e uma
@@ -71,7 +78,8 @@ Quem entra com esse RE vê **só a página do CGP daquela Cia**: missões e reca
 Não envia nem exclui missões (isso é da Cia). Depois de atualizar, cole de novo o **Motor.gs e o Logica.gs** no Apps
 Script (o perfil do CGP é gravado na conta pelo motor).
 
-- **Enviar para o CGP**: botão na demanda que a P/3 mandou para a Cia e na demanda do Numerador da Cia. Pede o
+- **Enviar para o CGP**: botão na demanda que a P/3 mandou para a Cia e na demanda do Numerador da Cia (no Numerador
+  também dá para enviar já ao criar a demanda). Pede o
   período (de/até, no calendário) e mostra quantos dias são. A mesma demanda só vai uma vez: depois de enviada,
   aparece "✅ Já enviada para o CGP" no lugar do botão (e "✅ CGP" na lista). Para mudar, exclua na aba CGP.
 - **CGP → Missões**: o que foi enviado, por dia e as próximas, com **Excluir do CGP**.
@@ -79,8 +87,8 @@ Script (o perfil do CGP é gravado na conta pelo motor).
   (**📎 Anexar ordem de serviço**, **Trocar ordem**, **Tirar ordem**). Pode ser **PDF de até 10 MB** ou **link do Google
   Drive** (PDF maior, ou que já está no Drive; o arquivo precisa estar compartilhado com quem vai abrir). O CGP vê
   **📄 Abrir ordem de serviço** / **⬇️ Baixar** (ou **🔗 Abrir** no link), mas não troca nem tira. Só a Cia dona e o CGP
-  dela abrem (nem a P/3, nem outra Cia). O PDF fica no banco só enquanto serve: o motor apaga **7 dias depois do último
-  dia da missão** (confere uma vez por dia), e excluir a missão do CGP tira a ordem junto. Com ~140 ordens por ciclo
+  dela abrem (nem a P/3, nem outra Cia). O PDF fica no banco só enquanto serve: sai do sistema **1 dia depois do último
+  dia da missão** (o motor apaga na primeira rodada do dia seguinte), e excluir a missão do CGP tira a ordem junto. Com ~140 ordens por ciclo
   de ~1 MB, ocupa no máximo uns 190 MB (no banco o PDF fica 1/3 maior) dos 1 GB do plano gratuito, e o espaço volta a cada limpeza. O prazo fica em
   `src/domain/cgp.ts` e no `apps-script/Logica.gs` (o teste confere que são iguais).
 - **CGP → Importação de fotos**: sem limite de quantidade; descrição (Operação, Intensificação…), local e

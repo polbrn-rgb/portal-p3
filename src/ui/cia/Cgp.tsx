@@ -62,6 +62,59 @@ export function missaoDe(missoes: MissaoCgp[], unidade: UnidadeId, origem: Orige
   return missoes.find((m) => m.id === id);
 }
 
+export type PeriodoCgpTela = { inicio: string; fim: string };
+
+/** Período sugerido: de hoje até o prazo (ou só hoje, sem prazo ou com prazo vencido). */
+export function periodoSugerido(fimSugerido?: string): PeriodoCgpTela {
+  const hoje = hojeISO();
+  return { inicio: hoje, fim: fimSugerido && fimSugerido >= hoje ? fimSugerido : hoje };
+}
+
+/** "De" e "Até" da missão do CGP, com quantos dias são. */
+export function CamposPeriodoCgp(p: { periodo: PeriodoCgpTela; aoMudar: (v: PeriodoCgpTela) => void; erros: ErrosPeriodo }) {
+  const dias = diasDoPeriodo(p.periodo);
+  return (
+    <>
+      <div className="grade">
+        <Campo rotulo="De" erro={p.erros.inicio} obrigatorio>
+          <input type="date" value={p.periodo.inicio} onChange={(e) => p.aoMudar({ ...p.periodo, inicio: e.target.value })} />
+        </Campo>
+        <Campo rotulo="Até" erro={p.erros.fim} obrigatorio>
+          <input type="date" value={p.periodo.fim} min={p.periodo.inicio} onChange={(e) => p.aoMudar({ ...p.periodo, fim: e.target.value })} />
+        </Campo>
+      </div>
+      {dias > 0 && (
+        <p className="item-info">
+          {periodoTexto(p.periodo)} · {dias} dia{dias > 1 ? 's' : ''}
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * Cria a missão do CGP e anexa a ordem (se escolhida). A missão vai primeiro; se só a ordem falhar,
+ * devolve ordemOk = false (dá para anexar depois na aba CGP).
+ */
+export async function enviarMissaoComOrdem(
+  m: { unidade: UnidadeId; origem: OrigemMissaoCgp; refId: string; numero: string; titulo: string; periodo: PeriodoCgpTela },
+  ordem: EscolhaOrdem,
+  aviso: (t: string) => void = () => undefined,
+): Promise<{ ordemOk: boolean }> {
+  const quem = autor(m.unidade);
+  const id = await enviarAoCgp(db, { ...m, criadoPor: quem });
+  try {
+    await gravarEscolha(ordem, { id, unidadeId: m.unidade, fim: m.periodo.fim }, quem, aviso);
+    return { ordemOk: true };
+  } catch {
+    return { ordemOk: false };
+  } finally {
+    aviso('');
+  }
+}
+
+export const AVISO_ORDEM_FALHOU = 'A missão foi enviada, mas a ordem de serviço não. Anexe pela aba CGP → Missões.';
+
 /**
  * "Enviar para o CGP": abre o período (de/até, com o calendário). Se a demanda já foi para o CGP,
  * mostra o aviso no lugar do botão (não duplica serviço).
@@ -77,9 +130,8 @@ export function EnviarAoCgp(p: {
   missoes: MissaoCgp[];
 }) {
   const ja = missaoDe(p.missoes, p.unidade, p.origem, p.refId);
-  const hoje = hojeISO();
   const [aberto, setAberto] = useState(false);
-  const [periodo, setPeriodo] = useState({ inicio: hoje, fim: p.fimSugerido && p.fimSugerido >= hoje ? p.fimSugerido : hoje });
+  const [periodo, setPeriodo] = useState(() => periodoSugerido(p.fimSugerido));
   const [erros, setErros] = useState<ErrosPeriodo>({});
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -110,57 +162,20 @@ export function EnviarAoCgp(p: {
     if (Object.keys(e).length || eOrdem) return;
     setOcupado(true);
     setErro('');
-    let id = '';
     try {
-      id = await enviarAoCgp(db, { unidade: p.unidade, origem: p.origem, refId: p.refId, numero: p.numero, titulo: p.titulo, periodo, criadoPor: autor(p.unidade) });
+      const r = await enviarMissaoComOrdem({ unidade: p.unidade, origem: p.origem, refId: p.refId, numero: p.numero, titulo: p.titulo, periodo }, ordem, setProgresso);
+      if (r.ordemOk) setAberto(false);
+      else setErro(AVISO_ORDEM_FALHOU);
     } catch (x) {
       setErro(x instanceof JaEnviadaAoCgp ? x.message : 'Não foi possível enviar para o CGP. Tente de novo.');
-      setOcupado(false);
-      return;
     }
-    try {
-      await gravarEscolha(ordem, { id, unidadeId: p.unidade, fim: periodo.fim }, autor(p.unidade), setProgresso);
-      setAberto(false);
-    } catch {
-      // A missão já foi; a ordem pode ser anexada depois na aba CGP.
-      setErro('A missão foi enviada, mas a ordem de serviço não. Anexe pela aba CGP → Missões.');
-    }
-    setProgresso('');
     setOcupado(false);
   }
 
-  const dias = diasDoPeriodo(periodo);
   return (
     <div className="cartao grupo cgp-periodo" role="group" aria-label="Enviar para o CGP">
       <strong>Enviar para o CGP — quanto tempo dura?</strong>
-      <div className="grade">
-        <Campo rotulo="De" erro={erros.inicio} obrigatorio>
-          <input
-            type="date"
-            value={periodo.inicio}
-            onChange={(e) => {
-              const v = e.target.value;
-              setPeriodo((x) => ({ ...x, inicio: v }));
-            }}
-          />
-        </Campo>
-        <Campo rotulo="Até" erro={erros.fim} obrigatorio>
-          <input
-            type="date"
-            value={periodo.fim}
-            min={periodo.inicio}
-            onChange={(e) => {
-              const v = e.target.value;
-              setPeriodo((x) => ({ ...x, fim: v }));
-            }}
-          />
-        </Campo>
-      </div>
-      {dias > 0 && (
-        <p className="item-info">
-          {periodoTexto(periodo)} · {dias} dia{dias > 1 ? 's' : ''}
-        </p>
-      )}
+      <CamposPeriodoCgp periodo={periodo} aoMudar={setPeriodo} erros={erros} />
       <EscolherOrdem valor={ordem} aoMudar={(v) => { setOrdem(v); setErroOrdem(''); }} erro={erroOrdem} opcional />
       {progresso && <p className="item-info" role="status">{progresso}</p>}
       {erro && (
@@ -182,11 +197,11 @@ export function EnviarAoCgp(p: {
 
 // ---------- Ordem de serviço da missão (PDF ou link do Google Drive) ----------
 
-type EscolhaOrdem = { modo: 'pdf' | 'link'; pdf: File | null; link: string };
-const SEM_ORDEM: EscolhaOrdem = { modo: 'pdf', pdf: null, link: '' };
+export type EscolhaOrdem = { modo: 'pdf' | 'link'; pdf: File | null; link: string };
+export const SEM_ORDEM: EscolhaOrdem = { modo: 'pdf', pdf: null, link: '' };
 
 /** Sem nada escolhido: '' se a ordem é opcional; senão, o erro do que falta. */
-function erroDaEscolha(e: EscolhaOrdem, obrigatoria: boolean): string {
+export function erroDaEscolha(e: EscolhaOrdem, obrigatoria: boolean): string {
   if (e.modo === 'pdf') return e.pdf ? validarPdfOrdem(e.pdf) : obrigatoria ? 'Escolha o PDF da ordem de serviço.' : '';
   return e.link.trim() || obrigatoria ? validarLinkOrdem(e.link) : '';
 }
@@ -204,7 +219,7 @@ async function gravarEscolha(e: EscolhaOrdem, m: Pick<MissaoCgp, 'id' | 'unidade
   return false;
 }
 
-function EscolherOrdem(p: { valor: EscolhaOrdem; aoMudar: (v: EscolhaOrdem) => void; erro: string; opcional?: boolean }) {
+export function EscolherOrdem(p: { valor: EscolhaOrdem; aoMudar: (v: EscolhaOrdem) => void; erro: string; opcional?: boolean }) {
   const v = p.valor;
   const nome = useId();
   return (

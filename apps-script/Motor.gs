@@ -13,7 +13,7 @@
  */
 
 /** Tem que ser igual ao VERSAO_LOGICA do Logica.gs (o diagnóstico confere: cole sempre os dois juntos). */
-var VERSAO_MOTOR = '2026-11-24';
+var VERSAO_MOTOR = '2026-11-25';
 var CONFIG_P3 = {
   PROJETO: 'portal-p3',
   AGENDA_CFP: '3be42784b6e4ea29cd4d52fab39246f1bc670a94b01486464a4e904a85945506@group.calendar.google.com',
@@ -410,8 +410,8 @@ function apagarFotosVencidas_(forcar) {
 }
 
 /**
- * Uma vez por dia: apaga a ordem de serviço (PDF ou link) das missões do CGP que terminaram há mais de
- * ORDENS_DIAS_APOS_FIM dias. As partes primeiro: se o cabeçalho falhar, ele é apagado na próxima rodada.
+ * Uma vez por dia (na primeira rodada do dia): apaga a ordem de serviço (PDF ou link) das missões do CGP que
+ * terminaram há ORDENS_DIAS_APOS_FIM dia(s) ou mais. As partes primeiro: se o cabeçalho falhar, ele é apagado na próxima rodada.
  */
 function apagarOrdensVencidas_(forcar) {
   var props = PropertiesService.getScriptProperties();

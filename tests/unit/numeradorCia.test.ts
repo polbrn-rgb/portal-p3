@@ -3,9 +3,13 @@ import {
   atrasadaCia,
   demandaCiaVazia,
   formatarNumeroCia,
+  dadosDaDemandaCia,
   idContadorCia,
+  normalizarDemandaCia,
   SECAO_DA_UNIDADE,
+  textoOrdemVerbal,
   validarDemandaCia,
+  type DemandaCia,
 } from '../../src/domain/numeradorCia';
 import { UNIDADES } from '../../src/domain/unidades';
 
@@ -29,5 +33,20 @@ describe('numerador das Cias/FT', () => {
     expect(validarDemandaCia({ ...d, saida: 'Escala', prazo: '2027-01-15' })).toEqual({});
     expect(atrasadaCia({ prazo: '2027-01-15', status: 'em_aberto' }, '2027-01-16')).toBe(true);
     expect(atrasadaCia({ prazo: '2027-01-15', status: 'concluida' }, '2027-01-16')).toBe(false);
+  });
+
+  test('Ordem Verbal: quem deu a ordem é obrigatório; nas outras origens o campo é limpo', () => {
+    const d = { ...demandaCiaVazia('2027-01-10'), saida: 'Policiamento no evento', origem: 'Ordem Verbal' };
+    expect(validarDemandaCia(d).quemOrdenou).toBe('Informe quem deu a ordem.');
+    expect(validarDemandaCia({ ...d, quemOrdenou: '   ' }).quemOrdenou).toBeTruthy();
+    expect(validarDemandaCia({ ...d, quemOrdenou: 'x'.repeat(121) }).quemOrdenou).toBeTruthy();
+    expect(validarDemandaCia({ ...d, quemOrdenou: ' Cap PM Fulano ' })).toEqual({});
+    expect(normalizarDemandaCia({ ...d, quemOrdenou: ' Cap PM Fulano ' }).quemOrdenou).toBe('Cap PM Fulano');
+    expect(normalizarDemandaCia({ ...d, origem: 'E-mail', quemOrdenou: 'Cap PM Fulano' }).quemOrdenou).toBe('');
+    expect(validarDemandaCia({ ...d, origem: 'SEI' })).toEqual({});
+    expect(textoOrdemVerbal({ origem: 'Ordem Verbal', quemOrdenou: 'Cap PM Fulano' })).toBe('Ordem verbal de Cap PM Fulano');
+    expect(textoOrdemVerbal({ origem: 'SEI', quemOrdenou: '' })).toBe('');
+    // Demanda antiga (gravada antes do campo) abre com o campo vazio.
+    expect(dadosDaDemandaCia({ ...d, quemOrdenou: undefined } as unknown as DemandaCia).quemOrdenou).toBe('');
   });
 });

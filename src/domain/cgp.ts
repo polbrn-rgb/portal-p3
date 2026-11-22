@@ -70,10 +70,10 @@ export function proximasMissoes(lista: MissaoCgp[], dia: string, quantas = 10): 
 
 // ---------- Ordem de serviço da missão ----------
 // A Cia anexa a ordem (PDF ou link do Google Drive) para o CGP ler. O PDF fica no banco só enquanto serve:
-// o motor apaga DIAS_ORDEM_APOS_FIM dias depois do último dia da missão (e sai junto quando a missão é excluída).
-// Tem que bater com ORDENS_DIAS_APOS_FIM do apps-script/Logica.gs (o teste confere).
+// sai do sistema DIAS_ORDEM_APOS_FIM dia(s) depois do último dia da missão (o motor apaga na virada do dia) e sai
+// junto quando a missão é excluída. Tem que bater com ORDENS_DIAS_APOS_FIM do apps-script/Logica.gs (o teste confere).
 
-export const DIAS_ORDEM_APOS_FIM = 7;
+export const DIAS_ORDEM_APOS_FIM = 1;
 /** Igual ao limite das regras do banco (10 MB). Maior que isso: use o link do Google Drive. */
 export const LIMITE_PDF_ORDEM = 10 * 1024 * 1024;
 export const LIMITE_LINK_ORDEM = 500;
@@ -89,7 +89,7 @@ export type OrdemCgp = {
   partes?: number;
   /** Só no link. */
   link?: string;
-  /** Último dia da missão (o motor apaga depois de DIAS_ORDEM_APOS_FIM dias). */
+  /** Último dia da missão (a ordem sai DIAS_ORDEM_APOS_FIM dia(s) depois). */
   fim: string;
   enviadoPor: string;
   enviadoEm: Date | null;
@@ -113,13 +113,14 @@ export function validarLinkOrdem(link: string): string {
   return '';
 }
 
-/** Dia em que a ordem sai do sistema. */
+/** Dia em que a ordem sai do sistema (na virada para esse dia). */
 export function ordemApagaEm(fim: string): string {
-  return somarDias(fim, DIAS_ORDEM_APOS_FIM + 1);
+  return somarDias(fim, DIAS_ORDEM_APOS_FIM);
 }
 
 export function textoOrdemApagaEm(fim: string): string {
-  return `Sai do sistema em ${formatarData(ordemApagaEm(fim))} (${DIAS_ORDEM_APOS_FIM} dias depois do fim da missão)`;
+  const n = DIAS_ORDEM_APOS_FIM;
+  return `Sai do sistema em ${formatarData(ordemApagaEm(fim))} (${n} dia${n > 1 ? 's' : ''} depois do fim da missão)`;
 }
 
 /** Tamanho para a tela: "850 KB", "2,4 MB". */

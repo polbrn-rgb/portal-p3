@@ -37,6 +37,8 @@ export type DadosDemandaCia = {
   saida: string;
   origem: string;
   numeroOrigem: string;
+  /** Origem "Ordem Verbal": quem deu a ordem (obrigatório). */
+  quemOrdenou: string;
   /** Prazo: vira evento na agenda da Cia. */
   prazo: string;
   responsavel: string;
@@ -58,6 +60,8 @@ export type DemandaCia = DadosDemandaCia & {
 export type ErrosDemandaCia = Partial<Record<keyof DadosDemandaCia, string>>;
 
 export const LIMITE_SAIDA = 200;
+export const LIMITE_QUEM_ORDENOU = 120;
+export const ORIGEM_ORDEM_VERBAL = 'Ordem Verbal';
 export const LIMITE_OBSERVACAO = 5000;
 
 export function demandaCiaVazia(hoje: string): DadosDemandaCia {
@@ -67,6 +71,7 @@ export function demandaCiaVazia(hoje: string): DadosDemandaCia {
     saida: '',
     origem: '',
     numeroOrigem: '',
+    quemOrdenou: '',
     prazo: '',
     responsavel: '',
     observacao: '',
@@ -80,6 +85,8 @@ export function normalizarDemandaCia(d: DadosDemandaCia): DadosDemandaCia {
     saida: d.saida.trim(),
     origem: d.origem.trim(),
     numeroOrigem: d.numeroOrigem.trim(),
+    // Só a Ordem Verbal tem "quem deu a ordem".
+    quemOrdenou: d.origem.trim() === ORIGEM_ORDEM_VERBAL ? (d.quemOrdenou ?? '').trim() : '',
     prazo: d.prazo,
     responsavel: d.responsavel.trim(),
     observacao: d.observacao.trim(),
@@ -93,6 +100,10 @@ export function validarDemandaCia(bruto: DadosDemandaCia): ErrosDemandaCia {
   if (!d.tipoSaida) e.tipoSaida = 'Escolha o tipo de saída.';
   if (!d.saida) e.saida = 'Informe o assunto.';
   else if (d.saida.length > LIMITE_SAIDA) e.saida = `O assunto pode ter até ${LIMITE_SAIDA} caracteres.`;
+  if (d.origem === ORIGEM_ORDEM_VERBAL) {
+    if (!d.quemOrdenou) e.quemOrdenou = 'Informe quem deu a ordem.';
+    else if (d.quemOrdenou.length > LIMITE_QUEM_ORDENOU) e.quemOrdenou = `Até ${LIMITE_QUEM_ORDENOU} caracteres.`;
+  }
   if (d.prazo && !ehDataISO(d.prazo)) e.prazo = 'Data inválida.';
   else if (d.prazo && !e.dataEntrada && d.prazo < d.dataEntrada) e.prazo = 'O prazo não pode ser antes da entrada.';
   if (d.observacao.length > LIMITE_OBSERVACAO) e.observacao = `A observação pode ter até ${LIMITE_OBSERVACAO} caracteres.`;
@@ -110,6 +121,11 @@ export function formatarNumeroCia(tipo: string, unidade: UnidadeId, sequencia: n
 }
 
 export { anoDe };
+
+/** "Ordem verbal de Cap PM Fulano" ('' quando não é Ordem Verbal). */
+export function textoOrdemVerbal(d: Pick<DadosDemandaCia, 'origem' | 'quemOrdenou'>): string {
+  return d.origem === ORIGEM_ORDEM_VERBAL && d.quemOrdenou ? `Ordem verbal de ${d.quemOrdenou}` : '';
+}
 
 /** Título do evento de prazo na agenda da Cia. */
 export function tituloDoPrazo(numeroDocumento: string, saida: string): string {
@@ -134,5 +150,5 @@ export function camposAlteradosCia(a: DadosDemandaCia, b: DadosDemandaCia): (key
 
 export function dadosDaDemandaCia(d: DemandaCia): DadosDemandaCia {
   const { dataEntrada, tipoSaida, saida, origem, numeroOrigem, prazo, responsavel, observacao } = d;
-  return { dataEntrada, tipoSaida, saida, origem, numeroOrigem, prazo, responsavel, observacao };
+  return { dataEntrada, tipoSaida, saida, origem, numeroOrigem, quemOrdenou: d.quemOrdenou ?? '', prazo, responsavel, observacao };
 }

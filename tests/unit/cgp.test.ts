@@ -66,16 +66,17 @@ describe('CGP', () => {
     expect(validarLinkOrdem('https://exemplo.com/os.pdf')).toMatch(/Google Drive/);
   });
 
-  test('ordem de serviço sai 7 dias depois do fim da missão; portal e motor batem', () => {
+  test('ordem de serviço sai 1 dia depois do fim da missão; portal e motor batem', () => {
     expect(logica.ORDENS_DIAS_APOS_FIM).toBe(DIAS_ORDEM_APOS_FIM);
-    expect(ordemApagaEm('2026-11-27')).toBe('2026-12-05');
-    expect(textoOrdemApagaEm('2026-11-27')).toBe('Sai do sistema em 05/12/2026 (7 dias depois do fim da missão)');
+    expect(ordemApagaEm('2026-11-27')).toBe('2026-11-28');
+    expect(ordemApagaEm('2026-12-31')).toBe('2027-01-01');
+    expect(textoOrdemApagaEm('2026-11-27')).toBe('Sai do sistema em 28/11/2026 (1 dia depois do fim da missão)');
     const limite = logica.limiteOrdensVencidas as (agora: number) => string;
     // O motor apaga quando fim < limite (horário de Brasília).
-    expect(limite(Date.parse('2026-12-05T02:59:00Z'))).toBe('2026-11-27'); // 04/12 23h59 em Brasília: fica
-    expect(limite(Date.parse('2026-12-05T03:00:00Z'))).toBe('2026-11-28'); // 05/12 0h em Brasília: sai
-    expect('2026-11-27' < limite(Date.parse('2026-12-05T03:00:00Z'))).toBe(true);
-    expect(limite(Date.parse('2027-01-03T12:00:00Z'))).toBe('2026-12-27');
+    expect(limite(Date.parse('2026-11-28T02:59:00Z'))).toBe('2026-11-27'); // 27/11 23h59 em Brasília: fica
+    expect(limite(Date.parse('2026-11-28T03:00:00Z'))).toBe('2026-11-28'); // 28/11 0h em Brasília: sai
+    expect('2026-11-27' < limite(Date.parse('2026-11-28T03:00:00Z'))).toBe(true);
+    expect(limite(Date.parse('2027-01-01T12:00:00Z'))).toBe(ordemApagaEm('2026-12-31'));
   });
 
   test('tamanho do PDF na tela', () => {
