@@ -99,7 +99,7 @@ export function FormIcc() {
             <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
           </Campo>
         </div>
-        <Campo rotulo="Ordem da ICC (PDF, até 10 MB)" obrigatorio erro={erros.arquivo}>
+        <Campo rotulo="Anexo da ICC (PDF, até 10 MB)" obrigatorio erro={erros.arquivo}>
           <input type="file" accept="application/pdf,.pdf" onChange={(e) => setPdf(e.target.files?.[0] ?? null)} />
         </Campo>
       </div>
