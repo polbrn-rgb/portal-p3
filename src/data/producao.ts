@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -162,4 +163,18 @@ export function observarProducaoDoMes(db: Firestore, mes: string, ok: (l: Produc
     (s) => ok(s.docs.map((d) => paraProducao(d.id, d.data({ serverTimestamps: 'estimate' })))),
     erro,
   );
+}
+
+/**
+ * P/3 → Sala de Operações → Resultados das Cias: os lançamentos do período (dia de serviço), de todas as unidades
+ * ou de uma só. Leitura única (não fica ouvindo): só quando a P/3 abre a sub-aba ou pede de novo.
+ */
+export async function buscarProducaoDoPeriodo(db: Firestore, de: string, ate: string, unidade?: UnidadeId): Promise<Producao[]> {
+  const filtros = [
+    ...(unidade ? [where('unidadeId', '==', unidade)] : []),
+    where('data', '>=', de),
+    where('data', '<=', ate),
+  ];
+  const s = await getDocs(query(collection(db, COLECAO_PRODUCAO), ...filtros));
+  return s.docs.map((d) => paraProducao(d.id, d.data()));
 }

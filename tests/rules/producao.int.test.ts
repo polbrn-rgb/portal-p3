@@ -3,6 +3,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestE
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc, where, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import {
+  buscarProducaoDoPeriodo,
   excluirProducao,
   observarPrimeiroLancamento,
   observarPrimeirosLancamentos,
@@ -148,6 +149,28 @@ describe('produção diária dos pelotões', () => {
     await salvarProducao(c, lancamento({ pelotao: 'pelB' }));
     await assertFails(addDoc(collection(c, 'producaoHistorico'), { ...falso, acao: 'excluido' }));
     await assertFails(addDoc(collection(cia('2cia'), 'producaoHistorico'), { ...falso, unidadeId: '2cia', producaoId: '2cia_2026-11-20_pelB' }));
+  });
+
+  test('P/3 → Sala de Operações: resultados do período, de todas ou de uma unidade; Cia não consulta as outras', async () => {
+    await salvarProducao(cia('1cia'), lancamento({ data: '2026-11-19' }));
+    await salvarProducao(cia('1cia'), lancamento({ data: '2026-11-20', pelotao: 'pelB' }));
+    await salvarProducao(cia('2cia'), lancamento({ unidade: '2cia', data: '2026-11-20' }));
+    await salvarProducao(cia('ft'), lancamento({ unidade: 'ft', data: '2026-11-21' }));
+    const ids = (l: Producao[]) => l.map((x) => x.id).sort();
+
+    expect(ids(await buscarProducaoDoPeriodo(p3(), '2026-11-20', '2026-11-20'))).toEqual(['1cia_2026-11-20_pelB', '2cia_2026-11-20_pelA']);
+    expect(ids(await buscarProducaoDoPeriodo(p3(), '2026-11-19', '2026-11-21'))).toHaveLength(4);
+    expect(ids(await buscarProducaoDoPeriodo(p3(), '2026-11-19', '2026-11-21', '1cia'))).toEqual(['1cia_2026-11-19_pelA', '1cia_2026-11-20_pelB']);
+    const [l] = await buscarProducaoDoPeriodo(p3(), '2026-11-21', '2026-11-21');
+    expect(l).toMatchObject({ unidadeId: 'ft', lancadoPor: 'Sd PM SALA (RE 111111)' });
+    expect(l.itens.pessoasAbordadas).toBe(40);
+    expect(l.taloes[0].bopc).toBe('XY1234');
+
+    // A Cia só consulta a dela.
+    expect(ids(await buscarProducaoDoPeriodo(cia('1cia'), '2026-11-19', '2026-11-21', '1cia'))).toHaveLength(2);
+    await assertFails(buscarProducaoDoPeriodo(cia('1cia'), '2026-11-19', '2026-11-21'));
+    await assertFails(buscarProducaoDoPeriodo(cia('1cia'), '2026-11-19', '2026-11-21', '2cia'));
+    await assertFails(buscarProducaoDoPeriodo(como({ perfil: 'sala' }), '2026-11-19', '2026-11-21'));
   });
 
   test('primeiro lançamento de cada Cia (início da contagem das pendências)', async () => {

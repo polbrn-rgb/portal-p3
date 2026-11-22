@@ -412,3 +412,28 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
 export function nomePlanilha(mes: string, unidade?: UnidadeId): string {
   return `Produtividade ${unidade ? siglaDe(unidade) : '8º BPM-M'} ${mes}.xlsx`;
 }
+
+// ---------- P/3 → Sala de Operações → Resultados das Cias (consulta por período) ----------
+
+/** Maior período de uma consulta (cada dia lê ~1 documento por pelotão que lançou). */
+export const MAXIMO_DIAS_CONSULTA = 31;
+
+/** O período pedido é válido? Devolve a mensagem do problema ou '' (tudo certo). */
+export function erroPeriodo(de: string, ate: string, hoje: string): string {
+  if (!ehDataISO(de) || !ehDataISO(ate)) return 'Informe as duas datas.';
+  if (de > ate) return 'A data inicial é depois da final.';
+  if (de > hoje) return 'A data inicial ainda não chegou.';
+  if (somarDias(de, MAXIMO_DIAS_CONSULTA - 1) < ate) return `Escolha no máximo ${MAXIMO_DIAS_CONSULTA} dias.`;
+  return '';
+}
+
+/** Os itens que têm algum valor em pelo menos uma das somas (o resto fica de fora da tabela). */
+export function itensComValor(somas: readonly Itens[]): ItemId[] {
+  return IDS_ITENS.filter((id) => somas.some((s) => (s[id] ?? 0) !== 0));
+}
+
+/** Ordena os lançamentos para mostrar: dia mais novo primeiro, depois a ordem dos pelotões. */
+export function ordenarLancamentos<T extends Pick<Producao, 'data' | 'pelotao'>>(lista: readonly T[]): T[] {
+  const ordem: readonly string[] = PELOTOES.map((p) => p.id);
+  return [...lista].sort((a, b) => b.data.localeCompare(a.data) || ordem.indexOf(a.pelotao) - ordem.indexOf(b.pelotao));
+}
