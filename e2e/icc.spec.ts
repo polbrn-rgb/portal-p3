@@ -14,7 +14,7 @@ test('ICC: a P/3 publica a ordem (PDF), a Cia baixa e informa os PM; a P/3 acomp
   await page.getByRole('button', { name: 'Publicar ICC' }).click();
   await expect(page.getByText('Escolha o PDF da ordem.')).toBeVisible();
   await page.getByLabel('Nº da ICC').fill(numero);
-  await page.getByLabel(/Ordem da ICC/).setInputFiles({ name: `ICC ${numero}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 teste') });
+  await page.getByLabel(/Anexo da ICC/).setInputFiles({ name: `ICC ${numero}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 teste') });
   await page.getByRole('button', { name: 'Publicar ICC' }).click();
   await expect(page.getByRole('heading', { name: `ICC ${numero}`, level: 2 })).toBeVisible({ timeout: 15000 });
   expect(await sobraLateral(page)).toBeLessThanOrEqual(0);
