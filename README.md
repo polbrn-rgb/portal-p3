@@ -111,22 +111,16 @@ contam os 15 dias a partir dessa data (saem a partir de 07/12/2026). O prazo fic
 
 Banco: `cgpMissoes`, `ordensCgp` (+ `ordensCgp/{id}/partes`), `recadosCgp`, `fotosCgp` + `fotosCgpDados`, `fotosEncaminhadas` + `fotosEncaminhadasDados`.
 
-## Senha da Sala de Operações de cada Cia/FT
+## Acesso à Sala de Operações de cada Cia/FT
 
-Cada Cia/FT tem um login próprio para a **Sala de Operações**, separado do da Cia: quem entra com ele vê **só a Sala de
-Operações daquela Cia** (lançar a produção dos pelotões e o resumo do mês). Não vê numerador, encaminhamentos, CGP etc.
+O policial da Sala de Operações da Cia entra como os outros: **RE e a senha dele**. Quem libera é o Administrador:
+**🔒 Administrador → Acessos**, cadastre o RE com o acesso **Sala de Operações de Cia / FT** e escolha a Cia (ele recebe o
+link para criar a senha no e-mail funcional). Quem entra com esse RE vê **só a Sala de Operações daquela Cia** (lançar a
+produção dos pelotões e o resumo do mês): não vê numerador, encaminhamentos, CGP nem as outras Cias. No lançamento fica
+"Lançado por" com o nome e o RE de quem lançou. Bloquear, reenviar link e excluir funcionam como nos outros acessos.
 
-- **Gerar a senha**: P/3 → **Sala de Operações** → **Senhas das Cias** → **Gerar senha** na Cia. A senha (10
-  caracteres, sem 0/O/1/l/I) aparece **uma vez só**, com o botão **Copiar**: anote e entregue à Sala da Cia. Vale quando a
-  situação fica **Ativa** (o motor aplica em até 5 minutos; normalmente na hora).
-- **Gerar senha nova** (pede confirmação): a antiga deixa de valer e os aparelhos logados com ela saem.
-  **Bloquear/Desbloquear**: ninguém entra enquanto estiver bloqueada.
-- **Entrar**: na tela de login, **Entrar na Sala de Operações da Cia** → escolhe a Cia → senha. Esqueceu: pede outra à P/3.
-- No lançamento fica "Lançado por: Sala de Operações 1ª CIA" (é uma conta só por Cia).
-
-Por trás: a P/3 grava `senhasSalaCia/{cia}`; o motor cria/atualiza a conta `sala-{cia}@portal-p3.firebaseapp.com` (perfil
-`salaCia` + unidade), aplica a senha e **apaga a senha do banco**. Só a P/3 lê essa coleção. Depois de atualizar, publique
-as regras (`npm run deploy:regras`) e cole de novo o **Motor.gs e o Logica.gs** no Apps Script.
+Por trás: o motor grava na conta o perfil `salaCia` + a Cia. Depois de atualizar, publique as regras
+(`npm run deploy:regras`) e cole de novo o **Motor.gs e o Logica.gs** no Apps Script.
 
 ## Produção diária dos pelotões (Sala de Operações das Cias)
 
@@ -268,8 +262,7 @@ histórico das demandas.
   e ficam no banco (`fotosTds` + `fotosTdsDados`); o limite de 5 é garantido pelas regras de segurança. Na aba **CFP → TDS**
   da P/3: escolhe o mês, vê as miniaturas por CFP, **⬇️ Baixar fotos (.zip)** (uma pasta por CFP) e, depois de baixar,
   **🗑️ Apagar do sistema** (com confirmação).
-- **Sala de Operações**: sub-aba **Recados** (o botão **Recado para a Sala**, que funciona igual: aparece no alto da página da
-  Sala de Operações) e sub-aba **Senhas das Cias** (senha da Sala de Operações de cada Cia/FT, ver acima).
+- **Sala Op.**: o botão **Recado para a Sala**, que funciona igual: aparece no alto da página da Sala de Operações.
 
 ## Backup
 

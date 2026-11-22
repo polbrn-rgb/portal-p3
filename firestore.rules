@@ -4,7 +4,7 @@ rules_version = '2';
 //   P/3    -> perfil = 'p3'
 //   Cia    -> perfil = 'unidade' e unidade = '1cia' ... '6cia' | 'ft'
 //   Sala de Operações -> perfil = 'sala';  CFP -> perfil = 'cfp' (o CFP também usa a página da Sala)
-//   Sala de Operações de uma Cia (senha gerada pela P/3) -> perfil = 'salaCia' e unidade = '1cia' ... | 'ft'
+//   Sala de Operações de uma Cia (acesso por RE) -> perfil = 'salaCia' e unidade = '1cia' ... | 'ft'
 // Logins individuais (por RE) levam ainda re e, no chefe/encarregado da P/3, admin = true (aba Administrador).
 // Tudo que não estiver liberado aqui fica bloqueado.
 service cloud.firestore {
@@ -514,7 +514,7 @@ service cloud.firestore {
         && request.auth.token.get('unidade', '') == unidade;
     }
 
-    // Sala de Operações da Cia (conta própria, senha gerada pela P/3): só lança e corrige a produção da Cia.
+    // Sala de Operações da Cia (acesso por RE, perfil 'salaCia' + unidade): só lança e corrige a produção da Cia.
     function ehSalaDaCia(unidade) {
       return logado() && request.auth.token.perfil == 'salaCia'
         && request.auth.token.get('unidade', '') == unidade;
@@ -777,25 +777,6 @@ service cloud.firestore {
         && request.resource.data.lancadoPor == resource.data.lancadoPor
         && request.resource.data.lancadoEm == resource.data.lancadoEm;
       allow delete: if lancaProducao(resource.data.unidadeId);
-    }
-
-    // Senha da Sala de Operações de cada Cia/FT (id = a Cia): a P/3 pede a senha nova ou o bloqueio; o motor aplica na
-    // conta da Sala e apaga a senha. Só a P/3 lê (o Administrador já lê tudo).
-    match /senhasSalaCia/{unidade} {
-      allow read: if ehP3();
-      allow create, update: if ehP3()
-        && unidade in ['1cia', '2cia', '3cia', '4cia', '5cia', '6cia', 'ft']
-        && request.resource.data.keys().hasOnly(['unidade', 'senha', 'ativo', 'sincronizar', 'status', 'erro', 'pedidoPor', 'pedidoEm'])
-        && request.resource.data.unidade == unidade
-        && request.resource.data.senha is string
-        && (request.resource.data.senha.size() == 0
-          || (request.resource.data.senha.size() >= 8 && request.resource.data.senha.size() <= 64))
-        && request.resource.data.ativo is bool
-        && request.resource.data.sincronizar == true
-        && request.resource.data.status == 'pendente'
-        && request.resource.data.erro == ''
-        && request.resource.data.pedidoPor is string && request.resource.data.pedidoPor.size() > 0
-        && request.resource.data.pedidoEm == request.time;
     }
 
     // Contador de cada Cia/tipo/ano: só avança de 1 em 1 (começar de outro número é pelo Administrador).

@@ -5,7 +5,6 @@ import { garantirContas } from '../scripts/contas-admin';
 import { emailDeLogin } from '../src/domain/acessos';
 import { TODAS_CONTAS } from '../src/domain/contas';
 import { mesReferencia } from '../src/domain/documentosMensais';
-import { emailSalaCia } from '../src/domain/salaCia';
 import { diasDoMes, idProducao, itensZerados } from '../src/domain/producao';
 import { SENHA_TESTE } from './dados';
 
@@ -24,24 +23,16 @@ export default async function globalSetup() {
     ['222222-2', { perfil: 'cfp', re: '222222' }],
     ['333333-3', { perfil: 'unidade', unidade: '3cia', re: '333333' }],
     ['444444-4', { perfil: 'cgp', unidade: '4cia', re: '444444' }],
+    ['555555-5', { perfil: 'salaCia', unidade: 'ft', re: '555555' }],
   ] as const) {
     const email = emailDeLogin(re);
-    const displayName = re === '333333-3' ? 'Sd PM TESTE' : undefined;
+    const displayName = re === '333333-3' ? 'Sd PM TESTE' : re === '555555-5' ? 'Cb PM SALA' : undefined;
     const uid = await auth
       .getUserByEmail(email)
       .then((u) => u.uid)
       .catch(async () => (await auth.createUser({ email, password: SENHA_TESTE })).uid);
     if (displayName) await auth.updateUser(uid, { displayName });
     await auth.setCustomUserClaims(uid, claims);
-  }
-  // Sala de Operações da FT (conta que o motor cria quando a P/3 gera a senha).
-  {
-    const email = emailSalaCia('ft');
-    const uid = await auth
-      .getUserByEmail(email)
-      .then((u) => u.uid)
-      .catch(async () => (await auth.createUser({ email, password: SENHA_TESTE })).uid);
-    await auth.setCustomUserClaims(uid, { perfil: 'salaCia', unidade: 'ft' });
   }
   await getFirestore(app)
     .doc('efetivo/123456')

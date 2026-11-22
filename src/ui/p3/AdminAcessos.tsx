@@ -33,6 +33,7 @@ export function AdminAcessos({ db }: { db: Firestore }) {
   const grupos = [
     ...UNIDADES.map((u) => ({ titulo: u.sigla, filtro: (a: Acesso) => a.perfil === 'unidade' && a.unidade === u.id })),
     ...UNIDADES.map((u) => ({ titulo: `CGP ${u.sigla}`, filtro: (a: Acesso) => a.perfil === 'cgp' && a.unidade === u.id })),
+    ...UNIDADES.map((u) => ({ titulo: `Sala de Operações ${u.sigla}`, filtro: (a: Acesso) => a.perfil === 'salaCia' && a.unidade === u.id })),
     { titulo: 'CFP', filtro: (a: Acesso) => a.perfil === 'cfp' },
     { titulo: 'Sala de Operações', filtro: (a: Acesso) => a.perfil === 'sala' },
     { titulo: 'P/3', filtro: (a: Acesso) => a.perfil === 'p3' },

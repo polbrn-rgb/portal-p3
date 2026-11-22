@@ -53,7 +53,7 @@ function quando(d: Date | null): string {
   return `${formatarData(hojeISO(d))} às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Quem entra pela conta da Sala de Operações da Cia (senha gerada pela P/3): só esta página. */
+/** Acesso por RE com o perfil Sala de Operações da Cia: só esta página ("Lançado por" vem do login). */
 export function PaginaSalaCia({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) {
   const hash = useHash();
   return (
