@@ -18,9 +18,9 @@ import { UNIDADES, type UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
 import { Campo } from '../Campo';
 
-// P/3 → Sala de Operações → Resultados das Cias: o que as Salas de Operações das Cias/FT lançaram no período.
-// Para economizar a cota do Firebase, lê uma vez quando a sub-aba é aberta e de novo só quando a P/3 pede
-// (botão Consultar). Não fica ouvindo o banco: cada consulta lê ~1 documento por pelotão que lançou no período.
+// Sala de Operações do batalhão (subordinada à P/3) → Resultados das Cias: o que as Salas de Operações das
+// Cias/FT lançaram no período. Para economizar a cota do Firebase, lê uma vez quando a sub-aba é aberta e de
+// novo só quando a Sala pede (botão Consultar). Não fica ouvindo o banco: cada consulta lê ~1 documento por pelotão que lançou no período.
 
 type Consulta = { de: string; ate: string; unidade: UnidadeId | '' };
 type Estado = { carregando: boolean; erro: string; lista: Producao[]; consulta: Consulta | null; em: Date | null };

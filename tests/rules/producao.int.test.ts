@@ -151,7 +151,7 @@ describe('produção diária dos pelotões', () => {
     await assertFails(addDoc(collection(cia('2cia'), 'producaoHistorico'), { ...falso, unidadeId: '2cia', producaoId: '2cia_2026-11-20_pelB' }));
   });
 
-  test('P/3 → Sala de Operações: resultados do período, de todas ou de uma unidade; Cia não consulta as outras', async () => {
+  test('Resultados das Cias: a P/3 e a Sala do batalhão (não o CFP) consultam o período, de todas ou de uma unidade; Cia não consulta as outras', async () => {
     await salvarProducao(cia('1cia'), lancamento({ data: '2026-11-19' }));
     await salvarProducao(cia('1cia'), lancamento({ data: '2026-11-20', pelotao: 'pelB' }));
     await salvarProducao(cia('2cia'), lancamento({ unidade: '2cia', data: '2026-11-20' }));
@@ -170,7 +170,17 @@ describe('produção diária dos pelotões', () => {
     expect(ids(await buscarProducaoDoPeriodo(cia('1cia'), '2026-11-19', '2026-11-21', '1cia'))).toHaveLength(2);
     await assertFails(buscarProducaoDoPeriodo(cia('1cia'), '2026-11-19', '2026-11-21'));
     await assertFails(buscarProducaoDoPeriodo(cia('1cia'), '2026-11-19', '2026-11-21', '2cia'));
-    await assertFails(buscarProducaoDoPeriodo(como({ perfil: 'sala' }), '2026-11-19', '2026-11-21'));
+    // Sala de Operações do batalhão: só lê, não grava nem apaga. O CFP continua sem ler a produção das Cias.
+    const sala = () => como({ perfil: 'sala' });
+    expect(await buscarProducaoDoPeriodo(sala(), '2026-11-19', '2026-11-21')).toHaveLength(4);
+    expect(ids(await buscarProducaoDoPeriodo(sala(), '2026-11-20', '2026-11-20', '2cia'))).toEqual(['2cia_2026-11-20_pelA']);
+    await assertFails(salvarProducao(sala(), lancamento({ data: '2026-11-22' })));
+    await assertFails(deleteDoc(doc(sala(), 'producao', '1cia_2026-11-19_pelA')));
+    await assertFails(getDoc(doc(sala(), 'producao', '1cia_2026-11-19_pelA')));
+    await assertFails(buscarProducaoDoPeriodo(como({ perfil: 'cfp' }), '2026-11-19', '2026-11-21'));
+    // Outros perfis (CGP, Sala de outra Cia) continuam sem ver as outras unidades.
+    await assertFails(buscarProducaoDoPeriodo(como({ perfil: 'cgp', unidade: '1cia' }), '2026-11-19', '2026-11-21'));
+    await assertFails(buscarProducaoDoPeriodo(como({ perfil: 'salaCia', unidade: '1cia' }), '2026-11-19', '2026-11-21', '2cia'));
   });
 
   test('primeiro lançamento de cada Cia (início da contagem das pendências)', async () => {

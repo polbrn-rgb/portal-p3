@@ -56,6 +56,9 @@ test.describe('login por RE', () => {
     await entrarRE(page, '222222', SENHA_TESTE);
     await page.getByRole('button', { name: 'Sala de Operações' }).click();
     await expect(page.getByRole('button', { name: 'Sala de Operações' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: 'Resultados das operações' })).toBeVisible();
+    // Resultados das Cias é só da conta da Sala de Operações.
+    await expect(page.getByRole('button', { name: 'Resultados das Cias' })).toHaveCount(0);
   });
 
   test('RE errado não entra; Esqueci a senha pede o RE e não revela se ele existe', async ({ page }) => {
