@@ -22,17 +22,6 @@ export async function entrarRE(page: Page, re: string, senha: string) {
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 }
 
-/** Sala de Operações da Cia (senha gerada pela P/3). */
-export async function entrarSalaCia(page: Page, unidade: string, senha: string) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Entrar', exact: true }).waitFor();
-  const sala = page.getByRole('button', { name: 'Entrar na Sala de Operações da Cia' });
-  if (await sala.isVisible()) await sala.click();
-  await page.getByLabel(/^Cia/).selectOption(unidade);
-  await page.getByLabel(/^Senha\s*\*?$/).fill(senha);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-}
-
 /** Quantos pixels a página passa da largura da tela (0 = sem rolagem para o lado). */
 export function sobraLateral(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

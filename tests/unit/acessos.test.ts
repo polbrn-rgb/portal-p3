@@ -10,6 +10,7 @@ import {
   responsavelDoRE,
   montarAcesso,
   reBase,
+  rotuloAcesso,
   situacaoAcesso,
   unidadeDaOpm,
   validarAcesso,
@@ -85,6 +86,12 @@ describe('cadastro', () => {
     expect(validarAcesso(dados({ perfil: 'unidade', unidade: '2cia' }))).toEqual({});
   });
 
+  test('Sala de Operações de Cia / FT: pede a Cia e aparece como "Sala de Operações <Cia>"', () => {
+    expect(validarAcesso(dados({ perfil: 'salaCia', unidade: '' }))).toHaveProperty('unidade');
+    expect(montarAcesso(dados({ perfil: 'salaCia', unidade: 'ft' }), { novo: true })).toMatchObject({ perfil: 'salaCia', unidade: 'ft', admin: false });
+    expect(rotuloAcesso({ perfil: 'salaCia', unidade: '3cia', admin: false })).toBe('Sala de Operações 3ª CIA');
+  });
+
   test('o que vai para o banco: admin só P/3 dos dois REs; link só no cadastro novo', () => {
     expect(montarAcesso(dados(), { novo: true })).toMatchObject({ admin: true, enviarLink: true, sincronizar: true, ativo: true, unidade: '' });
     expect(montarAcesso(dados({ perfil: 'cfp' }), { novo: false })).toMatchObject({ admin: false });
@@ -97,6 +104,7 @@ describe('cadastro', () => {
     expect(motor.claimsDoAcesso({ perfil: 'p3', re: '130155-1', admin: true })).toEqual({ perfil: 'p3', re: '130155', admin: true });
     expect(motor.claimsDoAcesso({ perfil: 'cfp', re: '222222-2', admin: true })).toEqual({ perfil: 'cfp', re: '222222' });
     expect(motor.claimsDoAcesso({ perfil: 'cgp', unidade: 'ft', re: '444444-4' })).toEqual({ perfil: 'cgp', unidade: 'ft', re: '444444' });
+    expect(motor.claimsDoAcesso({ perfil: 'salaCia', unidade: '2cia', re: '555555-5' })).toEqual({ perfil: 'salaCia', unidade: '2cia', re: '555555' });
   });
 
   test('e-mail do link: botão, RE e sem HTML do nome', () => {
