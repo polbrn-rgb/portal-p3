@@ -1,3 +1,6 @@
+import { observarDespachosCgp } from '../../data/despachos';
+import type { DespachoCgp } from '../../domain/despacho';
+import { DespachosDaMissao, FormDespacho } from './DespachoCgp';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import {
   anexarOrdemLink,
@@ -484,6 +487,10 @@ function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boo
   const [aviso, setAviso] = useState('');
   const ordens = useAoVivo<OrdemCgp[]>((ok, erro) => observarOrdensCgp(db, p.unidade, ok, erro), [p.unidade]);
   const ordemDe = (id: string) => ordens.valor?.find((o) => o.id === id);
+  // Despacho: o CGP escreve e assina dentro da missão; a Cia (e o CGP) baixa o PDF.
+  const despachos = useAoVivo<DespachoCgp[]>((ok, erro) => observarDespachosCgp(db, p.unidade, ok, erro), [p.unidade]);
+  const [despachando, setDespachando] = useState('');
+  const despachosDe = (id: string) => (despachos.valor ?? []).filter((d) => d.missaoId === id);
   const doDia = missoesDoDia(p.lista, dia);
   const proximas = proximasMissoes(p.lista, dia);
 
@@ -510,6 +517,15 @@ function MissoesCgp(p: { unidade: UnidadeId; lista: MissaoCgp[]; carregando: boo
           {m.origem === 'numerador' ? 'Numerador da Cia' : 'Demanda da P/3'} · enviada por {m.criadoPor}
         </span>
         <OrdemDaMissao missao={m} ordem={ordemDe(m.id)} podeEditar={p.podeExcluir} />
+        <DespachosDaMissao despachos={despachosDe(m.id)} podeApagar={p.podeExcluir} />
+        {!p.podeExcluir &&
+          (despachando === m.id ? (
+            <FormDespacho missao={m} aoFechar={() => setDespachando('')} />
+          ) : (
+            <button className="botao destaque" type="button" onClick={() => setDespachando(m.id)}>
+              Despacho
+            </button>
+          ))}
         {!p.podeExcluir ? null : aExcluir === m.id ? (
           <div className="acoes-linha" role="alertdialog" aria-label={`Confirmar exclusão de ${m.numero}`}>
             <span>Tirar do CGP?</span>
