@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 
 // Navegação simples pelo "#" da URL: o botão Voltar do celular funciona sem biblioteca extra.
 // Rotas que apontam para um item específico (link compartilhado): essas abrem direto, sem passar pela tela inicial.
-const ROTA_DE_ITEM = /^#\/[\w-]+\/.+/;
+// Sub-abas (ex.: #/operacoes/..., #/painel/p3, #/sala/mes) não entram: a página sempre abre na tela inicial.
+const ROTA_DE_ITEM = /^#\/(enc|demanda|destinar|efetivo|eap|rac|numerador|documentos|admin)\/.+/;
+
+/** Login: tira a rota da URL para a pessoa cair na tela inicial (P/3: Painel → Prazos; Cia: Painel de Demandas). */
+export function irParaTelaInicial(): void {
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch {
+    /* sem history: segue */
+  }
+}
 
 /** F5 (recarregar) mantém a tela em que a pessoa estava. */
 function foiRecarregada(): boolean {

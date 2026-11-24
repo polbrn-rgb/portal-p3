@@ -164,7 +164,7 @@ export function ResultadosCias() {
                   <ul className="lista-erros" aria-label="Flagrantes do período">
                     {flagrantes.map(({ l, t }) => (
                       <li key={`${l.id}-${t.numero}`}>
-                        {sigla(l.unidadeId)} · {rotuloPelotao(l.pelotao, l.unidadeId)} · {formatarData(t.data || l.data)} · Talão {t.numero}
+                        {sigla(l.unidadeId)} · {rotuloPelotao(l.pelotao, l.unidadeId, l.turno)} · {formatarData(t.data || l.data)} · Talão {t.numero}
                         {t.bopc ? ` · BOPC ${t.bopc}` : ' · BOPC a completar'} · {rotuloNatureza(t.natureza)}
                       </li>
                     ))}
@@ -185,7 +185,7 @@ export function ResultadosCias() {
                         return (
                           <li key={l.id}>
                             <strong>
-                              {formatarData(l.data)} · {rotuloPelotao(l.pelotao, l.unidadeId)}
+                              {formatarData(l.data)} · {rotuloPelotao(l.pelotao, l.unidadeId, l.turno)}
                             </strong>
                             {' — '}
                             {comValor.length ? comValor.map((id) => `${ROTULO_ITEM[id]}: ${fmt(l.itens[id], id)}`).join('; ') : 'tudo zerado'}

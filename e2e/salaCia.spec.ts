@@ -20,7 +20,8 @@ test('Sala de Operações da Cia: entra com o RE e vê só a Sala daquela Cia', 
   await expect(page.getByRole('link', { name: 'CGP' })).toHaveCount(0);
 
   await page.getByLabel(/^Dia do serviço/).fill(dia);
-  await page.getByRole('group', { name: 'Pelotão' }).getByRole('button', { name: new RegExp(`^Pel ${pel}`) }).click();
+  await page.getByRole('group', { name: 'Turno' }).getByRole('button', { name: 'Pelotão Diurno' }).click();
+  await page.getByLabel(/^Qual seu pelotão\?/).selectOption(pel);
   const form = page.getByRole('form', { name: new RegExp(`Produção do Pel ${pel}`) });
   await form.waitFor();
   const apagar = form.getByRole('button', { name: 'Apagar lançamento' });

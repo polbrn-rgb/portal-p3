@@ -14,7 +14,7 @@ import {
   type Firestore,
   type Timestamp,
 } from 'firebase/firestore';
-import { ehNatureza, idProducao, lerItens, normalizarTalao, type Itens, type PelotaoId, type Producao, type Talao } from '../domain/producao';
+import { ehNatureza, ehTurno, idProducao, turnoDo, lerItens, normalizarTalao, type Itens, type PelotaoId, type Producao, type Talao, type TurnoLancamento } from '../domain/producao';
 import type { UnidadeId } from '../domain/unidades';
 
 // Produção diária dos pelotões (ver domain/producao.ts). Coleção "producao", id "{cia}_{dia}_{pelotão}":
@@ -33,6 +33,7 @@ export function paraProducao(id: string, x: DocumentData): Producao {
     data: x.data ?? '',
     mes: x.mes ?? '',
     pelotao: x.pelotao,
+    turno: ehTurno(x.turno) ? x.turno : '',
     itens: lerItens(x.itens),
     taloes: Array.isArray(x.taloes)
       ? x.taloes
@@ -52,7 +53,7 @@ export function paraProducao(id: string, x: DocumentData): Producao {
  */
 export async function salvarProducao(
   db: Firestore,
-  p: { unidade: UnidadeId; data: string; pelotao: PelotaoId; itens: Itens; taloes: readonly Talao[]; por: string },
+  p: { unidade: UnidadeId; data: string; pelotao: PelotaoId; turno?: TurnoLancamento; itens: Itens; taloes: readonly Talao[]; por: string },
 ): Promise<string> {
   const ref = doc(db, COLECAO_PRODUCAO, idProducao(p.unidade, p.data, p.pelotao));
   const itens = { ...p.itens };
@@ -75,6 +76,8 @@ export async function salvarProducao(
       data: p.data,
       mes: p.data.slice(0, 7),
       pelotao: p.pelotao,
+      // Sem turno informado (gravação antiga/scripts), segue a escala antiga do pelotão.
+      turno: p.turno ?? (turnoDo(p.pelotao, p.unidade) || 'dia'),
       itens,
       taloes,
       lancadoPor: antes ? antes.lancadoPor : p.por,

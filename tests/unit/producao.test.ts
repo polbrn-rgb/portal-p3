@@ -149,6 +149,28 @@ describe('somas, pendências e planilha', () => {
     expect(pendencias([], '2026-12', '2026-11-20', '2026-11-01', '1cia')).toEqual([]);
   });
 
+  test('turno escolhido no lançamento vale mais que a escala antiga (sem padrão de pelotão por turno)', () => {
+    // Pel A trabalhou de noite e Pel D de dia: o dia 1 está completo; o Pel B (sem turno gravado) segue a escala antiga (noite).
+    const lista = [
+      lanc({ data: '2026-11-01', pelotao: 'pelA', turno: 'noite' }),
+      lanc({ data: '2026-11-01', pelotao: 'pelD', turno: 'dia' }),
+      lanc({ data: '2026-11-02', pelotao: 'pelC', turno: 'noite' }),
+      lanc({ data: '2026-11-02', pelotao: 'pelB' }),
+    ];
+    const p = pendencias(lista, '2026-11', '2026-11-03', '2026-11-01', '1cia');
+    expect(p).toEqual([{ data: '2026-11-02', faltaDia: true, faltaNoite: false }]);
+    expect(rotuloPelotao('pelA', '1cia', 'noite')).toBe('Pel A (noite)');
+    // A planilha mostra o turno escolhido; o pelotão (o que alimenta RAC e Documentos Mensais) não muda.
+    const linhas = abasDaProducao(lista, ['1cia'])[0].linhas.slice(1).map((l) => [l[3], l[4]]);
+    expect(linhas).toEqual([
+      ['Pel A', 'noite'],
+      ['Pel D', 'dia'],
+      ['Pel B', 'noite'],
+      ['Pel C', 'noite'],
+    ]);
+    expect(validarProducao({ data: '2026-11-02', pelotao: 'pelA', turno: '', textos: textos(), taloes: [] }, '1cia', '2026-11-02').erros.turno).toBeTruthy();
+  });
+
   test('pendências só contam a partir do primeiro lançamento da unidade', () => {
     expect(pendencias([], '2026-11', '2026-11-20', null, '1cia')).toEqual([]);
     const p = pendencias([lanc({ data: '2026-11-18', pelotao: 'pelA' })], '2026-11', '2026-11-20', '2026-11-18', '1cia');
