@@ -1,4 +1,5 @@
 import { InputSenha } from './InputSenha';
+import { irParaTelaInicial } from '../lib/navegacao';
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { type FormEvent, useState } from 'react';
 import { emailDeLogin, reBase } from '../domain/acessos';
@@ -78,6 +79,7 @@ function LoginRE() {
     if (e.re || e.senha) return;
     setEnviando(true);
     try {
+      irParaTelaInicial();
       await signInWithEmailAndPassword(auth, emailDeLogin(re), senha);
     } catch (falha) {
       setErro(mensagemErroLogin(codigoDoErro(falha)));
@@ -146,6 +148,7 @@ function LoginUnidade() {
       } catch {
         /* sem armazenamento: segue sem lembrar */
       }
+      irParaTelaInicial();
       await signInWithEmailAndPassword(auth, emailDaConta(conta), senha);
     } catch (e) {
       setErro(mensagemErroLogin(codigoDoErro(e)));

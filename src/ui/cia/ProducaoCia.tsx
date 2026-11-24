@@ -15,7 +15,10 @@ import {
   pelotoesDa,
   pendencias,
   rotuloNatureza,
+  letraPelotao,
   rotuloPelotao,
+  TURNOS,
+  turnoDoLancamento,
   somarItens,
   textoQuantidade,
   turnosPendentes,
@@ -28,6 +31,7 @@ import {
   type NaturezaFlagrante,
   type Producao,
   type Talao,
+  type TurnoLancamento,
 } from '../../domain/producao';
 import { UNIDADES, type UnidadeId } from '../../domain/unidades';
 import { db } from '../../lib/firebase';
@@ -90,6 +94,7 @@ export function SalaDaCia({ unidade, sigla, hash, autor }: { unidade: UnidadeId;
 function LancarProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; dataInicial?: string; pelotaoInicial?: PelotaoId }) {
   const hoje = hojeISO();
   const [data, setData] = useState(p.dataInicial && p.dataInicial <= hoje ? p.dataInicial : hoje);
+  const [turno, setTurno] = useState<TurnoLancamento | ''>('');
   const [pelotao, setPelotao] = useState<PelotaoId | ''>(p.pelotaoInicial ?? '');
   const mes = /^\d{4}-\d{2}-\d{2}$/.test(data) ? data.slice(0, 7) : hoje.slice(0, 7);
   const lancs = useAoVivo<Producao[]>(
@@ -99,6 +104,15 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; 
   );
   const doDia = (lancs.valor ?? []).filter((l) => l.data === data);
   const existente = doDia.find((l) => l.pelotao === pelotao);
+  // Abrindo um lançamento já feito (link do resumo ou chip abaixo), o turno vem dele.
+  const turnoExistente = existente ? turnoDoLancamento(existente) : '';
+  const turnoEfetivo: TurnoLancamento | '' = turno || (p.pelotaoInicial && turnoExistente ? turnoExistente : '');
+
+  function abrir(l: Producao) {
+    setPelotao(l.pelotao);
+    const t = turnoDoLancamento(l);
+    if (t) setTurno(t);
+  }
 
   return (
     <section className="painel">
@@ -106,33 +120,39 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; 
         <h2>Produção do pelotão</h2>
       </div>
       <p className="item-info">
-        Cada pelotão lança no fim do turno o que produziu (a BCS entra no resultado do pelotão).{' '}
-        {p.unidade === 'ft'
-          ? 'Pel A e Pel B trabalham de dia, em dias alternados.'
-          : 'Pel A e C: dia; Pel B e D: noite. No turno da noite, use o dia em que o turno começou.'}
+        Cada pelotão lança no fim do turno o que produziu (a BCS entra no resultado do pelotão). No turno da noite, use o dia em que o turno começou.
       </p>
       <div className="cartao grupo">
         <Campo rotulo="Dia do serviço" obrigatorio>
           <input type="date" value={data} max={hoje} onChange={(e) => setData(e.target.value)} />
         </Campo>
-        <div role="group" aria-label="Pelotão" className="escolha-pelotao">
-          {pelotoesDa(p.unidade).map((x) => {
-            const feito = doDia.some((l) => l.pelotao === x.id);
-            return (
-              <button
-                key={x.id}
-                type="button"
-                className="botao-pelotao"
-                aria-pressed={pelotao === x.id}
-                onClick={() => setPelotao(x.id)}
-              >
-                {rotuloPelotao(x.id, p.unidade)}
-                {feito && <span className="feito-pelotao"> ✓</span>}
-              </button>
-            );
-          })}
+        <div role="group" aria-label="Turno" className="escolha-pelotao">
+          {TURNOS.map((t) => (
+            <button key={t.id} type="button" className="botao-pelotao" aria-pressed={turnoEfetivo === t.id} onClick={() => setTurno(t.id)}>
+              {t.rotulo}
+            </button>
+          ))}
         </div>
-        <p className="item-info">✓ = já lançado neste dia (tocar abre para corrigir).</p>
+        <Campo rotulo="Qual seu pelotão?" obrigatorio>
+          <select value={pelotao} onChange={(e) => setPelotao(e.target.value as PelotaoId | '')}>
+            <option value="">{p.unidade === 'ft' ? 'ex: A ou B' : 'ex: A; B; C ou D'}</option>
+            {pelotoesDa(p.unidade).map((x) => (
+              <option key={x.id} value={x.id}>
+                {letraPelotao(x.id)}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        {doDia.length > 0 && (
+          <div className="chips-cias" aria-label="Já lançados neste dia">
+            <span className="item-info">Já lançados neste dia (tocar abre para corrigir):</span>
+            {doDia.map((l) => (
+              <button key={l.id} type="button" className="chip-cia chip-gravado" onClick={() => abrir(l)}>
+                {rotuloPelotao(l.pelotao, p.unidade, l.turno)} ✓
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {lancs.erro && (
         <p className="mensagem erro" role="alert">
@@ -140,9 +160,24 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; 
         </p>
       )}
       {lancs.carregando && <p className="carregando">Carregando…</p>}
-      {!lancs.carregando && !pelotao && <p className="vazio">Escolha o pelotão para lançar.</p>}
-      {!lancs.carregando && pelotao && /^\d{4}-\d{2}-\d{2}$/.test(data) && data <= hoje && (
-        <FormProducao key={`${data}_${pelotao}`} unidade={p.unidade} sigla={p.sigla} autor={p.autor} data={data} pelotao={pelotao} existente={existente} />
+      {!lancs.carregando && (!turnoEfetivo || !pelotao) && <p className="vazio">Escolha Pelotão Diurno ou Noturno e informe qual é o seu pelotão.</p>}
+      {!lancs.carregando && turnoEfetivo && pelotao && existente && turnoExistente && turnoExistente !== turnoEfetivo && (
+        <p className="mensagem atencao" role="status">
+          O {rotuloPelotao(pelotao, p.unidade, turnoExistente)} já tem lançamento neste dia. Salvar corrige esse lançamento e muda o turno para{' '}
+          {turnoEfetivo === 'dia' ? 'diurno' : 'noturno'}.
+        </p>
+      )}
+      {!lancs.carregando && turnoEfetivo && pelotao && /^\d{4}-\d{2}-\d{2}$/.test(data) && data <= hoje && (
+        <FormProducao
+          key={`${data}_${pelotao}_${turnoEfetivo}`}
+          unidade={p.unidade}
+          sigla={p.sigla}
+          autor={p.autor}
+          data={data}
+          pelotao={pelotao}
+          turno={turnoEfetivo}
+          existente={existente}
+        />
       )}
     </section>
   );
@@ -151,7 +186,7 @@ function LancarProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; 
 const textosDe = (itens?: Itens): Record<ItemId, string> =>
   Object.fromEntries(ITENS_PRODUCAO.map((i) => [i.id, itens ? textoQuantidade(itens[i.id], 'decimal' in i && i.decimal) : ''])) as Record<ItemId, string>;
 
-function FormProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; data: string; pelotao: PelotaoId; existente?: Producao }) {
+function FormProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; data: string; pelotao: PelotaoId; turno: TurnoLancamento; existente?: Producao }) {
   const [textos, setTextos] = useState<Record<ItemId, string>>(() => textosDe(p.existente?.itens));
   const [taloes, setTaloes] = useState<Talao[]>(() => p.existente?.taloes ?? []);
   const [novoTalao, setNovoTalao] = useState<Talao>({ numero: '', bopc: '', data: p.data, natureza: '' });
@@ -190,7 +225,7 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; da
     ev.preventDefault();
     setMensagem('');
     setErro('');
-    const r = validarProducao({ data: p.data, pelotao: p.pelotao, textos, taloes }, p.unidade, hojeISO());
+    const r = validarProducao({ data: p.data, pelotao: p.pelotao, turno: p.turno, textos, taloes }, p.unidade, hojeISO());
     setErros(r.erros);
     if (!r.itens) return;
     if (novoTalao.numero.trim() || novoTalao.bopc.trim() || novoTalao.natureza) {
@@ -199,8 +234,8 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; da
     }
     setOcupado(true);
     try {
-      await salvarProducao(db, { unidade: p.unidade, data: p.data, pelotao: p.pelotao, itens: r.itens, taloes, por: autor });
-      setMensagem(`Lançamento do ${rotuloPelotao(p.pelotao, p.unidade)} de ${formatarData(p.data)} salvo.`);
+      await salvarProducao(db, { unidade: p.unidade, data: p.data, pelotao: p.pelotao, turno: p.turno, itens: r.itens, taloes, por: autor });
+      setMensagem(`Lançamento do ${rotuloPelotao(p.pelotao, p.unidade, p.turno)} de ${formatarData(p.data)} salvo.`);
     } catch {
       setErro('Não foi possível salvar. Verifique a conexão e tente de novo.');
     }
@@ -223,9 +258,9 @@ function FormProducao(p: { unidade: UnidadeId; sigla: string; autor?: string; da
   }
 
   return (
-    <form className="formulario-producao" onSubmit={salvar} noValidate aria-label={`Produção do ${rotuloPelotao(p.pelotao, p.unidade)} em ${formatarData(p.data)}`}>
+    <form className="formulario-producao" onSubmit={salvar} noValidate aria-label={`Produção do ${rotuloPelotao(p.pelotao, p.unidade, p.turno)} em ${formatarData(p.data)}`}>
       <h3 className="titulo-secao">
-        {rotuloPelotao(p.pelotao, p.unidade)} · {formatarData(p.data)} ({diaDaSemanaPorExtenso(p.data)})
+        {rotuloPelotao(p.pelotao, p.unidade, p.turno)} · {formatarData(p.data)} ({diaDaSemanaPorExtenso(p.data)})
       </h3>
       {p.existente ? (
         <p className="mensagem atencao" role="status">

@@ -13,7 +13,9 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
   await entrar(page, cia.id, SENHA_TESTE);
   await irParaAbaCia(page, 'Sala de Operações');
   await expect(page.getByRole('heading', { name: 'Produção do pelotão' })).toBeVisible();
-  await page.getByRole('group', { name: 'Pelotão' }).getByRole('button', { name: /^Pel A \(dia\)/ }).click();
+  // Sem padrão fixo de pelotão por turno: escolhe o turno e responde qual é o pelotão.
+  await page.getByRole('group', { name: 'Turno' }).getByRole('button', { name: 'Pelotão Diurno' }).click();
+  await page.getByLabel(/^Qual seu pelotão\?/).selectOption('A');
 
   const form = page.getByRole('form', { name: /Produção do Pel A \(dia\)/ });
   await form.waitFor();
@@ -55,7 +57,7 @@ test('Produção do pelotão: lançar, conferir, corrigir e a P/3 ver no total',
 
   await form.getByRole('button', { name: 'Salvar lançamento' }).click();
   await expect(form.getByText(`Lançamento do Pel A (dia) de ${dia} salvo.`)).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Pel A \(dia\) ✓/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pel A (dia) ✓' })).toBeVisible();
   await expect(form.getByText(/Já lançado por .* Você está corrigindo/)).toBeVisible();
 
   // Correção: muda um número e salva de novo (o "lançado por" continua).

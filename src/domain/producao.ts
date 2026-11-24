@@ -1,9 +1,11 @@
 // Produção diária dos pelotões, lançada pela Sala de Operações de cada Cia/FT no fim do turno.
 //
-// - Cias, turno de 12x36: Pel A e Pel C de dia, Pel B e Pel D de noite. A Ronda Escolar e a RPM
-//   entram no resultado do pelotão (não têm lançamento à parte).
-// - Força Tática: Pel A e Pel B de dia, em dias alternados (não tem turno da noite).
-// - Um lançamento por pelotão por dia de serviço (o turno da noite usa a data em que começou).
+// - Não há padrão fixo de pelotão por turno: quem lança escolhe "Pelotão Diurno" ou "Pelotão Noturno" e responde
+//   "Qual seu pelotão?" (A, B, C ou D; na Força Tática, A ou B). O turno fica gravado no lançamento (`turno`);
+//   lançamentos antigos, sem o campo, seguem a escala antiga (Pel A e C de dia, Pel B e D de noite; FT de dia).
+// - A Ronda Escolar e a RPM entram no resultado do pelotão (não têm lançamento à parte).
+// - Um lançamento por pelotão por dia de serviço (o turno da noite usa a data em que começou). O banco continua
+//   separado por pelotão (A–D), e é por pelotão que alimenta o RAC, os Documentos Mensais e as planilhas.
 // - O resultado da BCS entra no resultado do pelotão.
 // - Nos flagrantes de delito ficam o nº do talão, o nº do BOPC, o dia e a natureza da ocorrência: a P/3 usa para colher
 //   os dados oficiais do QMO, e a natureza separa o flagrante de tráfico dos outros na Avaliação Periódica.
@@ -20,6 +22,14 @@ export type AbaPlanilha = { nome: string; linhas: Celula[][] };
 
 export type PelotaoId = 'pelA' | 'pelB' | 'pelC' | 'pelD';
 export type Turno = 'dia' | 'noite' | '';
+export type TurnoLancamento = 'dia' | 'noite';
+
+/** As duas opções de turno na hora de lançar. */
+export const TURNOS: readonly { id: TurnoLancamento; rotulo: string }[] = [
+  { id: 'dia', rotulo: 'Pelotão Diurno' },
+  { id: 'noite', rotulo: 'Pelotão Noturno' },
+];
+export const ehTurno = (v: unknown): v is TurnoLancamento => v === 'dia' || v === 'noite';
 
 export const PELOTOES: readonly { id: PelotaoId; rotulo: string; turno: Turno }[] = [
   { id: 'pelA', rotulo: 'Pel A', turno: 'dia' },
@@ -28,7 +38,7 @@ export const PELOTOES: readonly { id: PelotaoId; rotulo: string; turno: Turno }[
   { id: 'pelD', rotulo: 'Pel D', turno: 'noite' },
 ];
 
-/** Força Tática: Pel A e Pel B trabalham de dia, em dias alternados (não há turno da noite). */
+/** Força Tática: Pel A e Pel B (escala antiga: de dia, em dias alternados). */
 const PELOTOES_FT: readonly { id: PelotaoId; rotulo: string; turno: Turno }[] = [
   { id: 'pelA', rotulo: 'Pel A', turno: 'dia' },
   { id: 'pelB', rotulo: 'Pel B', turno: 'dia' },
@@ -39,17 +49,26 @@ export function pelotoesDa(unidade: UnidadeId) {
   return unidade === 'ft' ? PELOTOES_FT : PELOTOES;
 }
 
-/** Turno do pelotão na unidade. */
+/** Turno do pelotão pela escala antiga (só para lançamento gravado antes de o turno ser escolhido). */
 export function turnoDo(id: string, unidade: UnidadeId): Turno {
   return pelotoesDa(unidade).find((p) => p.id === id)?.turno ?? '';
 }
 
-/** "Pel A (dia)", "Pel D (noite)", "RPM". */
-export function rotuloPelotao(id: string, unidade: UnidadeId): string {
+/** Turno do lançamento: o escolhido por quem lançou; lançamento antigo segue a escala antiga. */
+export function turnoDoLancamento(l: Pick<Producao, 'pelotao' | 'unidadeId'> & { turno?: Turno }): Turno {
+  return l.turno || turnoDo(l.pelotao, l.unidadeId);
+}
+
+/** "Pel A (dia)", "Pel D (noite)". Sem o turno do lançamento, usa a escala antiga. */
+export function rotuloPelotao(id: string, unidade: UnidadeId, turno?: Turno): string {
   const p = pelotoesDa(unidade).find((x) => x.id === id);
   if (!p) return id;
-  return p.turno ? `${p.rotulo} (${p.turno})` : p.rotulo;
+  const t = turno || p.turno;
+  return t ? `${p.rotulo} (${t})` : p.rotulo;
 }
+
+/** "Pel A" -> "A" (resposta de "Qual seu pelotão?"). */
+export const letraPelotao = (id: string): string => id.replace(/^pel/, '');
 
 /** A unidade tem turno da noite (a Força Tática não tem). */
 export const temTurnoNoite = (unidade: UnidadeId): boolean => pelotoesDa(unidade).some((p) => p.turno === 'noite');
@@ -164,6 +183,8 @@ export type Producao = {
   data: string;
   mes: string;
   pelotao: PelotaoId;
+  /** Turno escolhido ao lançar; '' = lançamento antigo (ver turnoDoLancamento). */
+  turno?: Turno;
   itens: Itens;
   taloes: Talao[];
   lancadoPor: string;
@@ -233,18 +254,19 @@ export function validarTalao(t: Talao, ja: readonly Talao[]): string {
   return '';
 }
 
-export type ErrosProducao = Partial<Record<ItemId | 'data' | 'pelotao' | 'taloes', string>>;
+export type ErrosProducao = Partial<Record<ItemId | 'data' | 'pelotao' | 'turno' | 'taloes', string>>;
 
 /** Confere o formulário. Sem erros, devolve os itens já como números. */
 export function validarProducao(
-  p: { data: string; pelotao: string; textos: Record<ItemId, string>; taloes: readonly Talao[] },
+  p: { data: string; pelotao: string; turno?: string; textos: Record<ItemId, string>; taloes: readonly Talao[] },
   unidade: UnidadeId,
   hoje: string,
 ): { erros: ErrosProducao; itens: Itens | null } {
   const erros: ErrosProducao = {};
   if (!ehDataISO(p.data)) erros.data = 'Informe o dia do serviço.';
   else if (p.data > hoje) erros.data = 'O dia do serviço não pode ser depois de hoje.';
-  if (!pelotoesDa(unidade).some((x) => x.id === p.pelotao)) erros.pelotao = 'Escolha o pelotão.';
+  if (p.turno !== undefined && !ehTurno(p.turno)) erros.turno = 'Escolha Pelotão Diurno ou Pelotão Noturno.';
+  if (!pelotoesDa(unidade).some((x) => x.id === p.pelotao)) erros.pelotao = 'Informe qual é o seu pelotão.';
   const itens = itensZerados();
   for (const it of ITENS_PRODUCAO) {
     const decimal = 'decimal' in it && it.decimal;
@@ -295,7 +317,7 @@ export type PendenciaDia = { data: string; faltaDia: boolean; faltaNoite: boolea
  * viram pendência.
  */
 export function pendencias(
-  lancamentos: readonly Pick<Producao, 'data' | 'pelotao'>[],
+  lancamentos: readonly (Pick<Producao, 'data' | 'pelotao'> & { turno?: Turno })[],
   mes: string,
   hoje: string,
   desde: string | null,
@@ -308,8 +330,10 @@ export function pendencias(
     if (data >= hoje) break;
     if (data < desde) continue;
     const doDia = lancamentos.filter((l) => l.data === data);
-    const faltaDia = !doDia.some((l) => turnoDo(l.pelotao, unidade) === 'dia');
-    const faltaNoite = noite && !doDia.some((l) => turnoDo(l.pelotao, unidade) === 'noite');
+    const turnoDe = (l: (typeof doDia)[number]) => turnoDoLancamento({ ...l, unidadeId: unidade });
+    // Força Tática (sem turno da noite na escala): qualquer lançamento do dia cobre o dia.
+    const faltaDia = noite ? !doDia.some((l) => turnoDe(l) === 'dia') : doDia.length === 0;
+    const faltaNoite = noite && !doDia.some((l) => turnoDe(l) === 'noite');
     if (faltaDia || faltaNoite) r.push({ data, faltaDia, faltaNoite });
   }
   return r;
@@ -360,7 +384,7 @@ export function abasDaProducao(lancamentos: readonly Producao[], unidades: reado
       diaDaSemanaPorExtenso(l.data),
       siglaDe(l.unidadeId),
       PELOTOES.find((p) => p.id === l.pelotao)?.rotulo ?? l.pelotao,
-      turnoDo(l.pelotao, l.unidadeId),
+      turnoDoLancamento(l),
       ...colunas.map((c) => c.valor(l.itens)),
       l.taloes.map(flag).join(', '),
       l.lancadoPor,

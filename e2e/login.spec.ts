@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entrar, entrarRE } from './ajuda';
+import { entrar, entrarRE, sair } from './ajuda';
 import { SENHA_TESTE } from './dados';
 
 test('Cia entra, vê o nome da própria unidade e sai', async ({ page }) => {
@@ -89,4 +89,13 @@ test('👁 mostra e oculta a senha digitada (RE e conta da unidade)', async ({ p
     await page.getByRole('button', { name: 'Ocultar senha' }).click();
     await expect(senha).toHaveAttribute('type', 'password');
   }
+});
+
+test('P/3 sai numa aba qualquer e, ao entrar de novo, cai no Painel → Prazos', async ({ page }) => {
+  await entrar(page, 'p3', SENHA_TESTE);
+  await page.evaluate(() => (window.location.hash = '#/operacoes'));
+  await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toHaveCount(0);
+  await sair(page);
+  await entrar(page, 'p3', SENHA_TESTE, { naTelaInicial: true });
+  await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
 });
