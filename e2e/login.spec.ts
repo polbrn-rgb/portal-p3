@@ -10,9 +10,9 @@ test('Cia entra, vê o nome da própria unidade e sai', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
 });
 
-test('P/3 entra direto no Numerador', async ({ page }) => {
-  await entrar(page, 'p3', SENHA_TESTE);
-  await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
+test('P/3 entra direto no Painel → Prazos', async ({ page }) => {
+  await entrar(page, 'p3', SENHA_TESTE, { naTelaInicial: true });
+  await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
 });
 
 test('senha errada mostra aviso e não entra', async ({ page }) => {
@@ -40,7 +40,7 @@ test('sem senha: avisa no próprio campo, em vermelho, e não entra', async ({ p
 test.describe('login por RE', () => {
   test('RE com ou sem dígito; chefe da P/3 vê o Administrador direto, sem a senha extra', async ({ page }) => {
     await entrarRE(page, '1301551', SENHA_TESTE);
-    await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
     await page.goto('/#/admin/acessos');
     await expect(page.getByRole('heading', { name: 'Acessos (login por RE)' })).toBeVisible();
     await expect(page.getByLabel('Senha do Administrador')).toHaveCount(0);
@@ -48,7 +48,7 @@ test.describe('login por RE', () => {
 
   test('operador da P/3 não vê a aba Administrador', async ({ page }) => {
     await entrarRE(page, '111111-1', SENHA_TESTE);
-    await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
     await expect(page.getByRole('link', { name: /Administrador/ })).toHaveCount(0);
   });
 

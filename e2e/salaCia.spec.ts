@@ -51,7 +51,7 @@ test('Administrador → Acessos: cadastra o RE com o acesso "Sala de Operações
   const re = info.project.name === 'celular' ? '777771' : '777772';
   await admin().doc(`acessos/${re}`).delete();
   await entrarRE(page, '130155-1', SENHA_TESTE);
-  await expect(page.getByRole('heading', { name: 'Numerador', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Painel de prazos' })).toBeVisible();
   await page.goto('/#/admin/acessos');
   const form = page.locator('form.form-acesso');
   await form.getByLabel(/^RE/).fill(`${re}-1`);

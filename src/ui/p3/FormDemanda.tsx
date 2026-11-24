@@ -42,7 +42,7 @@ export function NovaDemanda() {
   return <FormDemanda />;
 }
 
-/** "Dar destino" a uma pendente: formulário de demanda nova já preenchido. */
+/** "Criar demanda" a partir de uma pendente: formulário de demanda nova já preenchido. */
 export function DestinarPendente({ id }: { id: string }) {
   const [pendente, setPendente] = useState<Pendente | null | undefined>(undefined);
   useEffect(() => {

@@ -19,7 +19,7 @@ test('SEI lançado nas pendentes ganha destino e vai para o Numerador', async ({
   await cartao.getByText('Ver texto').click();
   await expect(cartao).toContainText('Detalhes do processo colado do SEI.');
 
-  await cartao.getByRole('link', { name: 'Dar destino' }).click();
+  await cartao.getByRole('link', { name: 'Criar demanda' }).click();
   await expect(page.getByRole('heading', { name: 'Nova demanda' })).toBeVisible();
   await expect(page.getByLabel(/^Origem/)).toHaveValue('SEI');
   await expect(page.getByLabel('Nº do processo SEI')).toHaveValue('006.00000099/2026-01');
@@ -52,7 +52,7 @@ test('Ordem Verbal pede quem deu a ordem e leva isso para a demanda', async ({ p
   const cartao = page.getByRole('article', { name: ordem });
   await expect(cartao).toContainText('Ordem de: Cmt Btl');
 
-  await cartao.getByRole('link', { name: 'Dar destino' }).click();
+  await cartao.getByRole('link', { name: 'Criar demanda' }).click();
   await expect(page.getByLabel(/^Origem/)).toHaveValue('Ordem Verbal');
   await expect(page.getByLabel(/^Quem deu a ordem/)).toHaveValue('Cmt Btl');
   await expect(page.getByLabel('Nº da origem')).toHaveCount(0);

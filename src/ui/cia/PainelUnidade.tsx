@@ -44,13 +44,14 @@ import type { FotoCgp, MissaoCgp } from '../../domain/cgp';
 import { EnviarAoCgp, missaoDe, PainelCgp } from './Cgp';
 import { SalaDaCia } from './ProducaoCia';
 
-const ABAS: { id: AbaUnidade; rotulo: string }[] = [
+// Pendentes, Respondidas e Finalizadas ficam juntas numa aba só: o Painel de Demandas (abre sempre nela).
+const SECOES: { id: AbaUnidade; rotulo: string }[] = [
   { id: 'pendentes', rotulo: 'Pendentes' },
   { id: 'respondidas', rotulo: 'Respondidas' },
   { id: 'finalizadas', rotulo: 'Finalizadas' },
 ];
 
-type AbaCia = AbaUnidade | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda' | 'numerador' | 'cgp' | 'sala';
+type AbaCia = 'demandas' | 'documentos' | 'aperfeicoamento' | 'rac' | 'agenda' | 'numerador' | 'cgp' | 'sala';
 
 function abaDaRota(hash: string): AbaCia | undefined {
   if (hash === '#/agenda') return 'agenda';
@@ -60,17 +61,15 @@ function abaDaRota(hash: string): AbaCia | undefined {
   if (hash.startsWith('#/documentos')) return 'documentos';
   if (hash.startsWith('#/aperfeicoamento')) return 'aperfeicoamento';
   if (hash === '#/rac' || hash.startsWith('#/rac/')) return 'rac';
-  if (hash === '#/respondidas') return 'respondidas';
-  if (hash === '#/finalizadas') return 'finalizadas';
-  if (/^#\/(enc|efetivo|eap)\//.test(hash)) return undefined;
-  return 'pendentes';
+  if (/^#\/(efetivo|eap)\//.test(hash)) return undefined;
+  return 'demandas';
 }
 
 const CHAVE_NOME = 'portalp3.respondidoPor';
 
 /** Tela das Cias e da Força Tática: menu (lateral no computador, ☰ no celular) e o conteúdo ao lado. */
 export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: string }) {
-  const hash = useHash();
+  const hash = useHash('#/demandas');
   const encs = useAoVivo<Encaminhamento[]>(
     (ok, erro) => observarDaUnidade(db, unidade, ok, erro),
     [unidade],
@@ -88,7 +87,7 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   const efetivo = /^#\/efetivo\/(.+)$/.exec(hash)?.[1];
   const eapAberto = /^#\/eap\/(.+)$/.exec(hash)?.[1];
   const encAberto = aberto ? lista.find((e) => e.id === aberto) : undefined;
-  const ativa: AbaCia | undefined = encAberto ? (abaDoEncaminhamento(encAberto.status) ?? undefined) : abaDaRota(hash);
+  const ativa: AbaCia | undefined = encAberto ? (abaDoEncaminhamento(encAberto.status) ? 'demandas' : undefined) : abaDaRota(hash);
   const mesRef = mesReferencia();
   const envios = useAoVivo<EnvioMensal[]>((ok, erro) => observarEnviosDaUnidade(db, unidade, mesRef, ok, erro), [unidade, mesRef]);
   const temDocs = documentosDaUnidade(unidade, mesRef).length > 0;
@@ -122,16 +121,16 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
   );
   const missoes = missoesCgp.valor ?? [];
   const itens = [
-    ...ABAS.map((a) => ({
-      id: a.id as AbaCia,
-      href: `#/${a.id}`,
-      rotulo: a.rotulo,
+    {
+      id: 'demandas' as AbaCia,
+      href: '#/demandas',
+      rotulo: 'Painel de Demandas',
+      // O número no menu é o que falta a Cia fazer (as pendentes).
       contador:
-        lista.filter((e) => abaDoEncaminhamento(e.status) === a.id).length +
-        (a.id === 'pendentes'
-          ? (solicitacoes.valor ?? []).filter((s) => s.status !== 'respondida').length + (eaps.valor ?? []).filter((r) => r.status !== 'enviada').length
-          : 0),
-    })),
+        lista.filter((e) => abaDoEncaminhamento(e.status) === 'pendentes').length +
+        (solicitacoes.valor ?? []).filter((s) => s.status !== 'respondida').length +
+        (eaps.valor ?? []).filter((r) => r.status !== 'enviada').length,
+    },
     ...(temDocs
       ? [{ id: 'documentos' as AbaCia, href: '#/documentos', rotulo: 'Documentos Mensais', contador: contarPendentesDocs(unidade, mesRef, envios.valor ?? []) }]
       : []),
@@ -168,8 +167,8 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
       }),
     [unidade, mesRef, encs.valor, solicitacoes.valor, eaps.valor, envios.valor, iccs.valor, respostasIcc.valor, racMeses.valor, racs.valor],
   );
-  // Numerador é a primeira aba.
-  itens.unshift({
+  // Painel de Demandas é a primeira aba; o Numerador vem logo depois.
+  itens.splice(1, 0, {
     id: 'numerador',
     href: '#/numerador',
     rotulo: 'Numerador',
@@ -293,7 +292,6 @@ export function PainelUnidade({ unidade, sigla }: { unidade: UnidadeId; sigla: s
     return (
       <ListaUnidade
         sigla={sigla}
-        aba={ativa ?? 'pendentes'}
         lista={lista}
         carregando={encs.carregando}
         erro={encs.erro}
@@ -392,7 +390,6 @@ function formatarMes(mes: string): string {
 
 function ListaUnidade(p: {
   sigla: string;
-  aba: AbaUnidade;
   lista: Encaminhamento[];
   carregando: boolean;
   erro: string;
@@ -401,22 +398,13 @@ function ListaUnidade(p: {
   missoesCgp: MissaoCgp[];
 }) {
   const hoje = hojeISO();
-  const visiveis = p.lista.filter((e) => abaDoEncaminhamento(e.status) === p.aba);
-  // Efetivo e EAP também seguem a aba: sem resposta em Pendentes, respondidos em Respondidas.
-  const solicitacoes = p.solicitacoes.filter((s) => abaDoPedido(s.status === 'respondida') === p.aba);
-  const eaps = p.eaps.filter((r) => abaDoPedido(r.status === 'enviada') === p.aba);
-  const rotulo = ABAS.find((a) => a.id === p.aba)?.rotulo;
 
   return (
     <section className="painel">
       <div className="painel-cabecalho">
         <h2>{p.sigla}</h2>
       </div>
-      <EapsDaCia lista={eaps} />
-      <SolicitacoesEfetivo lista={solicitacoes} />
-      <h3 className="titulo-aba-cia">
-        {rotulo} ({visiveis.length})
-      </h3>
+      <h3 className="titulo-painel-demandas">Painel de Demandas</h3>
 
       {p.erro && (
         <p className="mensagem erro" role="alert">
@@ -424,33 +412,48 @@ function ListaUnidade(p: {
         </p>
       )}
       {p.carregando && <p className="carregando">Carregando…</p>}
-      {!p.carregando && !p.erro && visiveis.length === 0 && <p className="vazio">Nada por aqui.</p>}
 
-      <ul className="lista">
-        {visiveis.map((e) => {
-          const atrasado = encAtrasado(e, hoje);
-          return (
-            <li key={e.id}>
-              <a className={`item-demanda item-cia ${atrasado ? 'borda-atrasado' : `borda-enc-${e.status}`}`} href={`#/enc/${e.id}`}>
-                <span className="item-topo">
-                  <strong className="item-num">{numeroExibido(e)}</strong>
-                  <span className={`selo ${atrasado ? 'selo-atrasado' : `enc-${e.status}`}`}>
-                    {atrasado ? 'Atrasado' : ROTULO_ENC[e.status]}
-                  </span>
-                </span>
-                <span className="item-saida">{e.saida}</span>
-                <span className="item-info">
-                  <span className="item-cat">{e.categoria}</span>
-                  <span className="item-prazo">
-                    {missaoDe(p.missoesCgp, e.unidadeId, 'enc', e.id) ? '✅ CGP · ' : ''}
-                    {e.prazoCia ? `Prazo ${formatarData(e.prazoCia)}` : ''}
-                  </span>
-                </span>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
+      {SECOES.map((secao) => {
+        const visiveis = p.lista.filter((e) => abaDoEncaminhamento(e.status) === secao.id);
+        // Efetivo e EAP também seguem a seção: sem resposta em Pendentes, respondidos em Respondidas.
+        const solicitacoes = p.solicitacoes.filter((s) => abaDoPedido(s.status === 'respondida') === secao.id);
+        const eaps = p.eaps.filter((r) => abaDoPedido(r.status === 'enviada') === secao.id);
+        return (
+          <div key={secao.id} className="secao-demandas" id={`secao-${secao.id}`}>
+            <h3 className="titulo-aba-cia">
+              {secao.rotulo} ({visiveis.length})
+            </h3>
+            <EapsDaCia lista={eaps} />
+            <SolicitacoesEfetivo lista={solicitacoes} />
+            {!p.carregando && !p.erro && visiveis.length === 0 && <p className="vazio">Nada por aqui.</p>}
+            <ul className="lista">
+              {visiveis.map((e) => {
+                const atrasado = encAtrasado(e, hoje);
+                return (
+                  <li key={e.id}>
+                    <a className={`item-demanda item-cia ${atrasado ? 'borda-atrasado' : `borda-enc-${e.status}`}`} href={`#/enc/${e.id}`}>
+                      <span className="item-topo">
+                        <strong className="item-num">{numeroExibido(e)}</strong>
+                        <span className={`selo ${atrasado ? 'selo-atrasado' : `enc-${e.status}`}`}>
+                          {atrasado ? 'Atrasado' : ROTULO_ENC[e.status]}
+                        </span>
+                      </span>
+                      <span className="item-saida">{e.saida}</span>
+                      <span className="item-info">
+                        <span className="item-cat">{e.categoria}</span>
+                        <span className="item-prazo">
+                          {missaoDe(p.missoesCgp, e.unidadeId, 'enc', e.id) ? '✅ CGP · ' : ''}
+                          {e.prazoCia ? `Prazo ${formatarData(e.prazoCia)}` : ''}
+                        </span>
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
     </section>
   );
 }

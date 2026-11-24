@@ -8,7 +8,7 @@ test.afterEach(async ({ page }, info) => {
 });
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { entrar, irPara, irParaAbaCia, sair, sobraLateral } from './ajuda';
+import { entrar, irPara, sair, sobraLateral } from './ajuda';
 import { demandaVazia } from '../src/domain/demanda';
 import { SENHA_TESTE } from './dados';
 
@@ -173,9 +173,7 @@ test('tela da Cia: respondida com prazo vencido há um dia sai; atrasada sem res
   }
   await entrar(page, '6cia', SENHA_TESTE);
   await expect(page.getByText(`Atrasada sem resposta ${marca}`)).toBeVisible({ timeout: 15000 }); // 1ª carga depois do login
-  await irParaAbaCia(page, 'Respondidas');
-  await expect(page.getByText(`Respondida no prazo ${marca}`)).toBeVisible({ timeout: 15000 });
-  await irParaAbaCia(page, 'Finalizadas');
+  await expect(page.locator('#secao-respondidas').getByText(`Respondida no prazo ${marca}`)).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole('heading', { name: '6ª CIA' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText(`Respondida vencida ${marca}`)).toHaveCount(0);
 });

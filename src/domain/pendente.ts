@@ -126,7 +126,7 @@ export function numeroOrigemDoEmail(p: Pick<Pendente, 'texto' | 'remetente'>): s
   return numeroMensagemCpa(p.texto) || (p.remetente ?? '').trim();
 }
 
-/** "Dar destino": a demanda nova já vem com a entrada preenchida a partir da pendente. */
+/** "Criar demanda": a demanda nova já vem com a entrada preenchida a partir da pendente. */
 export function demandaDaPendente(p: Pendente, base: DadosDemanda): DadosDemanda {
   const numeroOrigem =
     p.tipo === 'sei' ? (p.numeroSei ?? '') : p.tipo === 'email' ? numeroOrigemDoEmail(p) || base.numeroOrigem : base.numeroOrigem;

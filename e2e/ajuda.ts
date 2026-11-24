@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Entrada antiga (conta da unidade). */
-export async function entrar(page: Page, unidade: string, senha: string) {
+export async function entrar(page: Page, unidade: string, senha: string, opcoes: { naTelaInicial?: boolean } = {}) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Entrar', exact: true }).waitFor();
   const antiga = page.getByRole('button', { name: 'Entrar com a conta da unidade (antiga)' });
@@ -9,6 +9,18 @@ export async function entrar(page: Page, unidade: string, senha: string) {
   await page.getByLabel('Unidade').selectOption(unidade);
   await page.getByLabel(/^Senha\s*\*?$/).fill(senha);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  if (unidade === 'p3' && !opcoes.naTelaInicial) await irParaNumeradorP3(page);
+}
+
+/**
+ * A P/3 abre no Painel → Prazos; os testes que trabalham no Numerador seguem para lá.
+ * (Com `{ naTelaInicial: true }` o teste fica na tela de abertura.)
+ */
+export async function irParaNumeradorP3(page: Page) {
+  await page.locator('#menu-p3').waitFor({ state: 'attached' });
+  await page.getByRole('heading', { name: 'Painel de prazos' }).waitFor();
+  await page.evaluate(() => (window.location.hash = '#/demandas'));
+  await page.getByRole('heading', { name: 'Numerador', level: 2 }).waitFor();
 }
 
 /** Login individual por RE. */
@@ -58,7 +70,7 @@ async function abrirEClicar(botao: Locator, link: Locator) {
 /** Vai para uma aba da Cia/Força Tática pelo menu (no celular abre o ☰ antes). */
 export async function irParaAbaCia(
   page: Page,
-  aba: 'Pendentes' | 'Respondidas' | 'Finalizadas' | 'Documentos Mensais' | 'Aperfeiçoamento' | 'RAC' | 'Agenda' | 'Numerador' | 'CGP' | 'Sala de Operações',
+  aba: 'Painel de Demandas' | 'Documentos Mensais' | 'Aperfeiçoamento' | 'RAC' | 'Agenda' | 'Numerador' | 'CGP' | 'Sala de Operações',
 ) {
   await page.locator('#menu-unidade').waitFor({ state: 'attached' });
   const botao = page.getByRole('button', { name: 'Abrir menu' });

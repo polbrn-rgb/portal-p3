@@ -93,16 +93,15 @@ test('solicitação de efetivo: P/3 pede, Cia preenche pelo RE, P/3 vê quem vai
   await page.getByLabel('Enviado por').fill('2º Sgt PM Teste');
   await page.getByRole('button', { name: 'Enviar efetivo' }).click();
   await expect(page.getByText('Efetivo enviado para a P/3')).toBeVisible();
-  // Cada aba mostra só o que é dela: respondida sai de Pendentes e vai para Respondidas.
-  const pedido3 = () => page.getByRole('region', { name: 'Solicitações de efetivo' }).getByRole('link').filter({ hasText: saida });
-  await irParaAbaCia(page, 'Pendentes');
+  // Painel de Demandas: respondida sai da seção Pendentes e vai para Respondidas.
+  const pedido3 = (secao: string) =>
+    page.locator(`#secao-${secao}`).getByRole('region', { name: 'Solicitações de efetivo' }).getByRole('link').filter({ hasText: saida });
+  await irParaAbaCia(page, 'Painel de Demandas');
   await expect(page.getByRole('heading', { name: /^Pendentes \(/ })).toBeVisible();
-  await expect(pedido3()).toHaveCount(0);
-  await irParaAbaCia(page, 'Respondidas');
-  await expect(pedido3()).toContainText('Respondida');
-  await irParaAbaCia(page, 'Finalizadas');
+  await expect(pedido3('pendentes')).toHaveCount(0);
+  await expect(pedido3('respondidas')).toContainText('Respondida');
   await expect(page.getByRole('heading', { name: /^Finalizadas \(/ })).toBeVisible();
-  await expect(pedido3()).toHaveCount(0);
+  await expect(pedido3('finalizadas')).toHaveCount(0);
   await sair(page);
 
   await entrar(page, 'p3', SENHA_TESTE);

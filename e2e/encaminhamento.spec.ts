@@ -35,8 +35,8 @@ test('demanda vai para a Cia, que responde, e a P/3 devolve e depois aceita', as
   await page.getByLabel('Respondido por').fill('Sd Teste');
   await page.getByRole('button', { name: 'Enviar resposta' }).click();
   await expect(page.getByRole('heading', { name: '3ª CIA' })).toBeVisible();
-  await irParaAbaCia(page, 'Respondidas');
-  await expect(linkDaDemanda()).toContainText('Respondido');
+  await irParaAbaCia(page, 'Painel de Demandas');
+  await expect(page.locator('#secao-respondidas').getByRole('link', { name: new RegExp(assunto) })).toContainText('Respondido');
   await sair(page);
 
   // P/3 vê a resposta e devolve
