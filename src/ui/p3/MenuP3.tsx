@@ -3,6 +3,7 @@ import { MenuLateral } from '../MenuLateral';
 export type AbaP3 = 'numerador' | 'pendentes' | 'operacoes' | 'aperfeicoamento' | 'agenda' | 'cfp' | 'sala' | 'fotos' | 'painel' | 'admin';
 
 const ITENS: { id: AbaP3; href: string; rotulo: string }[] = [
+  { id: 'painel', href: '#/painel', rotulo: 'Painel' },
   { id: 'numerador', href: '#/demandas', rotulo: 'Numerador' },
   { id: 'pendentes', href: '#/pendentes', rotulo: 'Demandas Pendentes' },
   { id: 'operacoes', href: '#/operacoes', rotulo: 'Operações' },
@@ -11,7 +12,6 @@ const ITENS: { id: AbaP3; href: string; rotulo: string }[] = [
   { id: 'cfp', href: '#/cfp', rotulo: 'CFP' },
   { id: 'sala', href: '#/sala', rotulo: 'Sala de Operações' },
   { id: 'fotos', href: '#/fotos', rotulo: 'Fotos das Cias' },
-  { id: 'painel', href: '#/painel', rotulo: 'Painel' },
   { id: 'admin', href: '#/admin', rotulo: '🔒 Administrador' },
 ];
 

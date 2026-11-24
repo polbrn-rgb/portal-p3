@@ -61,7 +61,7 @@ export function PainelPrazos() {
         <Numero rotulo="Vencem hoje" valor={painel.venceHoje} classe="n-hoje" href="#/demandas/vence_hoje" />
         <Numero rotulo="Próximos 3 dias" valor={painel.proximos3} classe="n-proximos" />
         <Numero rotulo="Cias atrasadas" valor={painel.ciasAtrasadas} classe="n-cia" href="#/demandas/cia_atrasada" />
-        <Numero rotulo="Aguardando seu aceite" valor={painel.aguardandoAceite} classe="n-aceite" href="#/demandas/respondida" />
+        <Numero rotulo="Respondidas pelas Cias · aguardando aceite da P/3" valor={painel.aguardandoAceite} classe="n-aceite" href="#/demandas/respondida" />
       </div>
 
       <div className="grade-painel">
@@ -73,7 +73,7 @@ export function PainelPrazos() {
                 <th>Cia</th>
                 <th>Pendentes</th>
                 <th>Atrasadas</th>
-                <th>Aguard. aceite</th>
+                <th>Aguard. aceite da P/3</th>
               </tr>
             </thead>
             <tbody>

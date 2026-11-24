@@ -1,8 +1,36 @@
 import { useEffect, useState } from 'react';
 
 // Navegação simples pelo "#" da URL: o botão Voltar do celular funciona sem biblioteca extra.
-export function useHash(): string {
-  const [hash, setHash] = useState(() => window.location.hash);
+// Rotas que apontam para um item específico (link compartilhado): essas abrem direto, sem passar pela tela inicial.
+const ROTA_DE_ITEM = /^#\/[\w-]+\/.+/;
+
+/** F5 (recarregar) mantém a tela em que a pessoa estava. */
+function foiRecarregada(): boolean {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    return nav?.type === 'reload';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hash atual da URL. Com `inicial`, toda vez que a página é aberta ela começa nessa tela
+ * (menos quando o link aponta para um item específico ou a página foi recarregada).
+ */
+export function useHash(inicial?: string): string {
+  const [hash, setHash] = useState(() => {
+    const atual = window.location.hash;
+    if (inicial && atual !== inicial && !ROTA_DE_ITEM.test(atual) && !foiRecarregada()) {
+      try {
+        history.replaceState(null, '', inicial);
+      } catch {
+        /* sem history: segue no hash atual */
+      }
+      return window.location.hash || inicial;
+    }
+    return atual;
+  });
   useEffect(() => {
     const aoMudar = () => setHash(window.location.hash);
     window.addEventListener('hashchange', aoMudar);

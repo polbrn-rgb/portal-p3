@@ -191,7 +191,7 @@ function CartaoPendente({ pendente: p, aoDescartar }: { pendente: Pendente; aoDe
             Descartar
           </button>
           <a className="botao destaque" href={`#/destinar/${p.id}`}>
-            Dar destino
+            Criar demanda
           </a>
         </div>
       )}

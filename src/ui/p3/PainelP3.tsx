@@ -92,7 +92,7 @@ function ComSubAbas(p: { rotulo: string; abas: SubAba[]; ativa: SubAba; operacoe
 /** Toda tela da P/3: menu (lateral no computador, ☰ no celular) e o conteúdo ao lado. */
 /** admin: 'direto' (chefe/encarregado), 'senha' (conta antiga da P/3) ou 'nao' (operador: sem a aba Administrador). */
 export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'nao' }) {
-  const hash = useHash();
+  const hash = useHash('#/painel');
   const pendentes = useAoVivo<Pendente[]>((ok, erro) => observarPendentes(db, ok, erro), []);
   const operacoes = useAoVivo<Operacao[]>((ok, erro) => observarOperacoes(db, ok, erro), []);
   // A limpeza de encaminhamentos sem demanda passou para o motor (uma vez por dia, sem depender de abrir o portal).
@@ -133,7 +133,8 @@ export function PainelP3({ admin = 'senha' }: { admin?: 'direto' | 'senha' | 'na
 function abaDaRota(hash: string): AbaP3 {
   if (/^#\/(pendentes|destinar)/.test(hash)) return 'pendentes';
   if (hash.startsWith('#/operacoes')) return 'operacoes';
-  if (hash.startsWith('#/painel')) return 'painel';
+  // Ao abrir o portal (sem rota) a P/3 cai no Painel → Prazos.
+  if (hash === '' || hash === '#' || hash === '#/' || hash.startsWith('#/painel')) return 'painel';
   if (hash.startsWith('#/admin')) return 'admin';
   if (hash.startsWith('#/cfp')) return 'cfp';
   if (hash === '#/sala') return 'sala';
@@ -163,7 +164,7 @@ function ConteudoP3({
   if (destinar) return <DestinarPendente id={destinar[1]} />;
   const editar = /^#\/demanda\/(\d+)$/.exec(hash);
   if (editar) return <EditarDemanda id={editar[1]} />;
-  if (hash.startsWith('#/painel')) {
+  if (hash === '' || hash === '#' || hash === '#/' || hash.startsWith('#/painel')) {
     const ativa = PAINEL.find((a) => a.hash === hash) ?? PAINEL[0];
     return <ComSubAbas rotulo="Painel" abas={PAINEL} ativa={ativa} operacoes={operacoes} />;
   }

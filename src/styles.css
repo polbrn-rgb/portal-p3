@@ -3823,3 +3823,16 @@ li.agenda-linha {
   flex: 1 1 140px;
   min-width: 0;
 }
+
+/* Painel de Demandas das Cias: Pendentes, Respondidas e Finalizadas na mesma tela. */
+.titulo-painel-demandas {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.secao-demandas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cor-borda, #ddd);
+}
