@@ -8,6 +8,7 @@ import {
   buscarConcluidas,
   ConflitoEdicao,
   criarDemanda,
+  criarDemandaNumerada,
   encaminhamentosDaDemanda,
   excluirDemanda,
   obterDemanda,
@@ -61,6 +62,15 @@ describe('criarDemanda', () => {
   test('cadastros ao mesmo tempo nunca repetem número', async () => {
     const numeros = await Promise.all(Array.from({ length: 5 }, (_, i) => criarDemanda(db, dados(`D${i}`))));
     expect([...numeros].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test('vários aparelhos ao mesmo tempo, com o contador já em uso: todos salvam e nenhum número repete', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore() as unknown as Firestore, 'contadores/demandas'), { ultimo: 2150 }));
+    const aparelho = (i: number) => env.authenticatedContext(`p3-aparelho-${i}`, { perfil: 'p3' }).firestore() as unknown as Firestore;
+    const r = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+      criarDemandaNumerada(aparelho(i), { ...dados(`D${i}`), dataEntrada: '2027-01-10', tipoSaida: 'OFÍCIO' })));
+    expect(r.map((x) => x.numero).sort((a, b) => a - b)).toEqual(Array.from({ length: 8 }, (_, i) => 2151 + i));
+    expect(new Set(r.map((x) => x.numeroDocumento)).size).toBe(8);
   });
 });
 

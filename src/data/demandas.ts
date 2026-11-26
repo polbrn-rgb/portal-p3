@@ -1,3 +1,4 @@
+import { repetirSeConcorrencia } from './concorrencia';
 import {
   arrayRemove,
   collection,
@@ -67,7 +68,7 @@ export async function criarDemandaNumerada(
   dados: DadosDemanda,
   pendenteId?: string,
 ): Promise<{ numero: number; numeroDocumento?: string }> {
-  return runTransaction(db, async (tx) => {
+  return repetirSeConcorrencia(() => runTransaction(db, async (tx) => {
     const refContador = doc(db, 'contadores', ID_CONTADOR_GERAL);
     const contador = await tx.get(refContador);
     const porTipo = usaNumeracaoPorTipo(dados.dataEntrada) && dados.tipoSaida !== '';
@@ -120,7 +121,7 @@ export async function criarDemandaNumerada(
       });
     }
     return { numero, numeroDocumento };
-  }, { maxAttempts: 10 });
+  }, { maxAttempts: 10 }));
 }
 
 export async function encaminhamentosDaDemanda(db: Firestore, demandaId: string): Promise<Encaminhamento[]> {

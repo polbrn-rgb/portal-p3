@@ -105,4 +105,10 @@ describe('numerador das Cias', () => {
     const antiga = await ler(cia2, 'antiga');
     await assertSucceeds(alterarStatusDemandaCia(cia2, antiga, 'concluida', '2ª CIA'));
   });
+
+  test('vários celulares da mesma Cia numerando ao mesmo tempo: todos salvam, sem repetir', async () => {
+    const r = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+      criarDemandaCia(como(`cia1-cel-${i}`, { perfil: 'unidade', unidade: '1cia' }), '1cia', dados(), '1ª CIA')));
+    expect(new Set(r.map((x) => x.numeroDocumento)).size).toBe(8);
+  });
 });
