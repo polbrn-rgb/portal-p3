@@ -1,3 +1,4 @@
+import { repetirSeConcorrencia } from './concorrencia';
 import {
   collection,
   deleteDoc,
@@ -81,7 +82,7 @@ export async function criarDemandaCia(
   erroDeValidacao(bruto);
   const dados = normalizarDemandaCia(bruto);
   const ano = anoDe(dados.dataEntrada);
-  return runTransaction(
+  return repetirSeConcorrencia(() => runTransaction(
     db,
     async (tx) => {
       const refContador = doc(db, COLECAO_CONTADORES_CIA, idContadorCia(unidade, ano, dados.tipoSaida));
@@ -109,7 +110,7 @@ export async function criarDemandaCia(
       return { id, numeroDocumento };
     },
     { maxAttempts: 10 },
-  );
+  ));
 }
 
 /** Edita os dados (o número e o tipo de saída não mudam) e acerta o evento da agenda. */
